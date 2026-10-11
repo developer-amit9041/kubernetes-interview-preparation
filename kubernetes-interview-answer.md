@@ -14335,3 +14335,137 @@ kubectl get pods
 **Interview Answer:** Host-based routing routes incoming requests to different Kubernetes Services based on the requested hostname. For example, `app.example.com` can route to the React frontend while `api.example.com` routes to the Express backend.
 
 **Remember:** Host-based routing uses the domain; path-based routing uses the URL path.
+
+---
+
+# 110. What Is the Difference Between LoadBalancer and Ingress?
+
+## 1. English Definition
+
+A Kubernetes `LoadBalancer` Service exposes a specific Service externally through a cloud or supported load balancer, while an `Ingress` defines Layer 7 HTTP/HTTPS routing rules that an Ingress Controller uses to direct traffic to multiple Services.
+
+## 2. Hindi Definition
+
+`LoadBalancer` Service application ki ek Service ko external access dene ke liye load balancer provision kar sakti hai. `Ingress` HTTP/HTTPS requests ko domain ya URL path ke basis par different Services tak route karne ke rules define karta hai. Ingress rules ko implement karne ke liye Ingress Controller chahiye.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application mein React frontend aur Node.js/Express backend hai.
+
+**LoadBalancer Service:**
+- Kisi specific Service ko external IP ya hostname ke through expose kar sakta hai.
+- Agar frontend aur backend ke liye alag-alag LoadBalancer Services banate ho, to cloud environment mein generally har Service ke liye alag external load balancer provision ho sakta hai.
+- Ye setup simple hai, lekin multiple Services ke liye cost aur management badh sakta hai.
+
+**Ingress:**
+- Ek external entry point ke through multiple Services ko route kar sakta hai.
+- `app.example.com/` ko frontend aur `app.example.com/api` ko backend par route kar sakta hai.
+- Host/path routing aur TLS termination support kar sakta hai, depending on the Ingress Controller configuration.
+- Ingress resource ko traffic serve karne ke liye controller aur uske external entry point ki zaroorat hoti hai.
+
+## 4. Practical Example / Code
+
+### Option A: LoadBalancer Service
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-loadbalancer
+spec:
+  type: LoadBalancer
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 80
+```
+
+**Explanation:** Supported cloud/provider environment mein Kubernetes is Service ke liye external load balancer provision kar sakta hai. `selector` frontend Pods ko choose karta hai; `targetPort` container/application port hai.
+
+### Option B: Ingress
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mern-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-service
+                port:
+                  number: 5000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-service
+                port:
+                  number: 80
+```
+
+**Explanation:** NGINX Ingress Controller hostname/path rules ko implement karta hai aur requests ko specified Services tak forward karta hai. Controller installed hona chahiye aur uska external entry point reachable hona chahiye. Dono examples illustrative hain; Service names, selectors, aur ports aapke application setup se match hone chahiye.
+
+## 5. Practical Commands
+
+```bash
+# Inspect Services, including LoadBalancer external addresses
+kubectl get services
+kubectl describe service frontend-loadbalancer
+
+# Inspect Ingress and its routing rules
+kubectl get ingress
+kubectl describe ingress mern-ingress
+
+# Check Ingress classes and application Services
+kubectl get ingressclass
+kubectl get services
+```
+
+Note: `EXTERNAL-IP` pending reh sakta hai agar cluster/provider LoadBalancer provisioning support nahi karta ya configuration incomplete hai.
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+                    External Traffic
+                           |
+                +----------+----------+
+                |                     |
+                v                     v
+       LoadBalancer Service      Ingress Entry Point
+                |                     |
+                v                     v
+          One Service          Ingress Controller
+                                      |
+                                Host / Path rules
+                                  /         \\
+                                 v           v
+                       frontend-service  backend-service
+                                 |           |
+                                 v           v
+                             React app   Express API
+```
+
+## 7. Summary Table
+
+| Feature | Service type LoadBalancer | Ingress |
+|---|---|---|
+| Main purpose | Exposes a Service externally | Routes HTTP/HTTPS traffic using rules |
+| Routing | Typically forwards traffic to one Service | Can route to multiple Services by host/path |
+| Layer | Commonly Layer 4 (TCP/UDP), provider-dependent | Layer 7 (HTTP/HTTPS) |
+| Host/path rules | Not provided by the Service itself | Supported through an Ingress Controller |
+| TLS termination | Depends on external load balancer setup | Commonly supported by the Ingress Controller |
+| Extra component | Cloud/provider LoadBalancer implementation | Ingress Controller plus external entry point |
+| Common use | Direct external exposure of a Service | Multiple web apps/APIs behind one HTTP/HTTPS entry point |
+
+**Interview Answer:** A LoadBalancer Service exposes a Kubernetes Service externally, while Ingress defines HTTP/HTTPS host- and path-based routing rules for an Ingress Controller to send traffic to one or more Services.
+
+**Remember:** LoadBalancer exposes a Service; Ingress routes web traffic to Services.
