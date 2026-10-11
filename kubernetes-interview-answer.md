@@ -14222,3 +14222,116 @@ kubectl get pods
 **Interview Answer:** Path-based routing uses URL paths defined in an Ingress resource to route HTTP/HTTPS requests to different Kubernetes Services, for example `/api` to the Express backend and `/` to the React frontend.
 
 **Remember:** Same domain, different URL paths, different Services.
+
+---
+
+# 109. What Is Host-Based Routing?
+
+## 1. English Definition
+
+Host-based routing in Kubernetes Ingress routes incoming HTTP/HTTPS requests to different Kubernetes Services based on the requested hostname or domain.
+
+## 2. Hindi Definition
+
+Host-based routing mein request ke domain ya hostname ke basis par decide hota hai ki traffic kis Kubernetes Service ko bhejna hai. Jaise `app.example.com` frontend par aur `api.example.com` backend par route ho sakta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application ke do subdomains hain:
+
+- `app.example.com` → React frontend
+- `api.example.com` → Node.js/Express backend
+
+Dono requests same Ingress Controller ke through aa sakti hain, lekin Ingress rules hostname check karke request ko alag Services tak bhejte hain. Dono domain names ke DNS records ko Ingress Controller ke external entry point par point karna hoga.
+
+**Path-based vs host-based routing:**
+- Host-based: domain/hostname ke basis par routing.
+- Path-based: same hostname ke URL path ke basis par routing.
+
+## 4. Practical Example / Code
+
+Example Ingress resource:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mern-host-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-service
+                port:
+                  number: 80
+    - host: api.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-service
+                port:
+                  number: 5000
+```
+
+**Explanation:**
+- First host rule routes requests for `app.example.com` to `frontend-service`.
+- Second host rule routes requests for `api.example.com` to `backend-service`.
+- Both Services must exist in the same namespace as this Ingress, and their ports must match the actual Service configuration.
+- The Ingress Controller must be installed, and DNS records for both hosts must point to its external entry point.
+
+## 5. Practical Commands
+
+```bash
+# Apply the Ingress
+kubectl apply -f ingress.yaml
+
+# Inspect host rules and assigned address
+kubectl get ingress
+kubectl describe ingress mern-host-ingress
+
+# Check destination Services
+kubectl get services
+
+# Check application Pods
+kubectl get pods
+```
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+             User / Browser
+               /       \\
+              v         v
+      app.example.com  api.example.com
+              \\         /
+               v       v
+        NGINX Ingress Controller
+                  |
+          Host-based routing
+             /          \\
+            v            v
+    frontend-service  backend-service
+            |            |
+            v            v
+         React UI    Express API
+```
+
+## 7. Summary Table
+
+| Hostname | Destination Service | MERN component |
+|---|---|---|
+| `app.example.com` | `frontend-service:80` | React frontend |
+| `api.example.com` | `backend-service:5000` | Node.js / Express API |
+
+**Interview Answer:** Host-based routing routes incoming requests to different Kubernetes Services based on the requested hostname. For example, `app.example.com` can route to the React frontend while `api.example.com` routes to the Express backend.
+
+**Remember:** Host-based routing uses the domain; path-based routing uses the URL path.
