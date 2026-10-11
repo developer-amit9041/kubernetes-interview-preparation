@@ -1921,3 +1921,131 @@ Service aur Deployment ko same Namespace mein rakho, ya apni cross-Namespace net
 - Service port aur targetPort alag ho sakte hain.
 
 **Remember:** Deployment Pods ko manage karta hai; Service un Pods tak stable network access provide karti hai.
+
+
+---
+
+# 17. What Is a ReplicaSet in Kubernetes?
+
+## 1. English Definition
+
+A **ReplicaSet** is a Kubernetes resource that maintains a specified number of identical Pod replicas running at a given time. If a Pod fails or is deleted, the ReplicaSet attempts to create a replacement to match the desired number of replicas.
+
+## 2. Hindi Definition
+
+ReplicaSet Kubernetes ka ek resource hai jo specified number mein Pods maintain karne ki koshish karta hai. Agar koi Pod fail ya delete ho jaye, toh ReplicaSet uski jagah naya Pod create karne ki koshish karta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapka MERN project hai aur Node.js + Express backend par bahut saari API requests aati hain. Aap chahte ho ki backend ke **3 Pods** run karein, taaki application multiple instances par available rahe.
+
+ReplicaSet mein aap desired replicas `3` set karte ho:
+
+- Shuru mein 3 backend Pods run kar rahe hain.
+- Agar ek Pod delete ho jata hai, toh ReplicaSet desired count ko wapas 3 karne ke liye replacement Pod create karne ki koshish karta hai.
+- Agar aap desired replicas ko 5 kar dete ho, toh controller 5 Pods maintain karne ki koshish karta hai.
+
+**Important difference:** ReplicaSet Pods ki desired count maintain karta hai. Deployment, ReplicaSet ko manage karne ke saath rolling updates aur rollbacks bhi provide karta hai. Isliye real applications mein aam taur par directly ReplicaSet ke bajaye Deployment use karte hain.
+
+## 4. Practical Example / Code — MERN Backend
+
+File name: `backend-replicaset.yaml`
+
+```yaml
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: mern-backend-rs
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+```
+
+### Code ko samjho
+
+- `kind: ReplicaSet` — ReplicaSet resource create karta hai.
+- `replicas: 3` — 3 Pods maintain karne ki desired count.
+- `selector.matchLabels` — ReplicaSet ko identify karne mein help karta hai ki kaunse Pods uske hain.
+- `template` — Replacement Pods create karne ke liye blueprint.
+- `image` — Aapke Node.js backend ki Docker image.
+
+Image name ko apni actual published image se replace karna.
+
+## 5. Architecture Diagram
+
+```text
+                  ReplicaSet
+             (desired replicas: 3)
+                       |
+          +------------+------------+
+          |            |            |
+          v            v            v
+       Backend       Backend       Backend
+        Pod 1         Pod 2         Pod 3
+
+  If one Pod is deleted, ReplicaSet attempts
+  to create a replacement Pod.
+```
+
+ReplicaSet desired number of Pods maintain karta hai. Woh khud Service ki tarah traffic distribute nahi karta.
+
+## 6. Practical Commands / Configuration
+
+### ReplicaSet create karo
+
+```bash
+kubectl apply -f backend-replicaset.yaml
+```
+
+### ReplicaSets aur Pods dekho
+
+```bash
+kubectl get replicasets
+kubectl get pods -l app=mern-backend
+```
+
+### ReplicaSet ki details dekho
+
+```bash
+kubectl describe replicaset mern-backend-rs
+```
+
+### Desired replicas change karo
+
+```bash
+kubectl scale replicaset mern-backend-rs --replicas=5
+```
+
+### Pod deletion ka behaviour observe karo
+
+```bash
+kubectl get pods -l app=mern-backend
+kubectl delete pod <pod-name>
+kubectl get pods -l app=mern-backend
+```
+
+Pod delete karne se pehle uska actual naam `kubectl get pods` se dekho. ReplicaSet replacement Pod create karne ki koshish karega, aur Pod naya naam/IP le sakta hai.
+
+## 7. Summary Table
+
+| Feature | ReplicaSet | Deployment |
+|---|---|---|
+| Main responsibility | Desired number of Pod replicas maintain karna | ReplicaSets aur application rollout manage karna |
+| Pod template | Yes | Yes, ReplicaSet ke through use hota hai |
+| Self-healing of replica count | Yes, controller reconciliation ke through | Yes, underlying ReplicaSet ke through |
+| Rolling updates and rollbacks | Directly provide nahi karta | Supports rolling updates and rollbacks |
+| Typical use | Usually Deployment ke through indirectly | Most application workloads ke liye recommended |
+
+**Remember:** ReplicaSet desired Pod count maintain karta hai. Deployment ReplicaSets ko manage karke application updates aur rollbacks ko bhi handle karta hai.
