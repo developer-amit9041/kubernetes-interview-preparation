@@ -19163,3 +19163,128 @@ also allow it
 **Interview Answer:** Pod affinity is a Kubernetes scheduling feature that places a Pod in a topology domain—such as the same Node or zone—as existing Pods matching specified labels. It uses `labelSelector` to identify those Pods and `topologyKey` to define the topology. Required affinity enforces the rule at scheduling time, while preferred affinity treats it as a scoring preference.
 
 ---
+
+## 150. What Is Pod Anti-Affinity?
+
+### 1. English Definition
+
+**Pod anti-affinity** is a Kubernetes scheduling feature that prevents or discourages a Pod from being scheduled in a topology domain—such as the same Node or zone—as existing Pods matching specified labels. It is commonly used to spread replicas across Nodes or zones for improved availability.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+Pod anti-affinity, Pod affinity ka opposite hai. Affinity matching Pods ke paas schedule karne ko kehti hai, jabki anti-affinity matching Pods ke saath same topology mein schedule hone se rok sakti hai ya us placement ko discourage karti hai.
+
+Iske do main types hain:
+- `requiredDuringSchedulingIgnoredDuringExecution`: Matching condition schedule karte waqt satisfy karna compulsory hai.
+- `preferredDuringSchedulingIgnoredDuringExecution`: Scheduler matching Pods se alag topology ko preference deta hai, lekin zaroorat par doosri feasible placement choose kar sakta hai.
+
+### 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapke Node.js backend ke teen replicas hain. Agar teeno same worker Node par run karein aur woh Node fail ho jaye, toh saare replicas ek saath unavailable ho sakte hain.
+
+Pod anti-affinity se aap rule bana sakte hain ki `app=node-api` label wale replicas same Node par ek saath schedule na hon. Isse replicas alag Nodes par spread ho sakte hain aur single-Node failure ka impact kam ho sakta hai—provided cluster mein enough suitable Nodes hain.
+
+### 4. Practical YAML Example — Required Anti-Affinity
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: node-api
+  template:
+    metadata:
+      labels:
+        app: node-api
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: node-api
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: node-api
+          image: node:20-alpine
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+```
+
+Yeh rule kehta hai ki `app=node-api` label wale Pods ko same hostname topology domain (same Node) par ek saath schedule na kiya jaye. Is strict rule ke saath aam taur par har replica ke liye alag suitable Node chahiye. Agar sirf do suitable Nodes hain aur teen replicas chahiye, toh ek replica `Pending` reh sakta hai. Production mein container command, ports, probes aur application configuration apne workload ke hisaab se add karein.
+
+### 5. Preferred Anti-Affinity
+
+```yaml
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app: node-api
+          topologyKey: kubernetes.io/hostname
+```
+
+Yeh matching Pods ke saath same Node par placement ko discourage karta hai, lekin hard restriction nahi hai. `weight` 1 se 100 ke beech hota hai aur scoring preference ko affect karta hai.
+
+### 6. Practical Commands
+
+```bash
+# Deploy the example
+kubectl apply -f node-api-deployment.yaml
+
+# See replica placement across Nodes
+kubectl get pods -l app=node-api -o wide
+
+# Inspect scheduling events if a replica is Pending
+kubectl describe pod <pod-name>
+
+# Check available Nodes
+kubectl get nodes
+```
+
+### 7. Pod Affinity vs. Pod Anti-Affinity
+
+| Feature | Pod affinity | Pod anti-affinity |
+|---|---|---|
+| Placement intent | Place near matching Pods | Avoid matching Pods in the same topology domain |
+| Typical use | Co-locate components that benefit from proximity | Spread replicas for availability or isolation |
+| Required rule | Matching topology must satisfy the rule | Matching topology must be avoided |
+| Preferred rule | Prefer matching topology | Prefer a topology without matching Pods |
+
+### 8. Scheduling Flow
+
+```text
+Pod defines podAntiAffinity
+              |
+              v
+Find existing Pods matching labelSelector
+              |
+              v
+Evaluate topologyKey (e.g. Node hostname)
+              |
+       +------+------+
+       |             |
+       v             v
+ Matching Pod    No matching Pod
+ in topology     in topology
+       |             |
+       v             v
+Required rule    Candidate may be
+rejects that     eligible if other
+placement        constraints pass
+```
+
+### Interview Answer
+
+“Pod anti-affinity is a Kubernetes scheduling feature that prevents or discourages a Pod from sharing a topology domain, such as a Node or zone, with Pods matching specified labels. Required anti-affinity is a hard scheduling constraint; preferred anti-affinity is a soft preference. It is commonly used to spread application replicas across Nodes or zones to reduce the impact of a single failure.”
+
+---
