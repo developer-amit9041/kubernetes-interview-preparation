@@ -15808,3 +15808,101 @@ Use `kubectl diff -f` to review differences before applying. `--dry-run=server` 
 **Interview Answer:** Use `kubectl apply -f <file.yaml>` to create or update Kubernetes resources defined in a manifest. Use `kubectl diff` to review changes and `kubectl get` to verify the result.
 
 **Remember:** `-f` means file; `apply` creates or updates resources to match the manifest.
+
+---
+
+# 123. How Do You Delete Kubernetes Resources?
+
+## 1. English Definition
+
+Use `kubectl delete` to remove Kubernetes resources such as Pods, Deployments, Services, and ConfigMaps from a cluster.
+
+## 2. Hindi Definition
+
+Kubernetes cluster se Pod, Deployment, Service ya kisi doosre resource ko remove karne ke liye `kubectl delete` command use karte hain.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapne MERN application ka backend Deployment test karne ke liye banaya tha aur ab usse remove karna hai. Aap `kubectl delete deployment backend` command use kar sakte ho.
+
+**Important:** Deployment delete karne se uske managed Pods bhi normally terminate ho jaate hain. Sirf ek Pod delete karoge aur woh Deployment ke control mein hai, toh Kubernetes uski jagah naya Pod create kar sakta hai. Production resources delete karne se pehle namespace aur resource name verify karo.
+
+## 4. Practical Example / Code
+
+### Delete a Deployment
+
+```bash
+kubectl delete deployment backend
+```
+
+### Delete a Service
+
+```bash
+kubectl delete service backend-service
+```
+
+### Delete resources defined in a YAML file
+
+```bash
+kubectl delete -f deployment.yaml
+```
+
+YAML se delete karte waqt file mein defined resource identity match honi chahiye. Command resource ko cluster se remove karne ka request bhejti hai.
+
+## 5. Practical Commands
+
+```bash
+# Delete a Pod
+kubectl delete pod <pod-name>
+
+# Delete a Deployment
+kubectl delete deployment <deployment-name>
+
+# Delete a Service
+kubectl delete service <service-name>
+
+# Delete resources from a manifest
+kubectl delete -f deployment.yaml
+
+# Delete a resource in a specific namespace
+kubectl delete deployment backend -n production
+
+# Delete all Pods in the current namespace
+kubectl delete pods --all
+
+# Check resources after deletion
+kubectl get pods
+kubectl get deployments
+kubectl get services
+```
+
+Use `kubectl delete pods --all` carefully: it deletes all Pods in the current namespace, although controllers may recreate managed Pods.
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+kubectl delete deployment backend
+                |
+                v
+       Kubernetes API Server
+                |
+                v
+          Deployment deleted
+                |
+                v
+   Managed ReplicaSet / Pods removed
+```
+
+## 7. Summary Table
+
+| Command | Purpose |
+|---|---|
+| `kubectl delete pod <pod-name>` | Specific Pod delete karta hai |
+| `kubectl delete deployment <name>` | Deployment aur uske managed workload ko remove karta hai |
+| `kubectl delete service <name>` | Service delete karta hai |
+| `kubectl delete -f deployment.yaml` | Manifest mein defined resources delete karta hai |
+| `kubectl delete pods --all` | Current namespace ke sabhi Pods delete karta hai |
+
+**Interview Answer:** Use `kubectl delete <resource-type> <resource-name>` or `kubectl delete -f <file.yaml>` to remove Kubernetes resources. Verify the namespace and resource name before deleting.
+
+**Remember:** Deleting a Pod managed by a Deployment may cause Kubernetes to create a replacement Pod; deleting the Deployment removes that workload's controller as well.
