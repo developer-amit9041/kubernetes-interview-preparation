@@ -17043,3 +17043,144 @@ kubectl logs backend
 
 **Interview Answer:** When a readiness probe fails, Kubernetes marks the Pod as not ready and removes it from the ready endpoints used by its Service. The Service stops routing new traffic to that Pod until it becomes ready again. Unlike a liveness probe failure, a readiness probe failure does not restart the container.
 
+---
+
+# 133. How Do You Configure an HTTP Health Check?
+
+## 1. English Definition
+
+In Kubernetes, an HTTP health check is configured by adding an HTTP probe (`httpGet`) to a container specification. Kubernetes sends an HTTP GET request to the specified path and port and evaluates the response status to determine whether the container is healthy or ready.
+
+HTTP probes can be configured as a `livenessProbe`, `readinessProbe`, or `startupProbe`, depending on the purpose.
+
+## 2. Hindi Definition
+
+Kubernetes mein HTTP health check configure karne ke liye container ke YAML configuration mein `httpGet` use karte hain. Kubernetes application ke specified endpoint aur port par HTTP GET request bhejta hai aur response status ke basis par check karta hai ki application healthy ya ready hai ya nahi.
+
+- `livenessProbe`: Application stuck ho toh container restart karne mein help karti hai.
+- `readinessProbe`: Decide karti hai ki Pod traffic receive karne ke liye ready hai ya nahi.
+- `startupProbe`: Slow-starting application ko startup ke liye time deti hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapka Node.js Express backend port `5000` par run kar raha hai aur usmein `/health` endpoint hai. Kubernetes har 10 seconds mein is endpoint par request bhej sakta hai.
+
+Agar endpoint successful HTTP response, jaise `200 OK`, return karta hai, toh HTTP probe successful hoti hai. HTTP status code `200` se `399` tak response generally successful maana jaata hai; is range ke bahar ka response probe failure hota hai. Network error ya timeout bhi failure hota hai.
+
+Dhyan rahe: health endpoint application mein pehle se implement hona chahiye. Sirf YAML mein path likhne se endpoint automatically create nahi hota.
+
+## 4. Practical Example / Code
+
+Example Express.js endpoint:
+
+```javascript
+const express = require('express');
+const app = express();
+
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
+app.listen(5000, () => {
+  console.log('Backend running on port 5000');
+});
+```
+
+Kubernetes Pod YAML with an HTTP liveness probe:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: backend
+spec:
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:latest
+      ports:
+        - containerPort: 5000
+      livenessProbe:
+        httpGet:
+          path: /health
+          port: 5000
+          scheme: HTTP
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        timeoutSeconds: 2
+        failureThreshold: 3
+```
+
+**Configuration explanation:**
+
+- `httpGet.path`: Endpoint to check, such as `/health`.
+- `httpGet.port`: Container port where the application listens.
+- `scheme`: `HTTP` by default; use `HTTPS` if the endpoint requires HTTPS.
+- `initialDelaySeconds`: Delay before the first probe, subject to startup-probe behavior if configured.
+- `periodSeconds`: Interval between checks.
+- `timeoutSeconds`: How long Kubernetes waits for a response.
+- `failureThreshold`: Consecutive failures required before the probe is considered failed.
+
+Use the same `httpGet` structure under `readinessProbe` when checking whether a Pod should receive Service traffic, or under `startupProbe` when checking whether the application has started.
+
+## 5. Practical Commands
+
+```bash
+# Create or update the Pod from YAML
+kubectl apply -f backend-pod.yaml
+
+# Check Pod status and restart count
+kubectl get pods
+
+# Inspect probe configuration and events
+kubectl describe pod backend
+
+# Check application logs
+kubectl logs backend
+
+# Forward local port 5000 to the Pod's port 5000
+kubectl port-forward pod/backend 5000:5000
+```
+
+After port forwarding, test the endpoint from another terminal:
+
+```bash
+curl -i http://localhost:5000/health
+```
+
+Expected response: HTTP `200` with a JSON body such as `{"status":"ok"}`.
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+Kubernetes Kubelet
+        |
+        | HTTP GET /health :5000
+        v
+Node.js / Express container
+        |
+        v
+HTTP response status
+        |
+        v
+Kubernetes evaluates probe
+        |
+        +--> Liveness: restart container after threshold failures
+        +--> Readiness: remove Pod from ready Service endpoints
+        +--> Startup: determine whether application has started
+```
+
+## 7. Summary Table
+
+| Field / probe | Purpose |
+|---|---|
+| `httpGet.path` | Endpoint to request |
+| `httpGet.port` | Application port |
+| `periodSeconds` | Probe interval |
+| `timeoutSeconds` | Maximum wait for response |
+| `failureThreshold` | Consecutive failures before probe failure is acted on |
+| `livenessProbe` | Detects a stuck or unhealthy container and can trigger restart |
+| `readinessProbe` | Controls whether the Pod is considered ready for Service traffic |
+| `startupProbe` | Allows time for the application to start |
+
+**Interview Answer:** Configure an HTTP health check by defining an HTTP probe with `httpGet`, specifying the endpoint path and container port, and setting appropriate timing and failure thresholds. Kubernetes sends HTTP GET requests and uses the response to determine whether the container is alive, ready, or has started, depending on which probe is configured.
+
