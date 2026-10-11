@@ -20266,3 +20266,60 @@ kubectl top pods
 **Interview Answer:** The Vertical Pod Autoscaler recommends or adjusts the CPU and memory resource requests of containers based on observed workload usage. Unlike HPA, which changes the number of Pod replicas, VPA changes the resources allocated/requested per Pod. Depending on its update mode and cluster support, applying changes may require Pod recreation. VPA is useful for right-sizing workloads and should be configured carefully when combined with HPA.
 
 ---
+
+## 160. What Is the Difference Between HPA and VPA?
+
+### 1. English Definition
+
+**HPA (Horizontal Pod Autoscaler)** adjusts the number of Pod replicas based on metrics such as CPU, memory, or custom metrics. **VPA (Vertical Pod Autoscaler)** recommends or adjusts CPU and memory resource requests for containers based on observed usage and its configuration.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+HPA aur VPA dono autoscaling ke liye use hote hain, lekin dono alag cheezein change karte hain:
+
+- **HPA:** Pods ki quantity badhata ya ghatata hai.
+- **VPA:** Har Pod ke container ke CPU aur memory resource requests recommend ya adjust karta hai.
+
+Simple yaad rakhne ka tarika: **HPA = more or fewer Pods; VPA = more or fewer resources requested per Pod.**
+
+### 3. MERN Stack Example
+
+Maan lo Node.js API Deployment par traffic badh raha hai.
+
+- HPA: 2 replicas se 4 replicas tak scale kar sakta hai, agar configured metrics target aur policies scaling ko support karein.
+- VPA: Har Node.js container ki CPU/memory request ko observed usage ke mutabik adjust ya recommend kar sakta hai; changes apply karne par configured mode ke hisaab se Pod recreation bhi ho sakti hai.
+
+HPA zyada requests handle karne ke liye additional Pods la sakta hai. VPA existing workload ke per-Pod resource sizing ko improve karta hai. Dono ka behavior metrics, policies, resource capacity aur configuration par depend karta hai.
+
+### 4. Side-by-Side Comparison
+
+| Feature | HPA | VPA |
+|---|---|---|
+| Full form | Horizontal Pod Autoscaler | Vertical Pod Autoscaler |
+| Changes | Number of Pod replicas | Per-container CPU/memory requests; controlled fields configuration par depend karte hain |
+| Scaling type | Horizontal | Vertical |
+| Main goal | Changing load ke saath replicas scale karna | Workload ke resources ko right-size karna |
+| Common signals | CPU, memory, custom/external metrics | Observed resource usage and recommendations |
+| Pod recreation | Replica count badhne/ghatne par Pods create/remove hote hain; existing Pods ko sirf replica count change ke liye usually recreate nahi karna padta | Update mode aur support ke hisaab se Pod recreation ho sakti hai |
+| Example | 2 Pods → 4 Pods | `128Mi` memory request → `256Mi` request (illustrative) |
+
+### 5. Can We Use HPA and VPA Together?
+
+Haan, kuch configurations mein dono use kar sakte hain, lekin metrics interaction ko carefully plan karna zaroori hai. Agar HPA CPU utilization ke basis par scale karta hai aur VPA CPU requests change karta hai, toh HPA ka utilization percentage bhi change ho sakta hai. Isliye overlapping resource metrics par dono controllers ko configure karte waqt official compatibility guidance aur workload behavior verify karo.
+
+A common approach is to use HPA for replica scaling and VPA recommendations (`updateMode: "Off"`) to review suitable resource requests, especially when first introducing VPA. Whether automatic updates are appropriate depends on workload availability and operational requirements.
+
+### 6. Quick Decision Guide
+
+| Situation | Typical choice |
+|---|---|
+| Request volume rises and more replicas are needed | HPA |
+| Each container's CPU/memory request seems too high or low | VPA |
+| Need both replica scaling and resource right-sizing | HPA + carefully configured VPA |
+| Need more worker Nodes for pending Pods | Cluster Autoscaler or provider node autoscaling, not HPA/VPA alone |
+
+### 7. Interview-Ready Answer
+
+"HPA and VPA solve different autoscaling problems. HPA changes the number of Pod replicas based on observed metrics, helping an application scale horizontally as demand changes. VPA recommends or adjusts the CPU and memory resource requests for containers, helping right-size each Pod vertically. For example, HPA may scale a Node.js API from two Pods to four, while VPA may recommend increasing each Pod's memory request. They can be used together with care, particularly when HPA uses CPU utilization and VPA changes CPU requests."
+
+---
