@@ -4995,3 +4995,105 @@ kubectl logs mern-backend-sidecar -c log-sidecar
 | MERN example | Node.js backend plus a log-collector sidecar |
 
 **Remember:** Main container runs the application; sidecar provides supporting functionality. They are placed in one Pod when they need to share Pod-level resources or lifecycle.
+
+---
+
+# 40. What Is the Pod Lifecycle?
+
+## 1. English Definition
+
+The **Pod lifecycle** describes the different phases a Kubernetes Pod goes through, from creation until it terminates. Kubernetes tracks the Pod's phase and container states to determine whether the Pod is waiting to run, running, or has finished or failed.
+
+The five main Pod phases are `Pending`, `Running`, `Succeeded`, `Failed`, and `Unknown`.
+
+## 2. Hindi Definition
+
+Pod lifecycle ka matlab hai Kubernetes mein Pod ke create hone se lekar terminate hone tak ke different stages. Kubernetes in stages ko track karta hai taaki pata chale ki Pod abhi start ho raha hai, run kar raha hai, ya complete/fail ho chuka hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumne Kubernetes mein Node.js backend ka Pod create kiya.
+
+- **Pending:** Pod accept ho gaya hai, lekin containers abhi setup/start nahi hue. Scheduler ka wait, image download, ya storage setup is phase mein ho sakta hai.
+- **Running:** Pod kisi Node par assign ho chuka hai aur kam se kam ek container start ho chuka hai ya start ho raha hai. Iska matlab zaroori nahi ki application Ready bhi ho.
+- **Succeeded:** Pod ke sabhi containers successfully terminate ho gaye. Yeh Jobs jaise tasks mein common hai.
+- **Failed:** Pod ke sabhi containers terminate ho gaye aur kam se kam ek container failure ke saath exit hua.
+- **Unknown:** Kubernetes ko Pod ki state determine karne ke liye sufficient information nahi mil rahi, aksar Node se communication problem ke karan.
+
+**Important:** `CrashLoopBackOff` ek Pod phase nahi hai. Yeh container status ka waiting reason hai, jab container baar-baar crash hone ke baad restart attempts ke beech wait kar raha hota hai.
+
+## 4. Practical Example / Code — MERN Backend Pod
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mern-backend-lifecycle
+spec:
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:1.0
+      ports:
+        - containerPort: 5000
+```
+
+Save this as `backend-pod.yaml`. Use an image that exists in your registry and ensure the application listens on port 5000.
+
+## 5. Architecture Diagram
+
+```text
+          Pod created
+               |
+               v
+            Pending
+               |
+               v
+            Running
+            /      \
+           /        \
+    completes      fails
+        |             |
+        v             v
+    Succeeded       Failed
+
+    Unknown can appear when Kubernetes cannot determine the Pod state.
+```
+
+This is a simplified view, not a guarantee that every Pod follows a straight line through all phases. Pods can be deleted, and controllers such as Deployments can create replacement Pods.
+
+## 6. Practical Commands / Configuration
+
+Create the Pod and inspect its phase:
+
+```bash
+kubectl apply -f backend-pod.yaml
+kubectl get pod mern-backend-lifecycle
+kubectl get pod mern-backend-lifecycle -o wide
+```
+
+Inspect events, conditions, and container states:
+
+```bash
+kubectl describe pod mern-backend-lifecycle
+kubectl get events --sort-by=.metadata.creationTimestamp
+kubectl logs mern-backend-lifecycle -c backend
+```
+
+To see the Pod phase directly:
+
+```bash
+kubectl get pod mern-backend-lifecycle -o jsonpath='{.status.phase}'
+```
+
+## 7. Summary Table
+
+| Pod phase | Meaning |
+|---|---|
+| `Pending` | Accepted, but setup or container startup is not complete |
+| `Running` | Assigned to a Node and at least one container has started or is starting |
+| `Succeeded` | All containers terminated successfully |
+| `Failed` | All containers terminated and at least one failed |
+| `Unknown` | Kubernetes cannot determine the Pod state |
+| `CrashLoopBackOff` | A container waiting reason, not a Pod phase |
+
+**Remember:** Pod phase describes the Pod's broad lifecycle state. Container states and readiness probes provide more detail about whether the application is actually ready to serve traffic.
