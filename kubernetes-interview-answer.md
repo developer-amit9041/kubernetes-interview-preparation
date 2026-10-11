@@ -1263,3 +1263,104 @@ Managed Kubernetes services mein Control Plane provider manage kar sakta hai, is
 | Controller Manager | Desired state reconcile karne ke liye controllers run karta hai |
 
 **Remember:** Control Plane cluster ka management brain hai; Worker Nodes application Pods run karte hain. “Master Node” older/common terminology hai, jabki modern Kubernetes terminology mein “Control Plane” preferred hai.
+
+
+---
+
+# 11. What Is a Worker Node?
+
+## 1. English Definition
+
+A **Worker Node** is a physical or virtual machine in a Kubernetes cluster where application workloads run inside Pods. It provides computing resources and components such as Kubelet and a container runtime to run and manage those workloads.
+
+## 2. Hindi Definition
+
+Worker Node Kubernetes cluster ki physical ya virtual machine hoti hai, jahan application ke Pods run hote hain. Ye CPU, memory, networking aur containers chalane ke liye zaroori components provide karti hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application mein:
+
+- React — Frontend
+- Node.js + Express — Backend
+- MongoDB — Database
+
+Aapke Kubernetes cluster mein 2 Worker Nodes hain:
+
+- **Worker Node 1:** Node.js backend ke 2 Pods run karta hai.
+- **Worker Node 2:** React frontend ka 1 Pod aur backend ka 1 Pod run karta hai.
+
+Worker Node ka main kaam application workloads ko run karna hai. Control Plane cluster ko manage karta hai aur Scheduler decide karta hai ki naya Pod kis suitable Worker Node par run ho sakta hai.
+
+## 4. Worker Node Architecture
+
+```text
+            Kubernetes Control Plane
+        (API Server, Scheduler, Controllers)
+                       |
+              schedules Pods
+                       |
+             +---------+---------+
+             |                   |
+             v                   v
+      +--------------+    +--------------+
+      | Worker Node 1|    | Worker Node 2|
+      | Kubelet      |    | Kubelet      |
+      | Runtime      |    | Runtime      |
+      | Backend Pod  |    | React Pod    |
+      | Backend Pod  |    | Backend Pod  |
+      +--------------+    +--------------+
+```
+
+Ye conceptual diagram hai. Actual Pod placement available CPU/memory, scheduling rules, taints, affinity aur cluster configuration par depend karti hai.
+
+## 5. Worker Node ke Main Components
+
+| Component | Kaam |
+|---|---|
+| Kubelet | Node par assigned Pods ki state manage karne mein help karta hai |
+| Container Runtime | Containers ko run karta hai, jaise `containerd` |
+| Kube-proxy | Common setups mein Service networking rules manage karta hai; kuch clusters alternatives use karte hain |
+| CPU and Memory | Application Pods ko compute resources dete hain |
+| Networking | Pods aur cluster services ke communication mein help karti hai |
+
+## 6. Practical Commands
+
+### 1. Worker Nodes list karo
+
+```bash
+kubectl get nodes
+```
+
+### 2. Node ki detailed information dekho
+
+```bash
+kubectl describe node <node-name>
+```
+
+### 3. Pods kis node par run ho rahe hain?
+
+```bash
+kubectl get pods -o wide
+```
+
+Output mein `NODE` column batata hai ki Pod kis node par scheduled hai.
+
+### 4. Node resource usage dekho
+
+```bash
+kubectl top nodes
+```
+
+Is command ke liye Metrics Server ya compatible metrics provider configured hona chahiye.
+
+## 7. Worker Node vs Control Plane
+
+| Worker Node | Control Plane |
+|---|---|
+| Application workloads run karta hai | Cluster ko manage aur coordinate karta hai |
+| Pods host karta hai | Pods ki scheduling aur desired state manage karne mein help karta hai |
+| Kubelet aur container runtime jaise components hote hain | API Server, Scheduler, Controller Manager aur etcd jaise components hote hain |
+| CPU/memory se application workloads execute hoti hain | Cluster-level decisions aur state management handle karta hai |
+
+**Remember:** Control Plane cluster ko manage karta hai, jabki Worker Node application Pods ko run karta hai. Production clusters mein Control Plane aur Worker Nodes ka exact arrangement setup ke according vary kar sakta hai.
