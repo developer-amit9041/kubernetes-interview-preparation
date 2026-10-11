@@ -6225,3 +6225,128 @@ Deleting it removes that Pod, and Kubernetes will not recreate it unless a contr
 | Persistent volume data | May survive, depending on storage and volume configuration |
 
 **Remember:** Deleting a Pod managed by a controller usually causes a replacement to be created. Deleting a standalone Pod does not. Kubernetes controllers work to reconcile the actual state with the desired state.
+---
+
+# 51. What Is a Deployment?
+
+## 1. English Definition
+
+**A Deployment is a Kubernetes resource that manages application Pods through ReplicaSets and helps maintain the desired number of replicas.** It also supports rolling updates and rollbacks when you update your application.
+
+## 2. Hindi Definition
+
+Kubernetes mein **Deployment ek resource hai jo application ke Pods ko manage karta hai**. Hum Deployment mein specify karte hain ki humein kitne Pods chahiye, kaunsi container image use karni hai, aur application ko kaise update karna hai.
+
+Agar koi managed Pod fail ya delete ho jata hai, toh Deployment ka controller desired number of replicas maintain karne ke liye replacement create karwata hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application ka Node.js backend Kubernetes par chalana hai. Agar tumhe backend ke 3 instances chahiye, toh manually 3 Pods create karne ke bajaye Deployment mein `replicas: 3` set kar sakte ho.
+
+Deployment ka flow:
+
+1. Tum Deployment YAML apply karte ho.
+2. Deployment ek ReplicaSet manage karta hai.
+3. ReplicaSet required number of Pods create karwata hai.
+4. Agar ek Pod delete ho jaye, toh ReplicaSet replacement Pod create karne ki koshish karta hai.
+5. Jab tum Docker image ka version update karte ho, toh Deployment rolling update perform kar sakta hai.
+
+**Simple difference:** Deployment application rollout ko manage karta hai, ReplicaSet desired Pod count maintain karta hai, aur Pod tumhara container run karta hai.
+
+## 4. Practical Example / Code
+
+Example Deployment for a Node.js backend:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+```
+
+Here, `replicas: 3` declares the desired number of Pods. The selector must match the labels in the Pod template.
+
+## 5. Architecture Diagram
+
+```text
+        Deployment
+             |
+             v
+        ReplicaSet
+             |
+       +-----+-----+
+       |     |     |
+       v     v     v
+     Pod 1  Pod 2  Pod 3
+       |     |     |
+       +-----+-----+
+        Node.js backend
+```
+
+## 6. Practical Commands / Configuration
+
+**Create or update the Deployment from YAML:**
+
+```bash
+kubectl apply -f backend-deployment.yaml
+```
+
+**List Deployments:**
+
+```bash
+kubectl get deployments
+```
+
+**Inspect the Deployment and its events:**
+
+```bash
+kubectl describe deployment mern-backend
+```
+
+**Check its ReplicaSets and Pods:**
+
+```bash
+kubectl get replicasets
+kubectl get pods
+```
+
+**Update the container image:**
+
+```bash
+kubectl set image deployment/mern-backend backend=your-dockerhub-username/mern-backend:2.0
+kubectl rollout status deployment/mern-backend
+```
+
+**Roll back to the previous rollout when appropriate:**
+
+```bash
+kubectl rollout undo deployment/mern-backend
+```
+
+## 7. Summary Table
+
+| Resource / Feature | Purpose |
+|---|---|
+| Deployment | Manages ReplicaSets and application rollouts |
+| ReplicaSet | Works to maintain the desired number of matching Pods |
+| Pod | Runs one or more containers |
+| `replicas: 3` | Declares that three Pods are desired |
+| Rolling update | Gradually replaces old Pods with updated ones according to rollout settings |
+| Rollback | Reverts to a previous Deployment revision when available |
+
+**Remember:** Deployment → ReplicaSet → Pods. Use a Deployment for most stateless applications because it helps maintain replicas and manage application updates.
