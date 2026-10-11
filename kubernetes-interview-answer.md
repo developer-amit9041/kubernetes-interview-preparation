@@ -9222,3 +9222,178 @@ If the application cannot connect, check the external DNS name, network routes/f
 | MERN use case | Giving an external database or API a cluster Service alias |
 
 **Remember:** ExternalName creates a DNS alias from a Kubernetes Service name to an external hostname. It does not route or proxy traffic to Pods and does not guarantee connectivity to the external destination.
+---
+
+# 74. What Is the Difference Between ClusterIP and NodePort?
+
+## 1. English Definition
+
+**ClusterIP:** ClusterIP is the default Kubernetes Service type that exposes an application on an internal IP address accessible from within the Kubernetes cluster.
+
+**NodePort:** NodePort is a Kubernetes Service type that exposes an application on a port on each Kubernetes node, allowing clients to access the application using a node's IP address and that port.
+
+## 2. Hindi Definition
+
+- **ClusterIP:** Application ko Kubernetes cluster ke andar access karne ke liye use hota hai. Normally, cluster ke bahar se directly access nahi kar sakte.
+- **NodePort:** Application ko Kubernetes ke har node ke IP address aur ek specific port ke through access kar sakte hain, agar network access aur firewall rules allow karte hain.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application Kubernetes par deployed hai: React frontend, Node.js backend jo port `5000` par run karta hai, aur MongoDB database.
+
+### A. ClusterIP — Internal communication
+
+Maan lo backend Service ka naam `backend-service` hai. Cluster ke andar koi Pod backend Service ko internal network par access kar sakta hai.
+
+```text
+React Pod
+    |
+    | Internal request
+    v
+ClusterIP Service
+    |
+    v
+Node.js Backend Pods
+```
+
+Example URL:
+
+```text
+http://backend-service:5000
+```
+
+Ye example tab kaam karega jab Service ka port `5000` ho aur caller us Service name ko resolve kar sake, jaise same namespace mein.
+
+### B. NodePort — Node IP se access
+
+Backend ko node ke IP aur port `30080` se access karne ke liye NodePort Service use ki ja sakti hai.
+
+```text
+Browser / External Client
+          |
+          | http://<NODE-IP>:30080
+          v
+      Kubernetes Node
+          |
+          v
+     NodePort Service
+          |
+          v
+    Node.js Backend Pods
+```
+
+Example URL:
+
+```text
+http://192.168.1.10:30080
+```
+
+Ye tabhi accessible hoga jab `192.168.1.10` actual reachable node IP ho aur network/firewall rules port `30080` ko allow karte hon.
+
+## 4. Practical Example / Code
+
+### ClusterIP Service
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+spec:
+  type: ClusterIP
+  selector:
+    app: mern-backend
+  ports:
+    - port: 5000
+      targetPort: 5000
+```
+
+### NodePort Service
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-nodeport
+spec:
+  type: NodePort
+  selector:
+    app: mern-backend
+  ports:
+    - port: 5000
+      targetPort: 5000
+      nodePort: 30080
+```
+
+`selector: app: mern-backend` matching Pods ko select karta hai. `port` Service ka port hai, `targetPort` container/application port hai, aur `nodePort` node par expose hone wala port hai. `30080` default NodePort range `30000–32767` ke andar hai.
+
+## 5. Architecture Diagram
+
+```text
+ClusterIP:
+  Pod inside cluster
+         |
+         v
+  ClusterIP Service
+         |
+         v
+  Backend Pods
+
+NodePort:
+  External client
+         |
+         v
+  Node IP : 30080
+         |
+         v
+  NodePort Service
+         |
+         v
+  Backend Pods
+```
+
+NodePort Services also have a cluster-internal Service IP. NodePort is often useful for testing or particular network setups; for many production applications, a LoadBalancer Service or Ingress/Gateway is a more suitable external entry point.
+
+## 6. Practical Commands / Configuration
+
+Apply either manifest:
+
+```bash
+kubectl apply -f backend-clusterip-service.yaml
+kubectl apply -f backend-nodeport-service.yaml
+```
+
+Inspect Services:
+
+```bash
+kubectl get services
+kubectl describe service backend-service
+kubectl describe service backend-nodeport
+```
+
+Check matching Pods:
+
+```bash
+kubectl get pods -l app=mern-backend
+```
+
+To test NodePort, use a reachable node IP and the configured NodePort:
+
+```text
+http://<NODE-IP>:30080
+```
+
+Make sure node networking and firewall/security rules permit the connection. ClusterIP is generally tested from within the cluster, for example by sending a request from another Pod.
+
+## 7. Summary Table
+
+| Feature | ClusterIP | NodePort |
+|---|---|---|
+| Main purpose | Internal cluster communication | Access through a node IP and port |
+| Default Service type | Yes | No |
+| Cluster-internal access | Yes | Yes |
+| Node IP and dedicated port access | No | Yes |
+| External access | Not directly by default | Possible if network rules allow it |
+| Typical use | Backend-to-backend communication | Testing or specific external access setups |
+
+**Remember:** ClusterIP is primarily for internal access; NodePort additionally exposes the Service through a port on each node. NodePort does not automatically guarantee internet access.
