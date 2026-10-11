@@ -28705,4 +28705,191 @@ If image pulling fails, inspect Pod events and verify image name/tag, registry c
 ### Interview-ready answer
 “`imagePullPolicy` determines when Kubernetes' container runtime attempts to pull an image. `IfNotPresent` uses a local image if available and otherwise pulls it; `Always` resolves the image reference against the registry when a container launches, while cached layers may be reused; and `Never` only uses a local image and fails if it is absent. Kubernetes defaults to `Always` for `latest` or an untagged image, and generally to `IfNotPresent` for an explicit non-`latest` tag or digest. For predictable production deployments, I prefer immutable image versions or digests.”
 
+## 208. How does Kubernetes restart a container?
+
+### 1. English Definition
+
+Kubernetes restarts a container when its process exits or when a configured liveness probe repeatedly fails. The kubelet on the worker node manages container restarts according to the Pod's `restartPolicy`. For workloads managed by a Deployment, the restart policy is normally `Always`.
+
+### 2. Hindi Definition — Easy Language
+
+Bhai, maan lo humne Kubernetes par apni MERN application deploy ki hai aur Node.js backend ka container crash ho gaya. Kubernetes ka **kubelet** container ki state ko monitor karta hai. Agar container crash ho jaye ya uska liveness probe baar-baar fail ho, toh configured rules ke according container restart kiya ja sakta hai.
+
+**Important:** container restart hona aur Pod recreate hona alag cheezein hain. Container restart hone par aam taur par wahi Pod rehta hai, lekin uske container ka process dobara start hota hai.
+
+### 3. Container restart kaise hota hai?
+
+```text
+Node.js container running
+          |
+          v
+Process exits / liveness probe repeatedly fails
+          |
+          v
+Kubelet detects the container failure
+          |
+          v
+Container is stopped and restarted (per restartPolicy)
+          |
+          v
+Application process starts again
+```
+
+Kubernetes restart karne ke do common examples:
+
+1. **Application crash:** Node.js process error ke kaaran exit ho gaya.
+2. **Liveness probe failure:** Application health check baar-baar fail hua, toh kubelet container ko terminate karke restart kar sakta hai.
+
+Readiness probe fail hone par container restart nahi hota. Readiness probe sirf Pod ko Service traffic ke liye unready mark karta hai.
+
+### 4. `restartPolicy` kya hoti hai?
+
+Pod specification mein `restartPolicy` decide karti hai ki container exit hone par Kubernetes kya karega.
+
+| Policy | Behaviour | Typical use |
+|---|---|---|
+| `Always` | Container exit ho toh restart karne ki koshish karta hai, chahe exit code zero hi kyon na ho | Deployments, StatefulSets, DaemonSets |
+| `OnFailure` | Non-zero exit code par restart karta hai | Jobs |
+| `Never` | Container ko automatically restart nahi karta | One-off debugging or specific workloads |
+
+Deployment ke Pod template mein `restartPolicy: Always` hi use hota hai. Deployment/StatefulSet jaise workload controllers ke liye doosri policies valid replacement nahi hain.
+
+### 5. Example: Node.js backend Deployment
+
+File: `backend-deployment.yaml`
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      restartPolicy: Always
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:v1
+          ports:
+            - containerPort: 5000
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+```
+
+**Is example mein kya hoga?**
+
+1. Deployment do backend Pod replicas maintain karega.
+2. Kubelet har container ke liveness endpoint `/health/live` ko check karega.
+3. Agar teen consecutive checks fail hote hain, kubelet container ko unhealthy maan kar restart karega.
+4. Container restart hone ke dauran us Pod par requests temporarily fail ho sakti hain; Service healthy/ready endpoints ko hi traffic dene ke liye use hoti hai.
+5. Agar poora Pod delete ho jaye ya node fail ho, Deployment controller desired replica count maintain karne ke liye replacement Pod banwa sakta hai.
+
+`/health/live` endpoint ko Express application mein implement karna hoga. Example:
+
+```javascript
+app.get("/health/live", (req, res) => {
+  res.status(200).json({ status: "alive" });
+});
+```
+
+Yeh basic liveness endpoint process ke response dene ko check karta hai. Ismein MongoDB connectivity check ko blindly include mat karo; database temporarily unavailable hone par application ko baar-baar restart karna recovery ko aur mushkil bana sakta hai.
+
+### 6. Apply aur inspect karne ke commands
+
+Manifest apply karo:
+
+```bash
+kubectl apply -f backend-deployment.yaml
+```
+
+Pods dekho:
+
+```bash
+kubectl get pods
+```
+
+Restart count check karo:
+
+```bash
+kubectl get pods
+kubectl get pod <pod-name> -o jsonpath='{.status.containerStatuses[*].restartCount}'
+```
+
+Detailed events aur probe failures dekho:
+
+```bash
+kubectl describe pod <pod-name>
+```
+
+Current container logs:
+
+```bash
+kubectl logs <pod-name> -c backend
+```
+
+Pichhle crashed container ke logs:
+
+```bash
+kubectl logs <pod-name> -c backend --previous
+```
+
+`--previous` crash se pehle wale terminated container instance ke logs dikhane mein useful hota hai, agar woh available hon.
+
+### 7. `CrashLoopBackOff` kya hai?
+
+Agar container repeatedly start hokar crash ho raha hai, Kubernetes restarts ke beech delay badhata hai. Pod status mein `CrashLoopBackOff` dikh sakta hai.
+
+Iska matlab yeh nahi ki Kubernetes ne permanent restart band kar diya hai. Yeh repeated failures ke baad restart attempts ke beech back-off delay ko indicate karta hai.
+
+Common causes:
+- Application startup error ya unhandled exception.
+- Galat environment variable ya missing Secret.
+- Database connection/configuration issue.
+- Container command ya entrypoint galat hona.
+- Liveness probe ka galat path/port ya bahut aggressive timing.
+
+Troubleshoot karne ke liye:
+
+```bash
+kubectl describe pod <pod-name>
+kubectl logs <pod-name> -c backend --previous
+kubectl get events --sort-by=.metadata.creationTimestamp
+```
+
+### 8. Container restart vs Pod replacement
+
+| Situation | Usually kya hota hai? |
+|---|---|
+| Container process crash hota hai | Kubelet same Pod ke andar container restart kar sakta hai |
+| Liveness probe repeated failures deta hai | Kubelet container restart karta hai |
+| Readiness probe fail hota hai | Pod traffic ke liye unready hota hai; restart nahi hota |
+| Deployment-managed Pod delete ho jata hai | Controller desired replicas maintain karne ke liye replacement Pod banwata hai |
+| Node unavailable ho jata hai | Controller/orchestrator replacement Pod schedule kar sakta hai, cluster state aur configuration ke mutabik |
+
+### 9. Interview-ready answer
+
+“Kubernetes restarts containers through the kubelet running on each worker node. If a container exits, the kubelet follows the Pod's `restartPolicy`. A liveness probe can also cause a container to be restarted after repeated failures. Deployments normally use `restartPolicy: Always`. A readiness probe failure only removes the Pod from ready Service endpoints; it does not restart the container. If a Deployment-managed Pod itself is deleted or lost, the Deployment controller works to create a replacement Pod to maintain the desired replica count. If a container keeps crashing, I check `kubectl describe pod`, current logs, and `kubectl logs --previous` to diagnose the cause.”
+
+### 10. Quick revision
+
+- **Kubelet:** Node par container lifecycle aur probe results handle karta hai.
+- **`restartPolicy`:** Container exit ke baad restart behaviour define karti hai.
+- **Liveness probe:** Repeated failure par container restart trigger kar sakti hai.
+- **Readiness probe:** Traffic eligibility control karti hai; restart trigger nahi karti.
+- **`CrashLoopBackOff`:** Repeated crashes ke beech back-off delay.
+- **Deployment controller:** Pod replace karke desired replica count maintain karne ki koshish karta hai.
+
 ---
