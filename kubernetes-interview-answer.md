@@ -2049,3 +2049,128 @@ Pod delete karne se pehle uska actual naam `kubectl get pods` se dekho. ReplicaS
 | Typical use | Usually Deployment ke through indirectly | Most application workloads ke liye recommended |
 
 **Remember:** ReplicaSet desired Pod count maintain karta hai. Deployment ReplicaSets ko manage karke application updates aur rollbacks ko bhi handle karta hai.
+
+
+---
+
+# 18. What Is a ReplicationController in Kubernetes?
+
+## 1. English Definition
+
+A **ReplicationController** is a Kubernetes resource that ensures a specified number of Pod replicas are running at any given time. If fewer Pods than desired are available, it attempts to create additional Pods; if too many exist, it attempts to remove the excess.
+
+## 2. Hindi Definition
+
+ReplicationController Kubernetes ka ek resource hai jo specified number mein Pods maintain karne ki koshish karta hai. Agar Pods ki sankhya kam ho jaye, toh ye naye Pods create karta hai; agar zyada ho jaye, toh extra Pods remove karne ki koshish karta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapke MERN project ka Node.js backend hai aur aap chahte ho ki uske **3 Pods** run karein.
+
+ReplicationController ko bolo ki 3 replicas maintain karne hain:
+
+- Initially 3 backend Pods run kar rahe hain.
+- Ek Pod delete ya fail ho jata hai, toh ReplicationController replacement Pod create karne ki koshish karta hai.
+- Agar desired count 3 hai, toh controller ka goal 3 Pods ki state maintain karna hai.
+
+Ye ReplicaSet jaisa hi basic purpose serve karta hai, lekin **ReplicationController purana (legacy) Kubernetes resource hai**. Modern Kubernetes applications mein aam taur par Deployment use kiya jata hai, jo ReplicaSet manage karta hai.
+
+## 4. Practical Example / Code — MERN Backend
+
+File name: `backend-replicationcontroller.yaml`
+
+```yaml
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: mern-backend-rc
+spec:
+  replicas: 3
+  selector:
+    app: mern-backend-rc
+  template:
+    metadata:
+      labels:
+        app: mern-backend-rc
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+```
+
+**YAML ka meaning:**
+
+- `kind: ReplicationController` — ReplicationController resource create karta hai.
+- `replicas: 3` — 3 Pods maintain karne ki desired count.
+- `selector` — Controller ko batata hai ki kaunse matching labels wale Pods manage karne hain.
+- `template` — Naye ya replacement Pods create karne ka blueprint.
+- `image` — Node.js backend ki Docker image.
+
+Apni actual published Docker image ka naam use karna.
+
+## 5. Architecture Diagram
+
+```text
+             ReplicationController
+                (replicas: 3)
+                       |
+          +------------+------------+
+          |            |            |
+          v            v            v
+       Backend       Backend       Backend
+        Pod 1         Pod 2         Pod 3
+
+  If the count falls below 3, the controller
+  attempts to create replacement Pod(s).
+```
+
+## 6. Practical Commands / Configuration
+
+### Resource create karo
+
+```bash
+kubectl apply -f backend-replicationcontroller.yaml
+```
+
+### ReplicationControllers aur Pods dekho
+
+```bash
+kubectl get replicationcontrollers
+kubectl get pods -l app=mern-backend-rc
+```
+
+### Details dekho
+
+```bash
+kubectl describe replicationcontroller mern-backend-rc
+```
+
+### Desired replica count change karo
+
+```bash
+kubectl scale replicationcontroller mern-backend-rc --replicas=5
+```
+
+### Pod replacement observe karo
+
+```bash
+kubectl get pods -l app=mern-backend-rc
+kubectl delete pod <pod-name>
+kubectl get pods -l app=mern-backend-rc
+```
+
+`<pod-name>` ko actual Pod name se replace karna. Controller replacement Pod create karne ki koshish karega.
+
+## 7. Summary Table
+
+| Feature | ReplicationController | ReplicaSet |
+|---|---|---|
+| Main purpose | Desired Pod replica count maintain karna | Desired Pod replica count maintain karna |
+| Selector | Equality-based selectors | Equality-based aur set-based selectors |
+| Modern usage | Legacy resource; usually avoid for new applications | Commonly managed by Deployments |
+| Rolling updates and rollbacks | Built-in Deployment-style rollout support nahi | Directly nahi; Deployment provide karta hai |
+| Recommended approach | Existing legacy workloads ko samjho/manage karo | New application workloads ke liye Deployment use karo |
+
+**Remember:** ReplicationController aur ReplicaSet ka basic purpose similar hai. ReplicationController legacy resource hai; modern applications ke liye aam taur par Deployment use karo, jo ReplicaSet manage karta hai.
