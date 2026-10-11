@@ -18819,3 +18819,111 @@ Agar Pod `Pending` state mein rahe, toh `kubectl describe pod <pod-name>` ke Eve
 **Interview Answer:** The Kubernetes Scheduler (`kube-scheduler`) assigns an eligible Node to an unscheduled Pod. It filters Nodes based on resource requests and scheduling constraints, scores the feasible Nodes, and binds the Pod to the selected Node. The kubelet on that Node then works with the container runtime to start the Pod's containers. If no Node satisfies the requirements, the Pod can remain Pending, and its events help identify the reason.
 
 ---
+
+## 147. What Is a Node Selector?
+
+### 1. English Definition
+
+A **node selector** is a Pod specification field, `nodeSelector`, that restricts scheduling to Nodes whose labels match all the specified key-value pairs. It is a simple way to tell Kubernetes which labeled Nodes a Pod is allowed to run on.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+`nodeSelector` Kubernetes Pod ki YAML file mein use hota hai. Isse hum specify karte hain ki Pod sirf us Node par schedule ho jahan required labels match karte hon. Agar kisi bhi Node par matching labels nahi hain, toh Pod `Pending` reh sakta hai.
+
+### 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapke cluster mein do worker Nodes hain:
+
+- `worker-1` par label `workload=backend` hai.
+- `worker-2` par label `workload=database` hai.
+
+Aap chahte hain ki Node.js backend ka Pod sirf backend Node par chale. Aap Pod mein `nodeSelector: workload: backend` set kar sakte hain. Scheduler matching label wale eligible Node ko hi consider karega; baaki scheduling requirements bhi satisfy honi chahiye.
+
+### 4. Practical YAML Example
+
+Pehle Node par label add karein:
+
+```bash
+kubectl label node worker-1 workload=backend
+```
+
+Pod YAML:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: node-api-pod
+spec:
+  nodeSelector:
+    workload: backend
+  containers:
+    - name: node-api
+      image: node:20-alpine
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "128Mi"
+```
+
+Yahan `workload: backend` label selector hai. Scheduler Pod ko aise Node par place karne ki koshish karega jiske labels mein `workload=backend` ho aur jo baaki requirements bhi fulfill karta ho.
+
+### 5. Practical Commands
+
+```bash
+# List Nodes and their labels
+kubectl get nodes --show-labels
+
+# Add a label to a Node
+kubectl label node worker-1 workload=backend
+
+# Apply the Pod manifest
+kubectl apply -f pod.yaml
+
+# Check which Node was selected
+kubectl get pod node-api-pod -o wide
+
+# Troubleshoot if it remains Pending
+kubectl describe pod node-api-pod
+```
+
+If you need to remove the example label later:
+
+```bash
+kubectl label node worker-1 workload-
+```
+
+### 6. Scheduling Flow
+
+```text
+Pod YAML has nodeSelector
+            |
+            v
+Scheduler checks Node labels
+            |
+            v
+Does a Node match all key-value pairs?
+        /           \\
+      Yes             No
+       |               |
+       v               v
+Check other rules    Pod remains Pending
+and available resources if no eligible Node exists
+       |
+       v
+Bind Pod to a suitable Node
+```
+
+### 7. Summary Table
+
+| Item | Meaning |
+|---|---|
+| `nodeSelector` | Simple Pod field that selects Nodes by labels |
+| Node label | Key-value metadata attached to a Node |
+| Matching rule | All key-value pairs in `nodeSelector` must match |
+| No matching eligible Node | Pod may remain `Pending` |
+| More advanced alternative | Node affinity supports more expressive matching rules |
+
+**Interview Answer:** A node selector is a simple Kubernetes scheduling mechanism that uses Node labels to restrict where a Pod can run. You specify key-value pairs under `spec.nodeSelector`; the Pod can be scheduled only onto Nodes matching all those pairs and satisfying the other scheduling constraints. If no eligible Node matches, the Pod can remain Pending.
+
+---
