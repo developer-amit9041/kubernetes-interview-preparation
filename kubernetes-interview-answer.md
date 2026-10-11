@@ -14595,3 +14595,106 @@ Commands such as `kubectl get pods` use the current namespace unless you specify
 **Interview Answer:** `kubectl` is the Kubernetes CLI used to communicate with a cluster and manage resources such as Pods, Deployments, and Services through the Kubernetes API.
 
 **Remember:** `kubectl` is the command-line interface for managing Kubernetes resources.
+
+---
+
+# 112. How Do You List Pods?
+
+## 1. English Definition
+
+Use the `kubectl get pods` command to list Pods in the current namespace. Add namespace or output options to list Pods elsewhere or see more details.
+
+## 2. Hindi Definition
+
+Pods ki list dekhne ke liye `kubectl get pods` command use karte hain. Ye current namespace ke Pods dikhata hai. Dusre namespace ke Pods dekhne ke liye `-n` ya sabhi namespaces ke liye `-A` use kar sakte hain.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo Kubernetes par aapki MERN application deployed hai aur aap check karna chahte ho ki frontend aur backend Pods running hain ya nahi.
+
+- `kubectl get pods` current namespace ke Pods dikhata hai.
+- `kubectl get pods -n production` production namespace ke Pods dikhata hai.
+- `kubectl get pods -A` cluster ke sabhi namespaces ke Pods dikhata hai.
+- `kubectl get pods -o wide` extra information, jaise Pod IP aur node, bhi dikhata hai.
+
+`STATUS` column mein `Running`, `Pending`, ya `CrashLoopBackOff` jaise states dekhkar aap initial troubleshooting kar sakte ho.
+
+## 4. Practical Example / Code
+
+Run this command:
+
+```bash
+kubectl get pods
+```
+
+Example output:
+
+```text
+NAME                        READY   STATUS    RESTARTS   AGE
+frontend-7c8d9f6b4c-ab12c   1/1     Running   0          10m
+backend-5d9f8c7b6d-xy34z    1/1     Running   1          8m
+```
+
+**Explanation:**
+- `NAME`: Pod ka naam.
+- `READY`: Kitne containers ready hain, jaise `1/1`.
+- `STATUS`: Pod ki current phase/status.
+- `RESTARTS`: Containers kitni baar restart hue.
+- `AGE`: Pod kitni der se exist kar raha hai.
+
+Output example ke liye hai; aapke cluster mein actual names aur values different honge.
+
+## 5. Practical Commands
+
+```bash
+# List Pods in the current namespace
+kubectl get pods
+
+# List Pods in a specific namespace
+kubectl get pods -n production
+
+# List Pods across all namespaces
+kubectl get pods -A
+
+# Show additional details, including Pod IP and node
+kubectl get pods -o wide
+
+# Watch Pod status changes
+kubectl get pods -w
+
+# Inspect one Pod
+kubectl describe pod <pod-name>
+```
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+       Developer / Terminal
+                |
+                v
+      kubectl get pods -A
+                |
+                v
+       Kubernetes API Server
+                |
+                v
+      Pod information returned
+                |
+                v
+       Terminal displays list
+```
+
+## 7. Summary Table
+
+| Command | Purpose |
+|---|---|
+| `kubectl get pods` | Lists Pods in the current namespace |
+| `kubectl get pods -n production` | Lists Pods in the specified namespace |
+| `kubectl get pods -A` | Lists Pods in all namespaces |
+| `kubectl get pods -o wide` | Shows extra details such as Pod IP and node |
+| `kubectl get pods -w` | Watches for changes |
+| `kubectl describe pod <pod-name>` | Shows details and events for a Pod |
+
+**Interview Answer:** Use `kubectl get pods` to list Pods in the current namespace. Use `kubectl get pods -A` to list Pods across all namespaces.
+
+**Remember:** `get pods` lists Pods; `-A` lists them across all namespaces.
