@@ -14931,3 +14931,131 @@ Use `-n <namespace>` if the Deployment is in a specific namespace.
 **Interview Answer:** Use `kubectl get deployments` to check Deployment status and desired, updated, and available replicas. Use `kubectl describe deployment <name>` and `kubectl rollout status deployment/<name>` for troubleshooting.
 
 **Remember:** `get deployments` gives the overview; `describe` and `rollout status` help investigate problems.
+
+---
+
+# 115. How Do You Check Services?
+
+## 1. English Definition
+
+Use `kubectl get services` to list Kubernetes Services in the current namespace and inspect how they expose and route traffic to application Pods.
+
+## 2. Hindi Definition
+
+Kubernetes Services check karne ke liye `kubectl get services` command use karte hain. Isse Service ka naam, type, ClusterIP, external address (agar assigned ho), aur ports dekh sakte hain.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application mein `frontend-service` aur `backend-service` hain. Aap verify karna chahte ho ki Services create hui hain aur unke ports sahi configured hain.
+
+- `kubectl get services` — current namespace ki Services dikhata hai.
+- `kubectl get services -A` — sabhi namespaces ki Services dikhata hai.
+- `kubectl describe service backend-service` — selector, ports aur related details/events dikhata hai.
+- Service ki configuration dekhne ke baad Pods aur endpoints bhi verify karo, kyunki Service ka exist karna akela ye prove nahi karta ki backend healthy hai.
+
+## 4. Practical Example / Code
+
+Example Service for a Node.js backend:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+spec:
+  type: ClusterIP
+  selector:
+    app: backend
+  ports:
+    - port: 5000
+      targetPort: 5000
+```
+
+Check the Service:
+
+```bash
+kubectl get services
+```
+
+Example output:
+
+```text
+NAME              TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
+backend-service   ClusterIP   10.96.120.15    <none>        5000/TCP   5m
+kubernetes        ClusterIP   10.96.0.1       <none>        443/TCP    30d
+```
+
+**Explanation:**
+- `NAME`: Service ka naam.
+- `TYPE`: Service type, jaise `ClusterIP`, `NodePort`, ya `LoadBalancer`.
+- `CLUSTER-IP`: cluster ke andar Service ka virtual IP.
+- `EXTERNAL-IP`: external address, agar applicable aur assigned ho.
+- `PORT(S)`: Service ke exposed ports.
+
+Output illustrative hai; actual IPs, names, aur ports cluster ke according honge.
+
+## 5. Practical Commands
+
+```bash
+# List Services in the current namespace
+kubectl get services
+
+# List Services in all namespaces
+kubectl get services -A
+
+# Show additional details
+kubectl get services -o wide
+
+# Inspect one Service
+kubectl describe service backend-service
+
+# Check EndpointSlices for selected backends
+kubectl get endpointslices
+
+# Check Pods and their labels
+kubectl get pods --show-labels
+```
+
+Agar Service kisi specific namespace mein hai, to `-n <namespace>` add karein. EndpointSlices mein expected backend addresses na hon, to Service selector aur Pod labels verify karein.
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+        MERN Application / Client
+                   |
+                   v
+            Kubernetes Service
+                   |
+          Selector matches labels
+                   |
+              +----+----+
+              |         |
+              v         v
+           Backend Pod Backend Pod
+           (Express)   (Express)
+
+      kubectl get services
+                 |
+                 v
+        Kubernetes API Server
+                 |
+                 v
+        Service list / details
+```
+
+## 7. Summary Table
+
+| Command / Field | Purpose |
+|---|---|
+| `kubectl get services` | Lists Services in current namespace |
+| `kubectl get services -A` | Lists Services across namespaces |
+| `TYPE` | Shows Service exposure type |
+| `CLUSTER-IP` | Shows the internal virtual IP |
+| `EXTERNAL-IP` | Shows external address when applicable |
+| `kubectl describe service <name>` | Shows selectors, ports, and events |
+| `kubectl get endpointslices` | Helps inspect backend endpoints |
+| `kubectl get pods --show-labels` | Helps verify Service selector matches |
+
+**Interview Answer:** Use `kubectl get services` to list Services and check their type, IP addresses, and ports. Use `kubectl describe service <name>` and inspect EndpointSlices when troubleshooting connectivity.
+
+**Remember:** `get services` shows Service configuration; verify its endpoints and Pods when traffic is not reaching the application.
