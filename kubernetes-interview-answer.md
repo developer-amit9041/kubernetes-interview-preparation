@@ -20757,3 +20757,160 @@ kubectl get serviceaccounts -n production
 **Interview Answer:** Kubernetes uses a layered security model. Authentication verifies identity, RBAC authorizes actions, and admission controls enforce policies before resources are stored. NetworkPolicies can restrict Pod-to-Pod traffic, while Pod security settings, restricted Secret access, secure images, and control-plane and Node hardening protect workloads and infrastructure. I follow least privilege, avoid hardcoded credentials, and regularly audit permissions and workloads. No single control is sufficient; these layers must work together.
 
 ---
+
+
+## 165. What Is RBAC in Kubernetes?
+
+### 1. English Definition
+
+Role-Based Access Control (RBAC) is a Kubernetes authorization mechanism that controls what actions users, groups, and ServiceAccounts can perform on Kubernetes resources through Roles, ClusterRoles, RoleBindings, and ClusterRoleBindings.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+RBAC ka full form **Role-Based Access Control** hai. Iska use Kubernetes cluster mein permissions control karne ke liye hota hai—kaun user ya ServiceAccount kaun-se resources ko dekh, create, update ya delete kar sakta hai.
+
+RBAC mein:
+- **Role:** Ek specific namespace ke andar permissions define karta hai.
+- **ClusterRole:** Cluster-wide resources ya reusable permissions define kar sakta hai.
+- **RoleBinding:** Kisi Role ya ClusterRole ki permissions ko ek namespace mein identity se bind karta hai.
+- **ClusterRoleBinding:** ClusterRole ki permissions ko cluster level par identity se bind karta hai.
+
+RBAC permissions grant karta hai; by default permissions deny hoti hain jab tak kisi identity ko required access na diya gaya ho. Role ya ClusterRole khud identity ko permission assign nahi karta—binding bhi chahiye.
+
+### 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapka MERN application Kubernetes ke `production` namespace mein deployed hai:
+- Node.js API Pods run kar rahe hain.
+- MongoDB database Pods mein run kar raha hai.
+- Developer ko sirf Pods ki status dekhni hai.
+- DevOps engineer ko Deployments update karne ki permission chahiye.
+
+RBAC se developer ko sirf Pods read karne ki permission de sakte hain. Isse woh production Deployment delete ya modify nahi kar sakta, jab tak uske paas koi doosri permission na ho.
+
+**Real-world principle:** Least privilege—har user ya ServiceAccount ko sirf utni permission do jitni uske kaam ke liye zaroori hai.
+
+### 4. Practical Example / YAML
+
+Is example mein `production` namespace ke andar ek Role banega jo Pods ko sirf read karne dega.
+
+**Step 1: Role create karo**
+
+File: `pod-reader-role.yaml`
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pod-reader
+  namespace: production
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+```
+
+**Explanation:**
+- `apiGroups: [""]` — core API group, jisme Pods aate hain.
+- `resources: ["pods"]` — permission sirf Pods par apply hogi.
+- `verbs` — `get`, `list`, aur `watch` read operations hain; create, update aur delete allowed nahi hain.
+
+**Step 2: Role ko ServiceAccount se bind karo**
+
+Example ServiceAccount: `developer-viewer`.
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: developer-viewer
+  namespace: production
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pod-reader-binding
+  namespace: production
+subjects:
+  - kind: ServiceAccount
+    name: developer-viewer
+    namespace: production
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: pod-reader
+```
+
+Yeh RoleBinding `pod-reader` Role ki permissions ko `developer-viewer` ServiceAccount se bind karti hai. Is ServiceAccount ko use karne wale workload ya authorized client ko sirf defined permissions milengi, subject to any other applicable access configuration.
+
+### 5. Practical Commands
+
+```bash
+# Apply the YAML files
+kubectl apply -f pod-reader-role.yaml
+kubectl apply -f developer-viewer-rbac.yaml
+
+# List Roles and RoleBindings in the namespace
+kubectl get roles -n production
+kubectl get rolebindings -n production
+
+# Check permissions for this ServiceAccount
+kubectl auth can-i list pods \
+  --as=system:serviceaccount:production:developer-viewer \
+  -n production
+
+# This should be denied by this Role alone
+kubectl auth can-i delete pods \
+  --as=system:serviceaccount:production:developer-viewer \
+  -n production
+
+# Describe the RoleBinding
+kubectl describe rolebinding pod-reader-binding -n production
+```
+
+Note: `--as` impersonation ke liye current identity ke paas impersonation permission honi chahiye. Second command mein expected result `no` hai agar koi additional RBAC grant ya other authorizer access allow nahi karta.
+
+### 6. Kubernetes RBAC Architecture Diagram
+
+```text
+User / Group / ServiceAccount
+              |
+              v
+        RoleBinding
+              |
+              v
+            Role
+              |
+              v
+      Allowed API Actions
+      (get/list/watch Pods)
+
+Cluster-wide access pattern:
+User / ServiceAccount
+          |
+          v
+  ClusterRoleBinding
+          |
+          v
+      ClusterRole
+          |
+          v
+Cluster-scoped permissions
+(or permissions to namespaced resources
+ across namespaces, as granted)
+```
+
+Important distinction: A Role is namespace-scoped. A ClusterRole can define permissions for cluster-scoped resources and can also define permissions for namespaced resources. How broadly those permissions apply depends on whether it is referenced by a RoleBinding or ClusterRoleBinding.
+
+### 7. Summary Table
+
+| RBAC Object | Purpose |
+|---|---|
+| Role | Namespace-level permissions define karta hai |
+| ClusterRole | Cluster-level or reusable permissions define karta hai |
+| RoleBinding | Role/ClusterRole permissions ko one namespace mein bind karta hai |
+| ClusterRoleBinding | ClusterRole permissions ko cluster level par bind karta hai |
+| Verbs | Allowed actions, jaise `get`, `list`, `create`, `update`, `delete` |
+
+**Interview-Ready Answer:** RBAC stands for Role-Based Access Control. It is Kubernetes' authorization mechanism for controlling who can perform which actions on which resources. A Role or ClusterRole defines permissions, while a RoleBinding or ClusterRoleBinding assigns those permissions to users, groups, or ServiceAccounts. I use RBAC to enforce least privilege—for example, allowing a developer to view production Pods without giving them permission to delete Deployments.
+
+---
