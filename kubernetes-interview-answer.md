@@ -16902,3 +16902,144 @@ kubectl get pod backend -o yaml
 
 **Interview Answer:** When a liveness probe fails for the configured number of consecutive attempts, Kubernetes restarts the affected container. This helps recover an application that is stuck or unresponsive. A single failed check does not necessarily trigger a restart.
 
+---
+
+# 132. What Happens If a Readiness Probe Fails?
+
+## 1. English Definition
+
+If a readiness probe fails, Kubernetes marks the container as not ready to receive traffic. The Pod is removed from the ready endpoints of its associated Service, so the Service stops routing new traffic to that Pod while it is not ready.
+
+**Important:** A readiness probe failure does not restart the container.
+
+## 2. Hindi Definition
+
+Agar readiness probe fail ho jaati hai, toh Kubernetes samajhta hai ki application abhi requests handle karne ke liye ready nahi hai. Isliye Kubernetes us Pod ko Service ke ready endpoints se hata deta hai, taaki Service us Pod par nayi requests na bheje.
+
+Lekin container restart nahi hota. Application chalti rehti hai aur Kubernetes readiness check karta rehta hai. Jab probe dobara successful ho jaati hai, toh Pod phir se traffic receive kar sakta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application mein Node.js backend ke 3 Pods run kar rahe hain:
+
+- Pod 1 — Ready
+- Pod 2 — Ready
+- Pod 3 — Readiness probe fail
+
+Agar Pod 3 ka backend temporarily MongoDB ka connection establish nahi kar paa raha hai, ya startup ke baad initialization kar raha hai, toh readiness probe fail ho sakti hai.
+
+Kubernetes ka behavior:
+
+1. Pod 3 ko not ready mark kiya jaata hai.
+2. Kubernetes Service Pod 3 ko ready endpoints se remove kar deta hai.
+3. Nayi requests ready Pods 1 aur 2 ko route hoti hain.
+4. Pod 3 chalta rehta hai aur readiness checks continue hote hain.
+5. Jab Pod 3 ready ho jaata hai, toh woh dobara traffic receive kar sakta hai.
+
+Isse temporarily unready Pod par traffic bhejne se bacha ja sakta hai.
+
+## 4. Practical Example / Code
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: backend
+  labels:
+    app: mern-backend
+spec:
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:latest
+      ports:
+        - containerPort: 5000
+      readinessProbe:
+        httpGet:
+          path: /health/ready
+          port: 5000
+        initialDelaySeconds: 5
+        periodSeconds: 5
+        timeoutSeconds: 2
+        failureThreshold: 3
+```
+
+A matching Service can select this Pod using the `app: mern-backend` label:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+spec:
+  selector:
+    app: mern-backend
+  ports:
+    - port: 80
+      targetPort: 5000
+```
+
+**Configuration explanation:**
+
+- `httpGet`: Kubernetes calls the readiness endpoint.
+- `/health/ready`: Your Express application should return a successful HTTP status only when it can serve requests.
+- `periodSeconds: 5`: Check approximately every 5 seconds.
+- `failureThreshold: 3`: Three consecutive failures mark the container as not ready.
+- The Service routes traffic to ready endpoints selected by its selector; it does not restart the unready container.
+
+## 5. Practical Commands
+
+```bash
+# Check Pod readiness and restart count
+kubectl get pods
+
+# Inspect readiness probe events and status
+kubectl describe pod backend
+
+# Check Service details
+kubectl describe service backend-service
+
+# Inspect Service endpoints
+kubectl get endpoints backend-service
+
+# Inspect EndpointSlices (recommended for current Kubernetes)
+kubectl get endpointslices -l kubernetes.io/service-name=backend-service
+
+# View application logs
+kubectl logs backend
+```
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+       Kubernetes Readiness Probe
+                   |
+                   v
+           Probe successful?
+              /         \
+            Yes          No
+             |            |
+       Pod stays ready   Pod marked not ready
+             |            |
+       Receives traffic  Removed from ready Service endpoints
+                          |
+                   Container keeps running
+                          |
+                 Probe checks continue
+                          |
+                 Probe becomes successful
+                          |
+                   Ready for traffic again
+```
+
+## 7. Summary Table
+
+| Situation | Kubernetes behavior |
+|---|---|
+| Readiness probe succeeds | Pod can receive traffic through its Service, assuming other routing conditions are met |
+| Readiness probe fails | Pod is marked not ready and excluded from ready Service endpoints |
+| Repeated readiness failures | Pod remains not ready; container is not restarted just because readiness fails |
+| Readiness probe succeeds again | Pod can be added back to ready endpoints |
+| Liveness probe fails to its threshold | Kubernetes restarts the affected container |
+
+**Interview Answer:** When a readiness probe fails, Kubernetes marks the Pod as not ready and removes it from the ready endpoints used by its Service. The Service stops routing new traffic to that Pod until it becomes ready again. Unlike a liveness probe failure, a readiness probe failure does not restart the container.
+
