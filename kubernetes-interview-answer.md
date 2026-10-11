@@ -11690,3 +11690,168 @@ kubectl get pods
 | Automated reloader / checksum | Can trigger a rollout when the ConfigMap changes, if configured |
 
 **Remember:** Updating a ConfigMap does not automatically restart a Pod. Environment-variable changes require Pod recreation, while normal mounted ConfigMap files update eventually and must be reread by the application.
+
+---
+
+# 90. What Can You Use in Kubernetes as an Alternative to a `.env` File?
+
+## 1. English Definition
+
+In Kubernetes, a ConfigMap is commonly used to provide non-sensitive configuration as environment variables or mounted files, while a Secret is used for sensitive values such as passwords and API keys. These resources can replace many uses of a local `.env` file.
+
+## 2. Hindi Definition
+
+Kubernetes mein local `.env` file ke alternative ke roop mein hum **ConfigMap** aur **Secret** use kar sakte hain. ConfigMap normal configuration, jaise application ka port ya log level, store karta hai. Secret sensitive information, jaise database password aur API keys, ke liye use hota hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application local machine par `.env` file use karti hai:
+
+```env
+PORT=5000
+LOG_LEVEL=info
+DB_PASSWORD=your-database-password
+```
+
+Kubernetes mein in values ko do categories mein divide kar sakte ho:
+
+- **ConfigMap:** `PORT`, `LOG_LEVEL` jaise non-sensitive configuration ke liye.
+- **Secret:** `DB_PASSWORD`, API keys aur doosre sensitive credentials ke liye.
+
+Isse configuration ko application image se alag manage kar sakte ho. Lekin Secret use karna apne aap complete security guarantee nahi karta; RBAC aur encryption at rest jaise controls bhi configure karne chahiye.
+
+## 4. Practical Example / Code
+
+### Step 1: Create a ConfigMap
+
+`backend-config.yaml`:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+data:
+  PORT: "5000"
+  LOG_LEVEL: "info"
+```
+
+### Step 2: Create a Secret
+
+`backend-secret.yaml`:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backend-secret
+type: Opaque
+stringData:
+  DB_PASSWORD: "replace-with-your-password"
+```
+
+Real credentials ko Git repository mein commit mat karo. Production mein secrets ko approved secure process ya external secret manager se manage karo.
+
+### Step 3: Use both in a Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: backend-secret
+          ports:
+            - containerPort: 5000
+```
+
+Is example mein ConfigMap aur Secret ke keys container ke environment variables ke roop mein available honge.
+
+Node.js mein:
+
+```javascript
+const port = process.env.PORT || 5000;
+const logLevel = process.env.LOG_LEVEL || "info";
+const dbPassword = process.env.DB_PASSWORD;
+```
+
+## 5. Architecture Diagram
+
+```text
+       Kubernetes Configuration
+                  |
+          +-------+-------+
+          |               |
+          v               v
+      ConfigMap         Secret
+   PORT, LOG_LEVEL    DB_PASSWORD
+          |               |
+          +-------+-------+
+                  |
+                  v
+           Backend Pod
+                  |
+                  v
+       process.env.PORT
+       process.env.LOG_LEVEL
+       process.env.DB_PASSWORD
+                  |
+                  v
+          Node.js / Express
+                  |
+                  v
+               MongoDB
+```
+
+## 6. Practical Commands / Configuration
+
+Apply the ConfigMap and Secret:
+
+```bash
+kubectl apply -f backend-config.yaml
+kubectl apply -f backend-secret.yaml
+```
+
+Check that the resources exist without displaying credential values:
+
+```bash
+kubectl get configmap
+kubectl get secrets
+```
+
+Apply the Deployment:
+
+```bash
+kubectl apply -f backend-deployment.yaml
+kubectl rollout status deployment/mern-backend
+```
+
+Other options include mounting ConfigMaps or Secrets as files, or using an external secret manager such as AWS Secrets Manager with an appropriate integration.
+
+## 7. Summary Table
+
+| Option | Use it for | Example |
+|---|---|---|
+| ConfigMap | Non-sensitive configuration | `PORT=5000`, `LOG_LEVEL=info` |
+| Secret | Sensitive configuration | Database password, API key |
+| ConfigMap volume | Configuration needed as files | App config file |
+| Secret volume | Sensitive values needed as files | Credential file |
+| External Secret Manager | Centrally managing production credentials | AWS Secrets Manager with suitable integration |
+
+**Remember:** In Kubernetes, use ConfigMaps instead of `.env` files for non-sensitive configuration and Secrets for sensitive values. You can expose them to a container as environment variables or mounted files.
