@@ -3279,3 +3279,133 @@ Cloud-controller-manager ki deployment aur visibility cluster distribution par d
 | Cloud provider API | Cloud resources create/update karne ka interface |
 
 **Remember:** `cloud-controller-manager` cloud-specific Kubernetes integration provide karta hai; exact responsibilities cluster aur cloud-provider setup par depend karti hain.
+
+
+---
+
+# 27. What Are the Components of a Worker Node?
+
+## 1. English Definition
+
+**A Kubernetes Worker Node is a machine that runs application Pods. Its core components include the kubelet, a container runtime, and kube-proxy (or an alternative networking implementation that provides the required Service networking functionality).**
+
+These components help run containers, communicate with the Kubernetes control plane, and provide network connectivity.
+
+## 2. Hindi Definition
+
+Worker Node Kubernetes cluster ki woh machine hai jahan application ke Pods chalte hain. Iske main components containers ko run karne, unki health manage karne aur network communication mein help karte hain.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application Kubernetes par deploy hai:
+
+- **React:** Frontend Pod
+- **Node.js/Express:** Backend Pod
+- **MongoDB:** Database Pod, agar aap ise cluster mein host kar rahe ho
+
+Ye Pods Worker Nodes par run karte hain. In Nodes par installed components unhe chalane aur network ke through communicate karne mein help karte hain.
+
+### Worker Node ke main components
+
+1. **kubelet:** Control plane se Pod specifications leta hai aur ensure karta hai ki assigned Node par required Pods run karne ki process sahi tarah handle ho.
+2. **Container Runtime:** Containers ko download/pull, create aur run karta hai. Common example: containerd ya CRI-O.
+3. **kube-proxy:** Kai Kubernetes setups mein Service networking implement karta hai, jaise Service traffic ko suitable backend endpoints tak route karne ke network rules maintain karna. Kuch clusters alternative networking implementations use karte hain jo ye functionality provide karte hain.
+
+Worker Node par CNI network plugin aur node monitoring/logging agents jaise additional components bhi ho sakte hain, lekin ye core three components se alag hain.
+
+## 4. Practical Example / Code — MERN Backend
+
+Example Pod manifest:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mern-backend
+  labels:
+    app: mern-backend
+spec:
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:1.0
+      ports:
+        - containerPort: 5000
+```
+
+Is manifest ko apply karne par Kubernetes control plane Pod ko schedule karta hai. Selected Worker Node ka kubelet Pod ko run karne ki process handle karta hai, aur container runtime container ko actually run karta hai.
+
+```bash
+kubectl apply -f backend-pod.yaml
+kubectl get pods -o wide
+kubectl describe pod mern-backend
+```
+
+`kubectl get pods -o wide` mein `NODE` column se assigned Worker Node pata chalta hai.
+
+## 5. Architecture Diagram
+
+```text
+        Kubernetes Control Plane
+                  |
+          Pod specification
+                  |
+                  v
+       +-----------------------+
+       |     Worker Node       |
+       |                       |
+       |  +-----------------+  |
+       |  |     kubelet     |  |
+       |  +-----------------+  |
+       |          |            |
+       |          v            |
+       |  +-----------------+  |
+       |  | Container       |  |
+       |  | Runtime         |  |
+       |  +-----------------+  |
+       |          |            |
+       |          v            |
+       |   MERN Backend Pod    |
+       |                       |
+       |  +-----------------+  |
+       |  | kube-proxy*     |  |
+       |  | Service network |  |
+       |  +-----------------+  |
+       +-----------------------+
+
+*Some clusters use alternative networking implementations.
+```
+
+## 6. Practical Commands / Configuration
+
+### Worker Nodes aur Pod placement check karo
+
+```bash
+kubectl get nodes -o wide
+kubectl get pods -o wide
+```
+
+### Node details dekho
+
+```bash
+kubectl describe node <node-name>
+```
+
+### Container runtime information
+
+```bash
+kubectl get nodes -o wide
+```
+
+Node details mein runtime information available ho sakti hai. Exact host-level commands ke liye Node par authorized access chahiye; managed Kubernetes environments mein direct host access restricted ho sakta hai.
+
+## 7. Summary Table
+
+| Component | Main responsibility |
+|---|---|
+| `kubelet` | Assigned Node par Pods ko run karne ki process manage karta hai |
+| Container runtime | Containers ko actually run karta hai |
+| `kube-proxy` | Commonly Service networking rules implement karta hai; alternatives bhi possible hain |
+| CNI network plugin | Pod networking aur network interfaces configure karne mein help karta hai |
+| Monitoring/logging agents | Metrics aur logs collect kar sakte hain; optional/additional components hain |
+
+**Remember:** `kubelet` manages Pods on the Node, the container runtime runs containers, and `kube-proxy` commonly supports Kubernetes Service networking.
