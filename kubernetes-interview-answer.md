@@ -15906,3 +15906,96 @@ kubectl delete deployment backend
 **Interview Answer:** Use `kubectl delete <resource-type> <resource-name>` or `kubectl delete -f <file.yaml>` to remove Kubernetes resources. Verify the namespace and resource name before deleting.
 
 **Remember:** Deleting a Pod managed by a Deployment may cause Kubernetes to create a replacement Pod; deleting the Deployment removes that workload's controller as well.
+
+---
+
+# 124. How Do You Check or Change the Current Namespace?
+
+## 1. English Definition
+
+Use `kubectl config view --minify` to inspect the current context and its namespace, and `kubectl config set-context --current --namespace=<namespace>` to change the namespace saved in the current context.
+
+## 2. Hindi Definition
+
+Current Kubernetes context ka namespace check karne ke liye `kubectl config view --minify` use kar sakte hain. Current context ka namespace change karne ke liye `kubectl config set-context --current --namespace=<namespace>` command use hoti hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application ka backend `production` namespace mein hai. Agar current context `default` namespace use kar raha hai, toh bina `-n production` diye commands galat namespace mein resources search kar sakti hain.
+
+Aap current context ka namespace check kar sakte ho aur phir use `production` set kar sakte ho. Yeh setting aapke current kubeconfig context mein save hoti hai, aur us context ke baad ke commands par apply hoti hai jab tak aap namespace ya context change nahi karte.
+
+## 4. Practical Example / Code
+
+### Check the current context and namespace
+
+```bash
+kubectl config view --minify
+```
+
+Output mein current context ka `namespace` field dekhein. Agar field omitted ho, toh Kubernetes commands generally `default` namespace use karti hain.
+
+### Change the current context's namespace
+
+```bash
+kubectl config set-context --current --namespace=production
+```
+
+Ab current context ke namespace-scoped commands default roop se `production` namespace use karenge.
+
+### Run one command in a namespace without changing the context
+
+```bash
+kubectl get pods -n production
+```
+
+## 5. Practical Commands
+
+```bash
+# Show the current context
+kubectl config current-context
+
+# Inspect current context configuration, including namespace
+kubectl config view --minify
+
+# Set namespace for the current context
+kubectl config set-context --current --namespace=production
+
+# Verify the current context configuration
+kubectl config view --minify
+
+# Override namespace for one command only
+kubectl get pods -n production
+
+# List namespaces
+kubectl get namespaces
+```
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+        kubectl command
+              |
+              v
+       kubeconfig context
+              |
+              v
+       Selected namespace
+              |
+              v
+ Kubernetes API request for namespaced resources
+```
+
+## 7. Summary Table
+
+| Command | Purpose |
+|---|---|
+| `kubectl config current-context` | Current context ka naam dikhata hai |
+| `kubectl config view --minify` | Current context ki configuration dikhata hai |
+| `kubectl config set-context --current --namespace=production` | Current context ka default namespace change karta hai |
+| `kubectl get pods -n production` | Sirf is command ke liye namespace select karta hai |
+| `kubectl get namespaces` | Available namespaces list karta hai |
+
+**Interview Answer:** Check the current context with `kubectl config current-context` and inspect its namespace using `kubectl config view --minify`. Change the default namespace with `kubectl config set-context --current --namespace=<namespace>`, or use `-n <namespace>` for a single command.
+
+**Remember:** Changing the current namespace updates kubeconfig context settings; it does not move existing resources between namespaces.
