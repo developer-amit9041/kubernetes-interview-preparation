@@ -28632,4 +28632,77 @@ Fix the underlying issue and let Kubernetes retry. Deleting Pods repeatedly will
 ### Interview-ready answer
 “For a private Docker Hub image, I create a Kubernetes registry Secret using a scoped access token, then reference that Secret under `imagePullSecrets` in the Pod template of my Deployment. The Secret must be in the same namespace as the Pod, and the image repository and tag must be correct. I apply the Deployment and inspect Pod events if the image pull fails. I also protect the token, restrict Secret access, and avoid committing credentials to source control.”
 
+## 207. What is `imagePullPolicy`?
+
+### English Definition
+`imagePullPolicy` is a Kubernetes container setting that determines when the container runtime attempts to pull an image from its registry.
+
+### Hindi Definition
+`imagePullPolicy` Kubernetes ko batati hai ki container image ko registry se kab pull karna hai. Isse local image use karne, registry se image reference resolve karne, ya registry pull na karne ka behavior control hota hai.
+
+### 1. `IfNotPresent`
+```yaml
+imagePullPolicy: IfNotPresent
+```
+Agar image node par pehle se available hai, runtime use kar sakta hai. Nahi hai toh registry se pull karne ki koshish karega. Versioned images jaise `mern-backend:v1` ke liye common choice hai.
+
+### 2. `Always`
+```yaml
+imagePullPolicy: Always
+```
+Har baar container launch hone par runtime registry se image reference resolve karne ki koshish karta hai. Agar layers node par cached hain, toh unhe dobara download karna zaroori nahi. Mutable tags ke behavior ko samajhkar use karein; production mein immutable tags ya digests better hote hain.
+
+### 3. `Never`
+```yaml
+imagePullPolicy: Never
+```
+Runtime registry se image pull nahi karega. Image node par pehle se honi chahiye; warna container start fail ho jayega. Yeh controlled local/preloaded-image scenarios mein useful hai.
+
+### MERN backend example
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: amit/mern-backend:v1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5000
+```
+
+In this example, `image` identifies the backend image, `imagePullPolicy` controls pull behavior, and `replicas: 2` asks the Deployment to maintain two Pods. The scheduler may place Pods on the same or different nodes; image cache is node-specific.
+
+### Comparison
+| Policy | Image is on node | Image is not on node |
+|---|---|---|
+| `IfNotPresent` | Use local image | Attempt registry pull |
+| `Always` | Resolve image reference from registry; cached layers may be reused | Attempt registry pull |
+| `Never` | Use local image | Container startup fails |
+
+### Default behavior
+If omitted when the Pod template is first created, Kubernetes defaults to `Always` for `:latest` or an untagged image, and `IfNotPresent` for an explicit non-`latest` tag such as `:v1` or an image digest. Updating the image tag later does not automatically recalculate an already-set policy.
+
+### Verify and troubleshoot
+```bash
+kubectl apply -f backend-deployment.yaml
+kubectl get pods
+kubectl describe pod <pod-name>
+```
+If image pulling fails, inspect Pod events and verify image name/tag, registry credentials, network access, and policy.
+
+### Interview-ready answer
+“`imagePullPolicy` determines when Kubernetes' container runtime attempts to pull an image. `IfNotPresent` uses a local image if available and otherwise pulls it; `Always` resolves the image reference against the registry when a container launches, while cached layers may be reused; and `Never` only uses a local image and fails if it is absent. Kubernetes defaults to `Always` for `latest` or an untagged image, and generally to `IfNotPresent` for an explicit non-`latest` tag or digest. For predictable production deployments, I prefer immutable image versions or digests.”
+
 ---
