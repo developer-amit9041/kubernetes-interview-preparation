@@ -21180,4 +21180,208 @@ kubectl auth can-i list pods \
 
 **Interview-Ready Answer:** A ClusterRole is a Kubernetes RBAC object that defines permissions for cluster-scoped resources or reusable permissions for resources such as Pods. Unlike a Role, it can be reused across namespaces. A RoleBinding can grant its permissions within one namespace, while a ClusterRoleBinding can grant them at cluster scope. The binding determines where the permissions apply.
 
+
+## 168. What Is a RoleBinding in Kubernetes?
+
+### 1. English Definition
+
+A **RoleBinding** is a Kubernetes RBAC object that grants the permissions defined in a Role or ClusterRole to a user, group, or ServiceAccount within a specific namespace.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+RoleBinding Kubernetes ka ek RBAC object hai jo kisi user, group ya ServiceAccount ko kisi specific namespace mein `Role` ya `ClusterRole` ki defined permissions assign karta hai.
+
+Simple words mein, Role permissions define karta hai aur RoleBinding un permissions ko kisi identity ke saath connect karta hai.
+
+### 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapne apna MERN Stack project Kubernetes par deploy kiya hai:
+
+- **React:** Frontend
+- **Node.js + Express.js:** Backend API
+- **MongoDB:** Database
+
+Aapke cluster mein `production` namespace hai. Aap chahte ho ki ek developer production environment mein Pods ki details check kar sake, lekin woh Pods ko delete na kar sake.
+
+Is situation mein RoleBinding ka use hoga.
+
+RoleBinding se pehle hum ek `Role` banayenge jo Pods ko read karne ki permission dega. Phir RoleBinding us Role ko developer ke saath connect karegi.
+
+**RoleBinding ke main components:**
+
+- **Role:** Kaun-se actions allowed hain, define karta hai.
+- **Subject:** Jisko permission deni hai, jaise user, group ya ServiceAccount.
+- **RoleBinding:** Subject ko Role ki permissions assign karti hai.
+
+Yaad rakho: RoleBinding khud permissions define nahi karti; woh existing Role ya ClusterRole ko reference karti hai.
+
+### 4. Practical Example / YAML
+
+Maan lo humein `production` namespace mein `developer-sa` ServiceAccount ko sirf Pods read karne ki permission deni hai.
+
+**Step 1: Role create karo**
+
+File: `pod-reader-role.yaml`
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pod-reader
+  namespace: production
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+```
+
+**Explanation:**
+
+- `kind: Role` — permissions define karta hai.
+- `namespace: production` — Role production namespace ke liye hai.
+- `resources: ["pods"]` — permission Pods par apply hogi.
+- `get` — ek Pod ki details dekhna.
+- `list` — Pods ki list dekhna.
+- `watch` — Pods mein changes observe karna.
+
+Is Role mein Pod create ya delete karne ki permission nahi hai.
+
+**Step 2: ServiceAccount aur RoleBinding create karo**
+
+File: `pod-reader-binding.yaml`
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: developer-sa
+  namespace: production
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: developer-pod-reader
+  namespace: production
+subjects:
+  - kind: ServiceAccount
+    name: developer-sa
+    namespace: production
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: pod-reader
+```
+
+**Important fields samjho:**
+
+| Field | Meaning |
+|---|---|
+| `subjects` | Kisko permissions milengi |
+| `kind: ServiceAccount` | Subject ek ServiceAccount hai |
+| `name: developer-sa` | ServiceAccount ka naam |
+| `roleRef` | Kaunsa Role assign karna hai |
+| `kind: Role` | Referenced object ek Role hai |
+| `name: pod-reader` | Pehle banaya gaya Role |
+
+Is example mein RoleBinding `developer-sa` ko `pod-reader` Role ki permissions deti hai, lekin sirf `production` namespace mein.
+
+### 5. Practical Commands
+
+**Step 1: YAML files apply karo**
+
+```bash
+kubectl apply -f pod-reader-role.yaml
+kubectl apply -f pod-reader-binding.yaml
+```
+
+**Step 2: Role aur RoleBinding check karo**
+
+```bash
+kubectl get roles -n production
+kubectl get rolebindings -n production
+```
+
+**Step 3: RoleBinding ki details dekho**
+
+```bash
+kubectl describe rolebinding developer-pod-reader -n production
+```
+
+**Step 4: Permission check karo**
+
+Pods list karne ki permission:
+
+```bash
+kubectl auth can-i list pods \\
+  --as=system:serviceaccount:production:developer-sa \\
+  -n production
+```
+
+Expected output:
+
+```text
+yes
+```
+
+Pods delete karne ki permission:
+
+```bash
+kubectl auth can-i delete pods \\
+  --as=system:serviceaccount:production:developer-sa \\
+  -n production
+```
+
+Expected output:
+
+```text
+no
+```
+
+Ye expected results tab hain jab koi additional permission grant nahi hai. `--as` commands chalane ke liye current Kubernetes identity ke paas impersonation permission honi chahiye.
+
+### 6. Kubernetes Architecture Diagram
+
+```text
+Developer ServiceAccount
+  (developer-sa)
+        |
+        v
+RoleBinding
+(developer-pod-reader)
+Namespace: production
+        |
+        v
+Role
+(pod-reader)
+Permissions: get, list, watch Pods
+        |
+        v
+Kubernetes API Server
+checks whether each requested action is authorized
+```
+
+**Architecture ka flow:**
+
+1. Developer ki identity ServiceAccount se represent hoti hai.
+2. RoleBinding ServiceAccount ko Role ke saath associate karti hai.
+3. Role allowed API actions define karta hai.
+4. Kubernetes API server authorization ke waqt check karta hai ki requested action allowed hai ya nahi.
+
+### 7. Summary Table
+
+| Term | Purpose |
+|---|---|
+| Role | Namespace ke andar permissions define karta hai |
+| ClusterRole | Cluster-scoped ya reusable permissions define karta hai |
+| RoleBinding | Role ya ClusterRole ki permissions ek namespace mein assign karti hai |
+| Subject | User, group ya ServiceAccount |
+| `roleRef` | Batata hai ki kaunsa Role ya ClusterRole reference karna hai |
+| RBAC | Kubernetes resources par access control karta hai |
+
+**Interview-Ready Answer:**
+
+“A RoleBinding is a Kubernetes RBAC object that grants the permissions defined in a Role or ClusterRole to a user, group, or ServiceAccount within a specific namespace. For example, in a MERN application, I can use a RoleBinding to allow a developer to view production Pods without granting permission to delete them.”
+
+---
+
 ---
