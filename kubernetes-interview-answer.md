@@ -13956,3 +13956,158 @@ Troubleshooting checklist:
 **Interview Answer:** Connect the domain's DNS record to the Kubernetes Ingress Controller's external LoadBalancer address, then configure an Ingress resource to route that hostname and its paths to the appropriate Services. Configure TLS to enable HTTPS.
 
 **Remember:** DNS points the domain to the entry point; Ingress routes the request to the correct Service.
+
+---
+
+# 107. How Do You Configure HTTPS/SSL in Kubernetes?
+
+## 1. English Definition
+
+HTTPS/SSL in Kubernetes is configured by providing a TLS certificate and private key, then configuring an Ingress resource to terminate HTTPS and route requests to the appropriate Kubernetes Services.
+
+## 2. Hindi Definition
+
+Kubernetes mein HTTPS enable karne ke liye TLS certificate aur private key configure karte hain. Ingress mein certificate wale TLS Secret ka naam dete hain, taaki user secure HTTPS connection se application access kar sake.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application `https://app.example.com` par chal rahi hai.
+
+- DNS domain ko Ingress Controller ke external LoadBalancer tak point karta hai.
+- TLS certificate prove karta hai ki server domain ke liye valid identity rakhta hai.
+- NGINX Ingress Controller HTTPS connection ko terminate karta hai aur request ko frontend ya backend Service tak route karta hai.
+- Browser aur Ingress Controller ke beech traffic encrypted hota hai. Backend tak traffic bhi encrypt karna hai to uske liye alag TLS configuration chahiye.
+
+Production mein valid certificate use karein. Certificate ko manually create kar sakte hain, ya cert-manager jaise tool se certificate issue aur renew karwa sakte hain.
+
+## 4. Practical Example / Code
+
+### Step 1: Create a TLS Secret
+
+Agar aapke paas certificate file `tls.crt` aur private key file `tls.key` hai, to dono ko Ingress ke same namespace mein Secret ke roop mein store karein:
+
+```bash
+kubectl create secret tls app-example-com-tls \
+  --cert=tls.crt \
+  --key=tls.key
+```
+
+**Explanation:** Kubernetes Secret certificate aur private key ko store karta hai. Private key ko Git repository mein commit na karein. Production mein Secret access ko RBAC ke through restrict karein.
+
+### Step 2: Configure Ingress TLS
+
+Example assumes that the NGINX Ingress Controller and these Services already exist.
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mern-ingress
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - app.example.com
+      secretName: app-example-com-tls
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-service
+                port:
+                  number: 5000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-service
+                port:
+                  number: 80
+```
+
+Apply the configuration:
+
+```bash
+kubectl apply -f ingress.yaml
+kubectl describe ingress mern-ingress
+kubectl get secret app-example-com-tls
+```
+
+**Explanation:**
+- `tls.hosts` lists the domain covered by the TLS configuration.
+- `secretName` references a TLS Secret containing the certificate and private key.
+- `rules` route requests to the correct Services.
+- The certificate must be valid for `app.example.com`, and DNS must point to the Ingress Controller's external address.
+
+This configuration enables TLS at the Ingress. Redirecting HTTP to HTTPS depends on the controller and its configuration; do not assume a redirect is enabled automatically.
+
+## 5. Practical Commands
+
+```bash
+# Inspect Ingress configuration and events
+kubectl get ingress
+kubectl describe ingress mern-ingress
+
+# Check the TLS Secret exists
+kubectl get secret app-example-com-tls
+kubectl describe secret app-example-com-tls
+
+# Check Services and Pods
+kubectl get services
+kubectl get pods
+
+# Inspect Ingress Controller Pods (namespace can vary)
+kubectl get pods -A | grep -i ingress
+kubectl get services -A | grep -i ingress
+```
+
+To test HTTPS after DNS and certificate setup:
+
+```bash
+curl -Iv https://app.example.com
+```
+
+If HTTPS fails, check that the Secret is in the same namespace as the Ingress, the certificate matches the domain and is not expired, DNS resolves correctly, and the controller is healthy.
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+          User / Browser
+                 |
+       HTTPS request (TLS)
+                 |
+                 v
+       DNS -> LoadBalancer
+                 |
+                 v
+     NGINX Ingress Controller
+        | reads TLS Secret
+        | terminates TLS
+                 |
+          Ingress path rules
+             /       \\
+            v         v
+    frontend-service  backend-service
+            |         |
+            v         v
+        React app   Express API
+```
+
+## 7. Summary Table
+
+| Component | Responsibility |
+|---|---|
+| TLS certificate | Identifies the domain and enables authenticated TLS |
+| TLS private key | Used by the server during TLS; keep it protected |
+| Kubernetes TLS Secret | Stores the certificate and private key |
+| Ingress TLS configuration | Connects the hostname to the TLS Secret |
+| Ingress Controller | Handles HTTPS and routes requests |
+| cert-manager (optional) | Automates certificate issuance and renewal |
+
+**Interview Answer:** Configure a valid TLS certificate and private key in a Kubernetes TLS Secret, reference that Secret in the Ingress `spec.tls` section, and ensure DNS points to the Ingress Controller. This enables HTTPS at the Ingress layer.
+
+**Remember:** TLS Secret stores the certificate and key; Ingress TLS configuration tells the controller which certificate to use for the domain.
