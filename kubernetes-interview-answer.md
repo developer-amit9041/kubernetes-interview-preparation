@@ -6748,3 +6748,118 @@ Usually, manage application rollouts through the Deployment rather than directly
 | Typical use | Recommended resource for most stateless applications | Usually managed by a Deployment rather than created directly |
 
 **Remember:** Deployment manages ReplicaSets; ReplicaSet maintains Pod replicas. For most application workloads, create a Deployment and let it manage the ReplicaSets.
+---
+
+# 55. How Do You Define the Number of Replicas?
+
+## 1. English Definition
+
+**In Kubernetes, you define the desired number of Pod replicas by setting the `spec.replicas` field in a Deployment manifest.** You can also change the replica count using the `kubectl scale` command.
+
+## 2. Hindi Definition
+
+Kubernetes mein replicas ka matlab hai application ke kitne Pod instances chalane hain.
+
+Agar tumhe Node.js backend ke 3 Pods chahiye, toh Deployment YAML mein `replicas: 3` set karoge. Kubernetes controllers teen Pods maintain karne ki koshish karenge.
+
+Replicas badhane ya kam karne ke liye tum YAML update kar sakte ho ya `kubectl scale` command use kar sakte ho.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application ka Node.js backend hai aur tum chahte ho ki backend ke 3 instances chal rahe hon.
+
+```yaml
+spec:
+  replicas: 3
+```
+
+Iska matlab hai ki Deployment ki desired state mein **3 Pods** hone chahiye.
+
+Agar traffic badh jaata hai aur tumhe 5 Pods chahiye, toh replicas ko 5 kar sakte ho. Kubernetes naye Pods create karne ki koshish karega. Agar replicas ko 2 karte ho, toh Kubernetes extra Pods terminate karega.
+
+Dhyan rahe: actual running replicas cluster resources, scheduling aur image availability par depend karte hain.
+
+## 4. Practical Example / Code
+
+Example Deployment for a Node.js backend:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+```
+
+Here, `replicas: 3` declares the desired number of matching Pods for this Deployment.
+
+## 5. Architecture Diagram
+
+```text
+       Deployment
+       replicas: 3
+            |
+            v
+        ReplicaSet
+            |
+      +-----+-----+
+      |     |     |
+      v     v     v
+    Pod 1 Pod 2 Pod 3
+```
+
+If the desired replica count changes, the ReplicaSet controller works to add or remove Pods to match it.
+
+## 6. Practical Commands / Configuration
+
+**Create or update the Deployment from YAML:**
+
+```bash
+kubectl apply -f backend-deployment.yaml
+```
+
+**Scale the Deployment to five replicas:**
+
+```bash
+kubectl scale deployment mern-backend --replicas=5
+```
+
+**Check the desired and available replica counts:**
+
+```bash
+kubectl get deployment mern-backend
+kubectl get pods
+```
+
+**Scale down to two replicas:**
+
+```bash
+kubectl scale deployment mern-backend --replicas=2
+```
+
+Note: if you later reapply a manifest that specifies `replicas: 3`, that manifest can set the desired count back to three. If a HorizontalPodAutoscaler manages the Deployment, it may also adjust replicas according to its metrics and configuration.
+
+## 7. Summary Table
+
+| Method | Example | Purpose |
+|---|---|---|
+| YAML field | `spec.replicas: 3` | Defines the desired replica count in the manifest |
+| Scale up | `kubectl scale deployment mern-backend --replicas=5` | Requests five Pods |
+| Scale down | `kubectl scale deployment mern-backend --replicas=2` | Requests two Pods |
+| Verify | `kubectl get deployment mern-backend` | Shows Deployment replica status |
+
+**Remember:** Set `spec.replicas` in the Deployment YAML or use `kubectl scale deployment <name> --replicas=<number>`. This defines the desired count; it does not guarantee every Pod becomes ready.
