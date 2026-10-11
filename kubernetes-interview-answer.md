@@ -17308,3 +17308,141 @@ A successful connection indicates the port is accepting TCP connections through 
 
 **Interview Answer:** A TCP probe checks whether Kubernetes can establish a TCP connection to a specified container port. It is useful when an application does not expose an HTTP health endpoint. A successful TCP connection only proves that the port accepts connections; the effect of a failed probe depends on whether it is used as a liveness, readiness, or startup probe.
 
+---
+
+# 135. What Is an Exec Probe?
+
+## 1. English Definition
+
+An exec probe is a Kubernetes health check that runs a command inside a container. If the command exits with status code `0`, the probe succeeds; if it exits with a non-zero status, the probe fails. Exec probes can be used for liveness, readiness, or startup checks.
+
+## 2. Hindi Definition
+
+Exec probe Kubernetes ka health check hai jo container ke andar ek command execute karta hai. Agar command exit code `0` return karti hai, toh probe successful hoti hai. Agar command non-zero exit code return karti hai, toh probe fail hoti hai.
+
+Ismein HTTP request ya TCP connection check karna zaroori nahi hota; Kubernetes container ke andar command run karke result check karta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapka Node.js backend container ke andar run ho raha hai. Aap exec probe se check kar sakte ho ki application ke process se related koi condition satisfy ho rahi hai ya nahi.
+
+Example:
+
+```yaml
+livenessProbe:
+  exec:
+    command:
+      - sh
+      - -c
+      - "test -f /tmp/healthy"
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  failureThreshold: 3
+```
+
+Kubernetes container ke andar `test -f /tmp/healthy` command run karega:
+
+- File `/tmp/healthy` exists karti hai: command exit code `0`, probe successful.
+- File exist nahi karti: command non-zero exit code, probe failed.
+- Agar liveness probe configured threshold tak fail hoti hai, Kubernetes container restart karta hai.
+
+Yeh sirf demonstration hai. Real application mein aisi file ko manually create kar dena actual application health ka reliable proof nahi hota. Aapko command ko meaningful condition check karne ke liye design karna chahiye.
+
+## 4. Practical Example / Code
+
+Pod YAML using an exec liveness probe:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: backend
+spec:
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:latest
+      command: ["sh", "-c"]
+      args:
+        - |
+          touch /tmp/healthy
+          node server.js &
+          APP_PID=$!
+          trap 'kill "$APP_PID" 2>/dev/null || true' TERM INT
+          wait "$APP_PID"
+      livenessProbe:
+        exec:
+          command:
+            - sh
+            - -c
+            - "test -f /tmp/healthy"
+        initialDelaySeconds: 5
+        periodSeconds: 10
+        timeoutSeconds: 2
+        failureThreshold: 3
+```
+
+**Important:** This example illustrates exec command mechanics, not robust Node.js health monitoring: the marker file is created before the app is verified healthy, so it does not prove that Node.js is serving requests. In production, use a meaningful check or prefer HTTP/TCP probes when appropriate. Also, the container image must include the executable used by the probe, such as `sh` and `test`.
+
+**Configuration explanation:**
+
+- `exec.command`: The command Kubernetes executes inside the container.
+- Exit code `0`: Probe success.
+- Non-zero exit code: Probe failure.
+- `periodSeconds`: Time between checks.
+- `timeoutSeconds`: Maximum time allowed for the command.
+- `failureThreshold`: Consecutive failures needed before the probe is considered failed.
+
+You can place the same `exec` structure under `readinessProbe` to control traffic eligibility or `startupProbe` to determine whether startup has completed.
+
+## 5. Practical Commands
+
+```bash
+# Apply the Pod YAML
+kubectl apply -f backend-pod.yaml
+
+# Check Pod state and restart count
+kubectl get pods
+
+# Inspect probe events and configuration
+kubectl describe pod backend
+
+# View application logs
+kubectl logs backend
+
+# Run a similar command manually inside the container
+kubectl exec backend -- sh -c 'test -f /tmp/healthy'
+```
+
+The last command helps test the condition manually, but it is not identical to kubelet's probe execution environment in every respect.
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+          Kubernetes Kubelet
+                  |
+                  | Execute command
+                  v
+          Inside container
+                  |
+             Command result
+              /         \
+       Exit code 0   Non-zero exit
+            |              |
+       Probe succeeds  Probe fails
+                           |
+                Apply configured probe behavior
+                (readiness, liveness, or startup)
+```
+
+## 7. Summary Table
+
+| Probe type | What it checks | Failure behavior at threshold |
+|---|---|---|
+| Exec liveness probe | Result of a command inside the container | Restarts the container |
+| Exec readiness probe | Command-based readiness condition | Marks the Pod not ready for Service traffic |
+| Exec startup probe | Command-based startup condition | Restarts the container if startup keeps failing |
+| HTTP probe | HTTP response from a path | Depends on the probe type |
+| TCP probe | Whether a port accepts a TCP connection | Depends on the probe type |
+
+**Interview Answer:** An exec probe runs a command inside a container and checks its exit code. Exit code `0` means success, while a non-zero exit code means failure. Depending on whether it is configured as liveness, readiness, or startup, the result can trigger a container restart, affect traffic routing, or determine whether startup has completed.
+
