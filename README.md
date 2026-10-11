@@ -4,7 +4,8 @@ Topic-wise Kubernetes interview preparation for developers, with practical focus
 
 ## Question List
 
-- **[Kubernetes Interview Questions](./kubernetes-interview-questions.md)** — 225 questions grouped into 18 topics, from fundamentals and architecture to MERN deployments and production scenarios.
+- **[Kubernetes Interview Questions](./kubernetes-interview-questions.md)** — 225 questions in English wording.
+- **[Kubernetes Interview Questions — Hinglish](./kubernetes-interview-questions-hinglish.md)** — uploaded topic-wise list with Amit's Must-Know Priority checklist. — 225 questions grouped into 18 topics, from fundamentals and architecture to MERN deployments and production scenarios.
 
 ## Topics Covered
 
