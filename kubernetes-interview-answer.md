@@ -1571,3 +1571,105 @@ Image name ko apni actual published image se replace karein.
 **Pod = Kubernetes ki unit jiske andar container(s) run hote hain.**
 
 Ek Pod mein usually ek main application container hota hai, lekin tightly coupled multiple containers bhi ho sakte hain.
+
+
+---
+
+# 14. What Is a Namespace in Kubernetes?
+
+## 1. English Definition
+
+A **Namespace** in Kubernetes is a mechanism used to logically separate and organize resources within a single Kubernetes cluster. It helps different teams, applications, or environments manage their resources independently.
+
+## 2. Hindi Definition
+
+Kubernetes mein Namespace ek logical separation hai, jiske through hum ek hi cluster ke resources ko alag-alag groups mein organize kar sakte hain.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapke paas ek Kubernetes cluster hai aur aap usmein MERN application ke do environments chalana chahte ho:
+
+- **Development:** Testing aur development ke liye.
+- **Production:** Real users ke liye.
+
+Aap dono environments ke resources ko alag Namespaces mein rakh sakte ho. Isse resources ko organize karna aur permissions aur resource limits manage karna aasaan hota hai.
+
+Namespace ko ek hi building ke alag sections ki tarah samjho. Building ek hi hai, lekin har section mein alag resources organized hain.
+
+## 4. Namespace Architecture Diagram
+
+```text
+                 Kubernetes Cluster
+              +------------------------+
+              |                        |
+              |  +------------------+  |
+              |  | development      |  |
+              |  | React Pod        |  |
+              |  | Node.js Pod      |  |
+              |  +------------------+  |
+              |                        |
+              |  +------------------+  |
+              |  | production       |  |
+              |  | React Pod        |  |
+              |  | Node.js Pod      |  |
+              |  +------------------+  |
+              |                        |
+              +------------------------+
+```
+
+Namespaces resources ko logically separate karte hain; ye automatically complete security isolation guarantee nahi karte.
+
+## 5. Important Default Namespaces
+
+| Namespace | Purpose |
+|---|---|
+| `default` | Jab aap doosra Namespace specify nahi karte, namespaced resources aam taur par yahan create hote hain. |
+| `kube-system` | Kubernetes ke system components aur related resources ke liye. |
+| `kube-public` | Publicly readable information ke liye; iska use limited hota hai. |
+| `kube-node-lease` | Nodes ki heartbeat aur liveness information track karne ke liye Lease objects. |
+
+## 6. Practical Commands
+
+### Step 1: Saare Namespaces dekho
+
+```bash
+kubectl get namespaces
+```
+
+### Step 2: Development Namespace create karo
+
+```bash
+kubectl create namespace development
+```
+
+### Step 3: Production Namespace create karo
+
+```bash
+kubectl create namespace production
+```
+
+### Step 4: Particular Namespace ke Pods dekho
+
+```bash
+kubectl get pods -n development
+kubectl get pods -n production
+```
+
+Yahan `-n` ka matlab `--namespace` hai.
+
+### Step 5: Kisi Namespace mein application deploy karo
+
+```bash
+kubectl apply -f backend-pod.yaml -n development
+```
+
+Agar YAML mein Namespace pehle se specify hai, to uske saath command ka behaviour dhyan se check karein; conflicting Namespace values se bachna chahiye.
+
+## 7. Important Points to Remember
+
+- Namespace ek cluster ke andar resources ko logically group karta hai.
+- Namespaced resources ke names alag Namespaces mein repeat ho sakte hain.
+- Namespace khud complete security boundary nahi hai; access control ke liye RBAC aur zarurat ke mutabik NetworkPolicy jaise controls configure karne padte hain.
+- Har Kubernetes resource namespaced nahi hota. Nodes aur PersistentVolumes jaise resources cluster-scoped hote hain.
+
+**Remember:** One cluster can contain multiple Namespaces, jaise `development`, `testing`, aur `production`.
