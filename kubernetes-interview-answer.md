@@ -6350,3 +6350,131 @@ kubectl rollout undo deployment/mern-backend
 | Rollback | Reverts to a previous Deployment revision when available |
 
 **Remember:** Deployment → ReplicaSet → Pods. Use a Deployment for most stateless applications because it helps maintain replicas and manage application updates.
+---
+
+# 52. How Does a Deployment Work?
+
+## 1. English Definition
+
+**A Kubernetes Deployment works by declaring the desired state of an application and managing ReplicaSets to make the actual state match that desired state.** It supports replica management, rolling updates, and rollbacks.
+
+## 2. Hindi Definition
+
+Kubernetes Deployment mein hum define karte hain ki application ke kitne Pods chalne chahiye aur kaunsi container image use honi chahiye.
+
+Kubernetes ke controllers continuously current state ko desired state se compare karte hain. Agar Pods kam ho jaate hain, toh ReplicaSet replacement Pods create karne ki koshish karta hai. Agar image update karte hain, toh Deployment naya ReplicaSet create karke rollout manage karta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application ka Node.js backend hai aur tum chahte ho ki uske 3 Pods hamesha available rahein. Tum Deployment YAML mein `spec.replicas: 3` set karte ho.
+
+Deployment ka flow:
+
+1. **Deployment create hota hai:** Tum `kubectl apply` se YAML cluster mein bhejte ho.
+2. **ReplicaSet manage hota hai:** Deployment ek ReplicaSet create ya update karta hai.
+3. **Pods create hote hain:** ReplicaSet 3 Pods maintain karne ki koshish karta hai.
+4. **Self-healing:** Ek Pod delete ho jaaye, toh ReplicaSet replacement create karne ki koshish karta hai.
+5. **Rolling update:** Tum backend image ka version `1.0` se `2.0` karte ho, toh Deployment naya ReplicaSet banakar rollout manage karta hai.
+6. **Rollback:** Agar new version mein issue aaye aur previous revision available ho, toh tum previous revision par wapas ja sakte ho.
+
+## 4. Practical Example / Code
+
+Example Deployment for a Node.js backend:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+```
+
+When you apply this manifest, Kubernetes records the desired state. The Deployment controller manages a ReplicaSet, and the ReplicaSet works to maintain three matching Pods. The scheduler assigns unscheduled Pods to nodes, and kubelets on those nodes manage the containers.
+
+## 5. Architecture Diagram
+
+```text
+       kubectl apply -f backend.yaml
+                    |
+                    v
+             Deployment object
+                    |
+                    v
+             Deployment controller
+                    |
+                    v
+                ReplicaSet
+                    |
+          +---------+---------+
+          |         |         |
+          v         v         v
+        Pod 1     Pod 2     Pod 3
+          |         |         |
+          +---- Node.js backend ----+
+```
+
+When the Pod template changes, such as changing the image tag, the Deployment creates a new ReplicaSet and manages the rollout according to its update strategy.
+
+## 6. Practical Commands / Configuration
+
+**Create or update the Deployment:**
+
+```bash
+kubectl apply -f backend-deployment.yaml
+```
+
+**Check Deployment, ReplicaSets, and Pods:**
+
+```bash
+kubectl get deployments
+kubectl get replicasets
+kubectl get pods
+```
+
+**Watch rollout progress:**
+
+```bash
+kubectl rollout status deployment/mern-backend
+kubectl rollout history deployment/mern-backend
+```
+
+**Update the backend image:**
+
+```bash
+kubectl set image deployment/mern-backend backend=your-dockerhub-username/mern-backend:2.0
+kubectl rollout status deployment/mern-backend
+```
+
+**Roll back to the previous revision when appropriate:**
+
+```bash
+kubectl rollout undo deployment/mern-backend
+```
+
+## 7. Summary Table
+
+| Stage | What happens |
+|---|---|
+| Apply manifest | Kubernetes records the desired Deployment configuration |
+| Deployment controller | Manages ReplicaSets and rollout state |
+| ReplicaSet | Works to maintain the desired number of matching Pods |
+| Scheduler and kubelet | Schedule Pods onto nodes and run their containers |
+| Pod failure or deletion | Controller works to restore the desired replica count |
+| Image/template update | Deployment creates a new ReplicaSet and manages a rollout |
+| Rollback | Reverts to a previous Deployment revision when available |
+
+**Remember:** Deployment → ReplicaSet → Pods. A Deployment does not directly run containers; it manages ReplicaSets, while Kubernetes schedules Pods and node kubelets run the containers.
