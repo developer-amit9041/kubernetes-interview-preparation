@@ -4771,3 +4771,117 @@ kubectl logs mern-backend-with-sidecar -c log-sidecar
 | Separation of responsibilities | Each container has a focused job | App server and proxy |
 
 **Remember:** Use multiple containers in one Pod for tightly coupled components, such as a main application and its sidecar. Use separate Pods for independently scalable services such as a React frontend, Node.js API, and MongoDB.
+
+---
+
+# 38. What Is a Multi-Container Pod?
+
+## 1. English Definition
+
+A **multi-container Pod** is a Kubernetes Pod that contains two or more containers running together on the same Node. These containers share the Pod's network namespace, can communicate using `localhost`, and can share storage through configured volumes.
+
+Multi-container Pods are commonly used for tightly coupled components, such as a main application container and a supporting sidecar container.
+
+## 2. Hindi Definition
+
+Multi-container Pod ek aisa Kubernetes Pod hota hai jiske andar do ya do se zyada containers hote hain. Ye containers ek hi Node par saath run karte hain, network share karte hain aur zaroorat padne par shared volume ke through files bhi share kar sakte hain.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari Node.js backend application hai. Backend ko API requests handle karni hain, aur ek doosra container uske logs collect karna chahta hai.
+
+- **Container 1 — Backend:** Node.js + Express application run karega.
+- **Container 2 — Sidecar:** Backend ke logs collect karega.
+- **Shared network:** Dono containers same Pod IP aur network namespace use karte hain.
+- **Shared storage:** Dono containers same configured volume mount karke log files access kar sakte hain.
+
+**Important difference:** Multi-container Pod ka matlab yeh nahi hai ki React, Node.js aur MongoDB ko hamesha ek hi Pod mein rakhna chahiye. Ye independently scalable services hain, isliye generally inhe separate Pods mein deploy karte hain.
+
+## 4. Practical Example / Code — Backend and Sidecar
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mern-multi-container-pod
+spec:
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:1.0
+      ports:
+        - containerPort: 5000
+      volumeMounts:
+        - name: shared-logs
+          mountPath: /var/log/mern
+
+    - name: log-sidecar
+      image: busybox:1.36
+      command:
+        - sh
+        - -c
+        - touch /var/log/mern/app.log; tail -n 20 -f /var/log/mern/app.log
+      volumeMounts:
+        - name: shared-logs
+          mountPath: /var/log/mern
+
+  volumes:
+    - name: shared-logs
+      emptyDir: {}
+```
+
+The backend must write logs to `/var/log/mern/app.log` for the sidecar to collect meaningful application logs. This is an illustrative example; production setups often use a purpose-built log collector.
+
+## 5. Architecture Diagram
+
+```text
+              Kubernetes Pod
+        (one Pod IP / network namespace)
+                     |
+             +-------+-------+
+             |               |
+             v               v
+       Backend Container   Sidecar Container
+       Node.js / Express   Log Collector
+             |               |
+             +-------+-------+
+                     |
+                     v
+                Shared Volume
+```
+
+## 6. Practical Commands / Configuration
+
+Create the Pod:
+
+```bash
+kubectl apply -f multi-container-pod.yaml
+```
+
+Check Pod status and container names:
+
+```bash
+kubectl get pod mern-multi-container-pod
+kubectl describe pod mern-multi-container-pod
+kubectl get pod mern-multi-container-pod -o jsonpath='{.spec.containers[*].name}'
+```
+
+Read logs from each container:
+
+```bash
+kubectl logs mern-multi-container-pod -c backend
+kubectl logs mern-multi-container-pod -c log-sidecar
+```
+
+## 7. Summary Table
+
+| Feature | Multi-container Pod |
+|---|---|
+| Number of containers | Two or more |
+| Scheduling | Containers run together as one Pod on the same Node |
+| Networking | Share the Pod network namespace and IP |
+| Inter-container communication | Can use `localhost` when the target listens on the relevant port |
+| Storage | Can share configured volumes |
+| Common pattern | Main application plus sidecar |
+| MERN example | Node.js backend plus a log-collector sidecar |
+
+**Remember:** A multi-container Pod groups tightly coupled containers that need shared networking, storage, or lifecycle. Independently scalable services generally belong in separate Pods.
