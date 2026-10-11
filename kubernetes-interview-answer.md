@@ -27313,4 +27313,141 @@ If the Node.js application has a slow startup, consider adding a `startupProbe`.
 ### Interview-ready answer
 “I configure a liveness probe in the Node.js Deployment using an HTTP GET endpoint such as `/health/live`. The Express endpoint returns HTTP 200 while the application can respond. I configure `initialDelaySeconds`, `periodSeconds`, `timeoutSeconds`, and `failureThreshold` according to the application's behavior. If the probe fails repeatedly beyond the threshold, Kubernetes restarts the container. I keep liveness checks independent of temporary external dependency failures, such as a MongoDB outage, to avoid unnecessary restart loops. For slow-starting applications, I consider using a startup probe as well.”
 
+## 198. How would you run multiple replicas of a backend?
+
+### English Definition
+In Kubernetes, multiple backend replicas can be run by configuring the `replicas` field in a Deployment. Kubernetes maintains the desired number of Pods and works to replace failed Pods. A Kubernetes Service provides a stable endpoint to distribute traffic across eligible backend Pods.
+
+### Hindi Definition
+MERN application mein Node.js backend ke multiple replicas ka matlab hai backend ke multiple Pods chalana. Deployment desired number of Pods maintain karta hai, aur Service ready Pods tak requests route karne ke liye stable network endpoint provide karti hai.
+
+### Step 1: Understand the architecture
+
+```text
+React frontend / Ingress
+          |
+          v
+    Backend Service
+      /     |     \
+     v      v      v
+  Pod 1   Pod 2   Pod 3
+  Node.js Node.js Node.js
+```
+
+If `replicas: 3` is configured, Kubernetes tries to maintain three backend Pods. The Service selects matching Pods using labels and routes traffic to eligible endpoints. Actual traffic distribution depends on the cluster networking implementation and request connections; it is not necessarily perfectly even.
+
+### Step 2: Create a Deployment
+Example `backend-deployment.yaml`:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: node-backend
+  template:
+    metadata:
+      labels:
+        app: node-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:v1
+          ports:
+            - containerPort: 5000
+```
+
+Explanation:
+- `kind: Deployment` manages the backend Pod replicas through ReplicaSets.
+- `replicas: 3` sets the desired replica count.
+- `selector.matchLabels` must match the Pod template labels.
+- `image` is the container image used by each replica.
+- `containerPort: 5000` documents the application port; the Node.js process must actually listen on that port.
+
+### Step 3: Create a Service
+Example `backend-service.yaml`:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+spec:
+  type: ClusterIP
+  selector:
+    app: node-backend
+  ports:
+    - port: 5000
+      targetPort: 5000
+```
+
+The Service selector must match the Pod labels. The Service's port is 5000, and traffic is forwarded to port 5000 on selected Pods. Other workloads in the same namespace can normally call it using `http://backend-service:5000`. From another namespace, use a namespace-qualified DNS name such as `backend-service.<namespace>.svc.cluster.local`.
+
+A ClusterIP Service is internal to the cluster. A browser-based React application cannot normally resolve this internal DNS name directly; browser traffic usually enters through an Ingress or another externally reachable API endpoint.
+
+### Step 4: Apply the resources
+
+```bash
+kubectl apply -f backend-deployment.yaml
+kubectl apply -f backend-service.yaml
+kubectl rollout status deployment/node-backend
+kubectl get deployments
+kubectl get pods -l app=node-backend
+kubectl get services
+kubectl get endpointslices
+```
+
+When the Deployment is healthy, the Deployment status may show three desired, updated, and available replicas. Exact output depends on cluster state and Kubernetes version.
+
+### Step 5: Scale replicas
+To scale the backend from three replicas to five:
+
+```bash
+kubectl scale deployment/node-backend --replicas=5
+kubectl get pods -l app=node-backend
+kubectl get deployment node-backend
+```
+
+Alternatively, update `spec.replicas` in the Deployment YAML and apply it again. If a HorizontalPodAutoscaler manages the Deployment, manually setting the replica count may be overridden by the autoscaler.
+
+### Step 6: What happens when a Pod fails?
+If a backend Pod fails, the Deployment's controller works toward the desired replica count by replacing the failed Pod. The Service routes new traffic to eligible ready endpoints rather than intentionally sending traffic to an unready Pod. This is not a guarantee of zero failed requests during every failure or rollout.
+
+For better production resilience:
+- Configure readiness and liveness probes appropriately.
+- Set CPU/memory requests and suitable limits.
+- Use a PodDisruptionBudget where appropriate for voluntary disruptions.
+- Consider topology spread constraints or pod anti-affinity to reduce the chance that all replicas run on one node.
+- Ensure the backend is stateless where possible; store shared durable data in MongoDB or another suitable data store rather than a Pod's local filesystem.
+- Ensure the database can handle the combined connection load from all backend replicas.
+
+### Step 7: Troubleshooting
+
+If fewer than three Pods become ready:
+
+```bash
+kubectl describe deployment node-backend
+kubectl describe pod <pod-name>
+kubectl logs <pod-name>
+kubectl get events --sort-by=.metadata.creationTimestamp
+kubectl get endpointslices
+```
+
+Common causes include an invalid image, image-pull errors, failed health probes, insufficient cluster resources, or Service selectors that do not match Pod labels. A Deployment showing three replicas does not mean all three are healthy; verify the ready/available counts and Service endpoints.
+
+### Deployment vs Service
+
+| Resource | Responsibility |
+|---|---|
+| Deployment | Creates and maintains the desired number of backend Pods |
+| Service | Provides a stable network endpoint and routes traffic to eligible matching Pods |
+| HorizontalPodAutoscaler | Can adjust replica count based on configured metrics and scaling policy |
+
+### Interview-ready answer
+“I run multiple backend replicas by setting `spec.replicas` in a Kubernetes Deployment, for example to three. Kubernetes works to maintain the desired number of Node.js Pods. I create a ClusterIP Service whose selector matches the backend Pod labels, so other workloads can reach the replicas through a stable DNS name. I verify the rollout, ready Pods, and Service endpoints with kubectl. For production, I also configure health probes, resource requests, and suitable resilience and scaling policies.”
+
 ---
