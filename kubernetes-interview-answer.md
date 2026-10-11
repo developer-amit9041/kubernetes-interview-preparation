@@ -18216,3 +18216,123 @@ kubectl describe resourcequota <quota-name>
 
 **Interview Answer:** If you do not specify resources for a Pod, Kubernetes has less explicit information for scheduling and resource control. This can make capacity planning less predictable and increase the risk of CPU contention, node memory pressure, and OOM kills. Namespace policies such as `LimitRange` may supply defaults, so the exact behavior depends on cluster configuration. Defining appropriate requests and limits improves predictability, but values should be based on measured workload requirements.
 
+---
+
+# 142. What Does `OOMKilled` Mean?
+
+## 1. English Definition
+
+`OOMKilled` means a container process was terminated by the operating system's Out-Of-Memory (OOM) mechanism because memory was exhausted or a memory limit was exceeded. In Kubernetes, this termination reason can appear in a container's status. Kubernetes may restart the container according to the Pod's restart policy.
+
+## 2. Hindi Definition
+
+`OOMKilled` ka matlab hai ki container ke process ko memory ki kami ya configured memory limit exceed hone ki wajah se operating system ke OOM mechanism ne terminate kar diya.
+
+Kubernetes mein yeh termination reason Pod ke status mein dikh sakta hai. Container restart hoga ya nahi, yeh Pod ki `restartPolicy` aur workload configuration par depend karta hai. Deployment ke Pods mein aam taur par container ko restart kiya jaata hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapka Node.js backend Kubernetes Pod mein run ho raha hai aur aapne memory limit `256Mi` set ki hai:
+
+```yaml
+resources:
+  requests:
+    memory: "128Mi"
+  limits:
+    memory: "256Mi"
+```
+
+Agar backend memory leak, heavy traffic, ya large data processing ki wajah se limit cross kar deta hai, toh Linux OOM mechanism container process ko kill kar sakta hai. Pod details mein termination reason `OOMKilled` nazar aa sakta hai.
+
+Lekin `OOMKilled` ka matlab hamesha yeh nahi ki container ne apni configured limit hi cross ki. Node par system-level memory pressure bhi OOM kill cause kar sakta hai. Isliye Pod events, container status, node events aur memory usage ko inspect karna chahiye.
+
+## 4. Practical Example / Code
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: node-backend
+spec:
+  restartPolicy: Always
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:latest
+      ports:
+        - containerPort: 5000
+      resources:
+        requests:
+          memory: "128Mi"
+        limits:
+          memory: "256Mi"
+```
+
+**Configuration explanation:**
+
+- `requests.memory: "128Mi"`: Scheduler 128 MiB requested memory account karta hai.
+- `limits.memory: "256Mi"`: Container ki configured memory limit 256 MiB hai.
+- `restartPolicy: Always`: Terminated container ko Kubernetes restart karne ki koshish karta hai, with back-off if repeated failures occur.
+- `OOMKilled`: Container termination ka reason memory-related OOM action tha.
+
+Example values ko actual application measurements ke basis par tune karna chahiye; limit bahut low rakhne se healthy workload bhi repeatedly OOM-killed ho sakta hai.
+
+## 5. Practical Commands
+
+```bash
+# Pod status and restart count
+kubectl get pods
+
+# Events, last termination state, and resource configuration
+kubectl describe pod node-backend
+
+# Read the last termination reason
+kubectl get pod node-backend -o jsonpath='{.status.containerStatuses[0].lastState.terminated.reason}'
+
+# Inspect logs from the previous container instance
+kubectl logs node-backend --previous
+
+# Check current memory usage (Metrics Server required)
+kubectl top pod node-backend
+kubectl top nodes
+
+# Inspect node-level events and pressure conditions
+kubectl describe node <node-name>
+```
+
+Note: `kubectl top` shows current observed usage, so it may not reveal a short-lived memory spike that already caused the kill. Use events, previous logs, and monitoring history when available.
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+       Node.js container uses memory
+                    |
+                    v
+       Memory limit exceeded OR
+       node memory pressure occurs
+                    |
+                    v
+         Operating system OOM action
+                    |
+                    v
+          Container process killed
+                    |
+                    v
+       Kubernetes reports OOMKilled
+                    |
+                    v
+       Pod restart policy is applied
+```
+
+## 7. Summary Table
+
+| Item | Meaning |
+|---|---|
+| `OOM` | Out Of Memory |
+| `OOMKilled` | Process/container was killed by an OOM mechanism |
+| Common causes | Memory limit exceeded, memory leak, traffic spike, large in-memory workload, or node memory pressure |
+| Does it always mean the container exceeded its own limit? | No; node-level memory pressure can also cause OOM kills |
+| How to investigate | `kubectl describe pod`, previous logs, node events, metrics and monitoring history |
+| Possible remediation | Profile memory use, fix leaks, tune requests/limits, optimize workload, or add node capacity where needed |
+
+**Interview Answer:** `OOMKilled` means the container was terminated by an Out-Of-Memory mechanism because of memory exhaustion or a memory limit being exceeded. Kubernetes may restart it according to the Pod's restart policy. To troubleshoot, inspect the Pod's termination reason, events, previous logs, memory metrics, and node memory pressure.
+
