@@ -28242,4 +28242,137 @@ If the image cannot be pulled, inspect Pod events. Common reasons include a wron
 ### Interview-ready answer
 “A Dockerfile defines how to build a container image, including the base image, dependencies, application files, and startup command. I use Docker tooling to build the image and push it to a registry such as Docker Hub or Amazon ECR. In Kubernetes, I reference that image in a Deployment manifest. Kubernetes schedules Pods and uses the node's container runtime to obtain the image and start containers. So, the Dockerfile builds the image, while Kubernetes deploys and manages workloads that use the image.”
 
+## 204. How do you deploy a Docker image in Kubernetes?
+
+### English Definition
+Deploying a Docker image in Kubernetes involves specifying the image in a Kubernetes Pod or Deployment manifest. Kubernetes schedules the Pods, and the node's container runtime pulls the image if necessary and starts containers from it.
+
+### Hindi Definition
+Docker image ko Kubernetes par deploy karne ke liye image ko registry mein accessible banate hain, phir Deployment YAML mein us image ka reference dete hain. Kubernetes Pods schedule karta hai aur node ka container runtime image se containers start karta hai. Deployment desired replica count maintain karne ki koshish karta hai.
+
+### Step 1: Understand the workflow
+
+```text
+Application source + Dockerfile
+             |
+             v
+       docker build
+             |
+             v
+        Docker image
+             |
+             v
+   Push to image registry
+    Docker Hub / Amazon ECR
+             |
+             v
+    Kubernetes Deployment YAML
+             |
+             v
+       Pods and containers
+```
+
+Kubernetes does not normally build the image from the Dockerfile. The image must be accessible to the cluster's container runtime, either from a registry or through a supported cluster-specific image-loading workflow.
+
+### Step 2: Build the Docker image
+
+Example Node.js backend `Dockerfile`:
+
+```dockerfile
+FROM node:22-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+EXPOSE 5000
+CMD ["npm", "start"]
+```
+
+Build the image:
+
+```bash
+docker build -t your-dockerhub-username/mern-backend:v1 .
+```
+
+This example assumes the application has an `npm start` script and listens on port 5000. Adapt the Dockerfile to the real project and do not copy credentials into the image.
+
+### Step 3: Push the image to a registry
+
+```bash
+docker login
+docker push your-dockerhub-username/mern-backend:v1
+```
+
+The image must have the correct registry path and tag. For a private registry, configure image-pull credentials or appropriate cloud identity permissions for the cluster. A local image on a developer's machine is not automatically available on cluster nodes.
+
+### Step 4: Create a Deployment manifest
+
+Create `backend-deployment.yaml`:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: node-backend
+  template:
+    metadata:
+      labels:
+        app: node-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:v1
+          ports:
+            - containerPort: 5000
+```
+
+Explanation:
+- `replicas: 2` asks Kubernetes to maintain two Pods.
+- `image` specifies the image and tag the runtime should use.
+- `selector.matchLabels` must match the Pod template labels.
+- `containerPort: 5000` declares the intended application port; the Node.js server must actually listen on it.
+
+### Step 5: Apply the Deployment
+
+```bash
+kubectl apply -f backend-deployment.yaml
+kubectl rollout status deployment/node-backend
+kubectl get deployments
+kubectl get pods
+```
+
+Kubernetes schedules the Pods to suitable nodes. The node's container runtime obtains the image if required and starts the containers. If the image is cached, it may not need to download every layer again, depending on the pull policy and runtime behavior.
+
+### Step 6: Verify and troubleshoot
+
+```bash
+kubectl describe deployment node-backend
+kubectl describe pod <pod-name>
+kubectl logs <pod-name>
+kubectl get events --sort-by=.metadata.creationTimestamp
+```
+
+Common problems:
+- `ErrImagePull` or `ImagePullBackOff`: wrong image path/tag, registry access issue, or missing credentials.
+- `CrashLoopBackOff`: container starts but repeatedly exits; inspect logs and startup configuration.
+- Pod is `Running` but not `Ready`: inspect readiness probes and application health.
+- Image architecture mismatch: ensure the image supports the node's architecture.
+- Port mismatch: ensure the app listens on the expected port; `containerPort` alone does not change the application port.
+
+### Step 7: Expose the application if needed
+
+A Deployment runs the Pods but does not by itself provide a stable network endpoint. For internal access, create a Service with a selector matching the Pod labels. For external HTTP/HTTPS access, use an appropriately configured Ingress controller or another supported exposure method. Do not assume that `containerPort` publishes the application to the internet.
+
+### Step 8: Image tags and pull policy
+
+Use a versioned immutable tag or image digest for predictable releases instead of relying on a mutable `latest` tag. Kubernetes supports `imagePullPolicy` values such as `IfNotPresent`, `Always`, and `Never`; if omitted, the default depends on the image tag and Kubernetes rules. `Always` asks the runtime to resolve/pull the image at container start, though cached layers can still be reused.
+
+### Interview-ready answer
+“I build the application image using Docker, tag it, and push it to a registry such as Docker Hub or Amazon ECR. I then reference that image in a Kubernetes Deployment manifest, configure the desired replicas, and apply the manifest with `kubectl apply`. Kubernetes schedules the Pods and the node's container runtime obtains the image if necessary and starts the containers. I verify the rollout and inspect Pod events and logs if there are image-pull or startup errors. If the application needs network access, I expose the Pods through a Service and, when appropriate, an Ingress.”
+
 ---
