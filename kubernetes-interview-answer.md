@@ -10073,3 +10073,122 @@ If communication fails, check the Service selector, Pod readiness, listening por
 | Cross-namespace Service DNS | Uses Service name plus namespace/domain | Use when the destination Service is in another namespace |
 
 **Remember:** Pods can communicate through Pod IPs, but a Kubernetes Service DNS name is generally preferred because Pod IPs can change when Pods are replaced.
+---
+
+# 80. How Does an Application Continue Working If a Service IP Changes?
+
+## 1. English Definition
+
+Kubernetes applications can communicate reliably by using a **Kubernetes Service DNS name instead of hard-coding a Service IP address**. If a Service is recreated and receives a different ClusterIP, applications using its DNS name can resolve the Service's current address.
+
+**Important:** A Service's ClusterIP normally remains stable for the lifetime of that Service. It may change if the Service is deleted and recreated.
+
+## 2. Hindi Definition
+
+Kubernetes mein application ko Service ke IP address par directly depend karne ke bajaye uske **DNS name** ka use karna chahiye.
+
+Agar Service delete karke dobara create ki jaati hai aur uska IP change ho jata hai, toh same naam aur namespace wali Service ka DNS name use karne wali application naya IP resolve kar sakti hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhare MERN project mein Node.js backend ko MongoDB Service se connect karna hai.
+
+Purana MongoDB Service IP `10.96.10.20` tha. Agar tum backend code mein ye IP hard-code kar doge, aur Service recreate hone par IP `10.96.25.40` ho gaya, toh purana hard-coded IP kaam nahi karega.
+
+Iske bajaye Service ka DNS name use karo:
+
+```javascript
+const mongoHost = "mongodb-service";
+```
+
+Same namespace mein `mongodb-service` DNS name resolve hokar Service ke current IP tak pahunch sakta hai.
+
+```text
+Node.js Backend
+       |
+       | mongodb-service
+       v
+ Kubernetes DNS
+       |
+       | Resolves current Service IP
+       v
+ MongoDB Service
+       |
+       v
+ MongoDB Pod(s)
+```
+
+**Yaad rakho:** DNS name stable service discovery provide karta hai, lekin existing database connections automatically repair nahi karta. Application ko connection failures handle karne aur zaroorat padne par reconnect karne ke liye bhi configure karna chahiye.
+
+## 4. Practical Example / Code
+
+### Avoid hard-coded Service IP
+
+```javascript
+// Avoid: this IP may become stale if the Service is recreated.
+const mongoHost = "10.96.10.20";
+```
+
+### Use the Service DNS name
+
+```javascript
+// Prefer the Service name when the app is in the same namespace.
+const mongoHost = "mongodb-service";
+const mongoUri = `mongodb://${mongoHost}:27017/myapp`;
+```
+
+If the MongoDB Service is in a different namespace, use a qualified DNS name, for example `mongodb-service.database.svc.cluster.local` (assuming namespace `database` and DNS domain `cluster.local`).
+
+DNS-based discovery avoids embedding a particular Service IP in application code. However, DNS caching, client connection pools, and already-open TCP connections may affect how quickly a client notices a change. Configure appropriate reconnect/retry behavior, and verify the cluster's DNS and network setup.
+
+## 5. Architecture Diagram
+
+```text
+Node.js Backend Pod
+        |
+        | Connect using mongodb-service
+        v
+    Kubernetes DNS
+        |
+        | Resolves current Service address
+        v
+    MongoDB Service
+        |
+        v
+    MongoDB Pod(s)
+```
+
+If the Service is deleted and recreated with a new ClusterIP, the Service name can remain the same and DNS can resolve it to the new address. A client using an old cached address may need to refresh its DNS result or retry the connection.
+
+## 6. Practical Commands / Configuration
+
+Check the Service's current ClusterIP:
+
+```bash
+kubectl get service mongodb-service
+```
+
+Inspect the Service:
+
+```bash
+kubectl describe service mongodb-service
+```
+
+Test DNS resolution from a Pod that has DNS tools installed:
+
+```bash
+nslookup mongodb-service
+```
+
+After a Service is recreated, check its current IP and resolve its DNS name again. Avoid deleting a production Service just to test this; use a controlled test environment. If connections still fail, inspect DNS caching, application retries, Service endpoints, and network policies.
+
+## 7. Summary Table
+
+| Approach | Result |
+|---|---|
+| Hard-code ClusterIP | May break if the Service is recreated with a new IP |
+| Use Service DNS name | Allows clients to discover the current Service address |
+| Keep the same Service name and namespace | Preserves the usual DNS name across Service recreation |
+| Handle reconnects and retries | Helps recover from interrupted connections |
+
+**Remember:** Use Kubernetes Service DNS names instead of hard-coded Service IPs. DNS helps discover the current address, while application retry and reconnect logic helps recover from interrupted connections.
