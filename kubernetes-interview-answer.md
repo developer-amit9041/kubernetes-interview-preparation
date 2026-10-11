@@ -471,3 +471,310 @@ Actual request distribution depends on Service configuration, readiness and clus
 | High availability support | Multiple replicas aur node distribution se resilience improve karna |
 
 **Important:** Kubernetes ki capabilities configuration, cluster resources aur application design par depend karti hain. Database backups, data durability, security, monitoring aur application-level reliability ke liye additional setup bhi zaroori hota hai.
+
+
+---
+
+# 4. What Is a Pod in Kubernetes?
+
+## 1. English Definition
+
+A **Pod** is the smallest deployable unit in Kubernetes. It contains one or more containers that run together on the same node and can share networking and configured storage volumes.
+
+## 2. Hindi Definition
+
+Pod Kubernetes ki sabse chhoti deployable unit hoti hai. Iske andar ek ya ek se zyada containers ho sakte hain, jo same node par saath run karte hain aur network resources share kar sakte hain.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application ka Node.js backend Kubernetes par deploy hai. Kubernetes backend container ko Pod ke andar run karta hai.
+
+```text
+Kubernetes Cluster
+       |
+   Worker Node
+       |
+   Backend Pod
+   +------------------+
+   | Node.js Container|
+   | Express API      |
+   +------------------+
+```
+
+Usually ek application container per Pod common pattern hai. Tightly coupled helper containers bhi same Pod mein run kar sakte hain.
+
+### Important points
+
+1. **Smallest deployable unit:** Kubernetes workloads ko Pod ke through schedule karta hai.
+2. **Shared network:** Same Pod ke containers same IP aur port space share karte hain. Woh aapas mein `localhost` se communicate kar sakte hain, agar ports conflict na karein.
+3. **Shared storage:** Containers configured volumes share kar sakte hain.
+4. **Ephemeral nature:** Pod replace hone par uska IP change ho sakta hai. Stable access ke liye Kubernetes Service use hoti hai.
+5. **Controllers:** Deployment jaise controllers desired Pod replicas maintain karte hain.
+
+## 4. Practical Commands
+
+```bash
+kubectl get pods
+kubectl describe pod <pod-name>
+kubectl logs <pod-name>
+kubectl apply -f backend-deployment.yaml
+```
+
+Deployment generally manually created standalone Pod se better hai, kyunki controller replicas aur recovery manage karne mein help karta hai.
+
+## 5. Pod vs Container
+
+| Pod | Container |
+|---|---|
+| Kubernetes ki deployable unit | Application ko isolated environment mein run karta hai |
+| Ek ya multiple containers rakh sakta hai | Pod ke andar run ho sakta hai |
+| Scheduling Pod level par hoti hai | Pod ka part hota hai |
+| Network aur configured volumes share karwa sakta hai | Pod ke shared resources use kar sakta hai |
+
+**Remember:** Container application run karta hai; Pod Kubernetes mein us container ko deploy aur manage karne ki basic unit hai.
+
+---
+
+# 5. What Is a Container?
+
+## 1. English Definition
+
+A **container** is a lightweight, isolated runtime environment that packages an application with its required dependencies, libraries, and configuration so it can run consistently across different environments.
+
+## 2. Hindi Definition
+
+Container ek lightweight, isolated environment hota hai jisme application ko run karne ke liye zaroori dependencies, libraries aur configuration hoti hain. Isse application different environments par consistently run kar sakti hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapne MERN application banayi hai:
+
+- React — Frontend
+- Node.js + Express.js — Backend
+- MongoDB — Database
+
+Aapke laptop par backend chal raha hai, lekin doosre server par Node.js version ya dependencies ki wajah se error aa raha hai. Docker image mein application aur required dependencies package karne se environment consistency improve hoti hai.
+
+```text
+Docker Image
+    |
+ docker run
+    v
+Running Container
++------------------------+
+| Node.js application    |
+| Required npm packages  |
+| Application config     |
++------------------------+
+```
+
+Linux containers host ka kernel share karte hain; woh apna complete OS kernel bundle nahi karte.
+
+## 4. Practical Node.js Example
+
+Project structure:
+
+```text
+mern-backend/
+├── server.js
+├── package.json
+├── package-lock.json
+└── Dockerfile
+```
+
+### server.js
+
+```javascript
+const express = require("express");
+const app = express();
+
+app.get("/", (req, res) => {
+  res.send("Hello from Docker Container!");
+});
+
+app.listen(5000, () => {
+  console.log("Server running on port 5000");
+});
+```
+
+### Dockerfile
+
+```dockerfile
+FROM node:22-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+EXPOSE 5000
+CMD ["npm", "start"]
+```
+
+Ensure `package.json` mein Express dependency aur `"start": "node server.js"` script ho.
+
+### Build and run
+
+```bash
+docker build -t mern-backend .
+docker run -d -p 5000:5000 --name my-backend mern-backend
+```
+
+Browser mein `http://localhost:5000` open karne par expected response hai:
+
+```text
+Hello from Docker Container!
+```
+
+## 5. Docker Image vs Container
+
+| Docker Image | Docker Container |
+|---|---|
+| Template ya blueprint | Image se create hua instance |
+| Build ki jaati hai | Image se create aur run hota hai |
+| `docker build` | `docker run` |
+
+**Remember:** Dockerfile image banane ke instructions deti hai, image template hai aur container us image se run hone wala instance hai.
+
+---
+
+# 6. What Is the Difference Between Kubernetes and Docker Compose?
+
+## 1. English Definition
+
+**Docker Compose** defines and runs multi-container applications, commonly on a single Docker host for local development and testing.
+
+**Kubernetes** is a container orchestration platform that manages containerized applications across a cluster and supports scaling, self-healing, service discovery, and rolling updates.
+
+## 2. Hindi Definition
+
+**Docker Compose:** Multiple containers, jaise React, Node.js aur MongoDB, ko ek configuration file se saath run aur manage karne ke liye use hota hai.
+
+**Kubernetes:** Containerized applications ko cluster mein deploy, scale aur manage karne ke liye use hota hai. Ye replicas maintain karne, failed Pods replace karne aur updates manage karne mein help karta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+### Docker Compose
+
+Aap `compose.yaml` mein services define kar sakte ho:
+
+```yaml
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+
+  backend:
+    build: ./backend
+    ports:
+      - "5000:5000"
+
+  mongodb:
+    image: mongo:8
+    volumes:
+      - mongo-data:/data/db
+
+volumes:
+  mongo-data:
+```
+
+Services start karne ke liye:
+
+```bash
+docker compose up -d
+```
+
+Ye local development aur testing mein teeno services ko saath run karne ka simple tareeka hai.
+
+### Kubernetes
+
+Kubernetes mein Deployment aur Service jaise resources define karte hain:
+
+```bash
+kubectl apply -f backend-deployment.yaml
+kubectl get pods
+kubectl scale deployment mern-backend --replicas=3
+```
+
+Kubernetes controllers desired replicas maintain karne mein help karte hain. Scaling aur recovery sahi configuration aur cluster resources par depend karti hai.
+
+## 4. Architecture Difference
+
+```text
+DOCKER COMPOSE
+Docker Host
+  ├── React Container
+  ├── Node.js Container
+  └── MongoDB Container
+
+KUBERNETES
+Kubernetes Cluster
+  ├── Worker Node 1
+  │     └── Backend Pod(s)
+  └── Worker Node 2
+        ├── Frontend Pod(s)
+        └── Other workload Pod(s)
+```
+
+Ye conceptual diagram hai; Kubernetes workloads ko available resources aur scheduling rules ke basis par place karta hai.
+
+## 5. Main Differences
+
+| Feature | Docker Compose | Kubernetes |
+|---|---|---|
+| Primary purpose | Multi-container apps run karna | Container orchestration |
+| Typical use | Local development and testing | Clustered environments and production |
+| Configuration | `compose.yaml` | Kubernetes YAML manifests |
+| Architecture | Usually one Docker host | Cluster with control plane and worker nodes |
+| Scaling | Service configuration/manual scaling | Replica management and optional HPA |
+| Self-healing | Restart policies se limited recovery | Controllers failed Pods replace kar sakte hain |
+| Networking | Compose network and published ports | Services and cluster networking |
+| Rolling updates | Full orchestration features limited | Deployment rolling updates support karta hai |
+| Complexity | Relatively simple | More setup and operational complexity |
+| Main command | `docker compose up -d` | `kubectl apply -f ...` |
+
+## 6. When Should You Use Each?
+
+**Docker Compose use karein jab:**
+- Local machine par MERN application develop karni ho.
+- React, Node.js aur MongoDB ko ek saath run karna ho.
+- Simple local testing environment chahiye.
+
+**Kubernetes use karein jab:**
+- Application ko cluster par deploy karna ho.
+- Multiple replicas aur self-healing chahiye.
+- Rolling updates, rollback aur declarative scaling chahiye.
+
+## 7. Can We Use Both Together?
+
+Yes. Aap local development ke liye Docker Compose aur production deployment ke liye Kubernetes use kar sakte ho.
+
+```text
+Develop MERN Application
+          |
+          v
+Docker Compose
+(Local development/testing)
+          |
+          v
+Build Docker Images
+          |
+          v
+Push Images to Container Registry
+          |
+          v
+Deploy Images with Kubernetes
+(Production cluster)
+```
+
+Compose file automatically Kubernetes manifest nahi ban jaati; Kubernetes Deployment aur Service jaise resources separately define karne hote hain.
+
+## 8. Summary
+
+| Docker Compose | Kubernetes |
+|---|---|
+| Simple multi-container workflow | Cluster-level container orchestration |
+| Commonly local development mein | Commonly production clusters mein |
+| Quick setup | More configuration and operations |
+| `docker compose up -d` | `kubectl apply -f ...` |
+
+**Remember:** Docker Compose containers ko ek saath run karne mein help karta hai; Kubernetes containers ko cluster mein orchestrate, scale aur recover karne mein help karta hai.
