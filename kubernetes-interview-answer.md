@@ -17574,3 +17574,123 @@ kubectl top nodes
 
 **Interview Answer:** A CPU request specifies the CPU amount Kubernetes uses for scheduling a Pod. The scheduler checks whether a node has enough allocatable capacity to accommodate the request. A CPU request is not a hard limit, so a container can use more CPU than its request when capacity is available and no lower CPU limit prevents it.
 
+---
+
+# 137. What Is a CPU Limit?
+
+## 1. English Definition
+
+A CPU limit specifies the maximum amount of CPU time a container is allowed to consume. Kubernetes enforces this limit through the container runtime and Linux CPU controls; when a container tries to use more CPU than its limit allows, it is typically throttled rather than restarted.
+
+## 2. Hindi Definition
+
+CPU limit woh maximum CPU capacity set karti hai jitni container use kar sakta hai. Agar container apni CPU limit se zyada CPU use karne ki koshish karta hai, toh Kubernetes uski CPU usage ko throttle karta hai.
+
+CPU limit cross karne se container normally restart nahi hota. Yeh memory limit se alag hai, kyunki memory limit exceed hone par container OOM kill ho sakta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapka Node.js backend Kubernetes Pod mein run kar raha hai. Aap set karte ho:
+
+```yaml
+resources:
+  requests:
+    cpu: "250m"
+  limits:
+    cpu: "1"
+```
+
+Iska matlab:
+
+- `requests.cpu: "250m"`: Scheduler scheduling ke liye 0.25 CPU core ki capacity account karega.
+- `limits.cpu: "1"`: Container maximum 1 CPU core ke equivalent CPU time tak use kar sakta hai.
+
+Agar backend par heavy traffic aata hai aur woh ek core se zyada CPU demand karta hai, toh container ko CPU throttling ho sakti hai. Isse request processing slow ho sakti hai, lekin CPU limit cross hone ki wajah se container automatically restart nahi hota.
+
+## 4. Practical Example / Code
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: node-backend
+spec:
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:latest
+      ports:
+        - containerPort: 5000
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "256Mi"
+        limits:
+          cpu: "1"
+          memory: "512Mi"
+```
+
+**Configuration explanation:**
+
+- `requests.cpu: "250m"`: CPU scheduling request, equivalent to one-quarter of a CPU core.
+- `limits.cpu: "1"`: CPU usage ceiling, equivalent to one CPU core.
+- `requests.memory: "256Mi"`: Memory amount accounted for scheduling.
+- `limits.memory: "512Mi"`: Memory usage limit; exceeding it can lead to an out-of-memory kill.
+
+CPU is a compressible resource: exceeding the CPU limit typically causes throttling. Memory is not compressible in the same way, so exceeding a memory limit can result in the container being terminated for OOM.
+
+## 5. Practical Commands
+
+```bash
+# Apply the Pod manifest
+kubectl apply -f backend-pod.yaml
+
+# Check Pod status and restart count
+kubectl get pods
+
+# Inspect resource requests, limits, events, and throttling clues
+kubectl describe pod node-backend
+
+# View configured resource settings
+kubectl get pod node-backend -o yaml
+
+# Check current usage (Metrics Server required)
+kubectl top pod node-backend
+```
+
+`kubectl top` reports observed CPU and memory usage, but it does not directly show CPU throttling. Container runtime or monitoring metrics are needed to investigate throttling accurately.
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+        Container requests CPU
+                 |
+                 v
+       CPU limit configured
+          e.g. 1 CPU
+                 |
+                 v
+       Container demands CPU
+                 |
+       +---------+---------+
+       |                   |
+  Within limit        Tries to exceed
+       |                   |
+       v                   v
+   Runs normally      CPU throttling
+                           |
+                    May increase latency
+                    (container usually stays running)
+```
+
+## 7. Summary Table
+
+| Setting / situation | Meaning |
+|---|---|
+| `limits.cpu: "1"` | Maximum CPU usage equivalent to one core |
+| CPU demand exceeds limit | Container is typically throttled |
+| Does CPU limit failure restart a container? | No, not by itself |
+| Memory usage exceeds memory limit | Container may be OOM-killed |
+| CPU request vs CPU limit | Request helps scheduling; limit caps CPU usage |
+
+**Interview Answer:** A CPU limit defines the maximum CPU resource a container can consume. If the container tries to exceed this limit, it is typically CPU-throttled rather than restarted. CPU requests help Kubernetes schedule Pods, while CPU limits restrict CPU usage.
+
