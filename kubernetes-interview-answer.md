@@ -25327,4 +25327,294 @@ Production mein deployment strategy, backward-compatible API/database changes, i
 
 “I would first containerize the Node.js/Express API using a Dockerfile and test the image locally. Then I would push a versioned image to a container registry, create a Kubernetes namespace, and store non-sensitive settings in a ConfigMap and credentials such as the MongoDB URI in a Secret. I would deploy the backend with a Deployment, expose it internally through a ClusterIP Service, and configure readiness and liveness probes plus CPU and memory requests/limits. If external API access is required, I would route traffic through an Ingress with DNS and TLS. Finally, I would verify the rollout and logs, and use versioned images and rollback support for updates.”
 
+
+## 188. How Would You Deploy MongoDB in Kubernetes?
+
+### 1. English Definition
+
+MongoDB can be deployed in Kubernetes using a StatefulSet, persistent storage through PersistentVolumeClaims (PVCs), a Service for network access, and Secrets for credentials. For production, a database operator or a managed MongoDB service may be preferable, depending on availability, backup, and operational requirements.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+Kubernetes mein MongoDB deploy karne ke liye generally **StatefulSet + PVC + Service + Secret** use kar sakte hain.
+
+- **StatefulSet:** MongoDB Pod ko stable identity deta hai.
+- **PVC:** Database ka data persistent storage par rakhne ke liye storage request karta hai.
+- **Service:** Backend ko MongoDB tak stable network access deti hai.
+- **Secret:** Database username/password jaise credentials provide karta hai.
+
+Agar MongoDB Pod delete ho jaye, toh properly configured persistent storage ki wajah se data retain kiya ja sakta hai. Lekin StatefulSet akela backup, replication ya high availability guarantee nahi karta.
+
+### 3. Hinglish Explanation — Step by Step
+
+Maan lo aapki MERN application ka Node.js backend MongoDB use karta hai. Aap MongoDB ko Kubernetes cluster ke andar run karna chahte ho. Is example mein ek MongoDB instance deploy karenge for learning/development. Production deployment ke liye backups, monitoring, authentication, storage policies, upgrades aur high availability ka separate plan zaroori hai.
+
+### Step 1: Architecture samjho
+
+```text
+Node.js / Express Backend
+          |
+          v
+MongoDB Service (internal DNS)
+          |
+          v
+MongoDB StatefulSet
+          |
+          v
+MongoDB Pod: mongo-0
+          |
+          v
+PersistentVolumeClaim (PVC)
+          |
+          v
+PersistentVolume / Storage
+```
+
+Credentials Kubernetes Secret mein rakhenge. StatefulSet stable Pod identity provide karega, aur PVC database data files ke liye persistent storage request karega.
+
+### Step 2: Kubernetes cluster aur namespace ready karo
+
+Aapke paas working Kubernetes cluster hona chahiye aur `kubectl` us cluster se connected hona chahiye. Local learning ke liye Minikube use kar sakte ho; production mein storage, security aur operational requirements ko evaluate karna chahiye.
+
+Namespace create karo:
+
+```bash
+kubectl create namespace database
+```
+
+Agar namespace already exist karta hai, toh usi ko reuse karo.
+
+### Step 3: MongoDB credentials ko Secret mein rakho
+
+MongoDB root username aur password ko Kubernetes Secret mein create karo:
+
+```bash
+kubectl create secret generic mongo-auth \
+  --namespace database \
+  --from-literal=username='admin' \
+  --from-literal=password='REPLACE_WITH_A_STRONG_PASSWORD'
+```
+
+Password placeholder ko apne strong password se replace karo. Production mein secret ko source control mein commit mat karo; shell history, RBAC, encryption at rest aur external secret-management options ka dhyan rakho. Kubernetes Secret ko by default automatically encrypted-at-rest maan kar mat chalo.
+
+### Step 4: Headless Service aur StatefulSet YAML banao
+
+`k8s/mongodb.yaml` file create karo:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo
+  namespace: database
+spec:
+  clusterIP: None
+  selector:
+    app: mongo
+  ports:
+    - name: mongodb
+      port: 27017
+      targetPort: 27017
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo
+  namespace: database
+spec:
+  serviceName: mongo
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo
+  template:
+    metadata:
+      labels:
+        app: mongo
+    spec:
+      containers:
+        - name: mongodb
+          image: mongo:7.0
+          ports:
+            - name: mongodb
+              containerPort: 27017
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-auth
+                  key: username
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-auth
+                  key: password
+          volumeMounts:
+            - name: mongo-data
+              mountPath: /data/db
+          readinessProbe:
+            tcpSocket:
+              port: 27017
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+  volumeClaimTemplates:
+    - metadata:
+        name: mongo-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+```
+
+**Important:** Yeh single-instance learning example hai. `mongo:7.0` ko apni supported, patched version ke saath pin aur test karo. Storage provision karne ke liye cluster mein suitable StorageClass available honi chahiye, ya compatible PersistentVolume pre-provisioned hona chahiye. CPU, memory aur storage values example hain; real workload ke hisaab se adjust karo.
+
+### Step 5: YAML ko samjho
+
+**Headless Service**
+
+- `clusterIP: None` headless Service create karta hai.
+- StatefulSet ke Pod ko predictable network identity milti hai.
+- Pod ka DNS name is example mein `mongo-0.mongo.database.svc.cluster.local` hoga, subject to cluster DNS configuration.
+
+**StatefulSet**
+
+- `replicas: 1` ek MongoDB Pod maintain karta hai.
+- Pod ka naam `mongo-0` hoga.
+- `serviceName: mongo` governing Service ko identify karta hai.
+- `volumeClaimTemplates` har StatefulSet Pod ke liye PVC create karta hai.
+
+**Persistent storage**
+
+- `mountPath: /data/db` MongoDB ke data directory ko persistent volume par mount karta hai.
+- PVC 10Gi storage request karta hai.
+- Pod recreate hone par same claim ka data dobara attach ho sakta hai, agar storage system aur policies allow karte hain.
+
+**Credentials**
+
+- `MONGO_INITDB_ROOT_USERNAME` aur `MONGO_INITDB_ROOT_PASSWORD` Secret se aate hain.
+- Official MongoDB image in initialization variables ko initial database setup ke waqt use karti hai. Existing data directory par password badalne ke liye sirf Secret update karna enough nahi hota; database credentials ko bhi properly rotate karna hota hai.
+
+**Health probe**
+
+- TCP readiness probe check karti hai ki port 27017 par connection accept ho raha hai.
+- Yeh probe MongoDB authentication, queries ya replica-set health validate nahi karti. Production mein database-aware health monitoring use karo.
+
+### Step 6: MongoDB deploy karo
+
+Manifest apply karo:
+
+```bash
+kubectl apply -f k8s/mongodb.yaml
+```
+
+Deployment resources check karo:
+
+```bash
+kubectl get statefulset,pods,services,pvc -n database
+```
+
+Pod ready hone ka wait karo:
+
+```bash
+kubectl rollout status statefulset/mongo -n database
+```
+
+Logs check karo:
+
+```bash
+kubectl logs mongo-0 -n database
+```
+
+Agar Pod start nahi hota, toh details aur events check karo:
+
+```bash
+kubectl describe pod mongo-0 -n database
+kubectl get events -n database --sort-by=.metadata.creationTimestamp
+kubectl describe pvc mongo-data-mongo-0 -n database
+```
+
+PVC `Pending` ho toh StorageClass, PersistentVolume availability, access modes aur cluster storage provisioner check karo.
+
+### Step 7: MongoDB ko backend se connect karo
+
+Is example mein headless Service aur StatefulSet DNS use hota hai. Connection URI ka conceptual format:
+
+```text
+mongodb://USERNAME:PASSWORD@mongo-0.mongo.database.svc.cluster.local:27017/admin?authSource=admin
+```
+
+Actual username/password ko URI mein correctly encode karna zaroori hai, especially agar password mein reserved URL characters hon. URI ko code mein hardcode ya GitHub par commit mat karo; backend ko Kubernetes Secret ya approved secret-management system ke through provide karo.
+
+Agar backend bhi isi cluster mein hai, toh Service DNS use kar sakta hai. Browser mein chalne wala React frontend MongoDB ko directly access nahi karna chahiye; database access backend tak limited rakho.
+
+### Step 8: MongoDB ko locally test karo
+
+Testing ke liye port-forward chalao:
+
+```bash
+kubectl port-forward service/mongo 27017:27017 -n database
+```
+
+Phir apne trusted local MongoDB client se `localhost:27017` connect kar sakte ho, aur configured credentials provide kar sakte ho. Yeh local testing ke liye hai; MongoDB ko public internet par directly expose karna recommended nahi hai.
+
+### Step 9: Data persistence aur backup ka difference samjho
+
+- **PVC / persistent storage:** Pod recreate hone par database files ko retain karne mein help karta hai.
+- **Backup:** Accidental deletion, corruption, storage failure ya disaster ke baad recovery ke liye separate backup chahiye.
+- **Replication / high availability:** Multiple MongoDB members, replica-set configuration, failure handling aur monitoring ki zaroorat hoti hai; sirf `replicas: 3` set kar dene se valid MongoDB replica set nahi ban jata.
+- **Production operations:** Database operator ya managed MongoDB service upgrades, backups, failover aur monitoring ko manage karne mein help kar sakte hain, depending on the selected solution.
+
+### Step 10: Troubleshooting commands
+
+| Problem | Command / check |
+|---|---|
+| Pod start nahi ho raha | `kubectl describe pod mongo-0 -n database` |
+| MongoDB logs dekhne hain | `kubectl logs mongo-0 -n database` |
+| PVC Pending hai | `kubectl get pvc -n database` |
+| Service check karni hai | `kubectl get svc mongo -n database` |
+| Pod DNS/network issue | Backend Pod se DNS aur TCP connectivity test karo |
+| Authentication failure | Secret values, actual MongoDB users aur `authSource` verify karo |
+
+### 4. Practical Commands — Quick Revision
+
+```bash
+kubectl create namespace database
+
+kubectl apply -f k8s/mongodb.yaml
+
+kubectl get statefulset,pods,services,pvc -n database
+
+kubectl rollout status statefulset/mongo -n database
+
+kubectl logs mongo-0 -n database
+
+kubectl port-forward service/mongo 27017:27017 -n database
+```
+
+### 5. Summary Table
+
+| Resource | Responsibility |
+|---|---|
+| StatefulSet | Stable Pod identity aur ordered workload management |
+| Headless Service | Stateful Pod DNS identity provide karti hai |
+| PVC | Persistent storage request karta hai |
+| PV / StorageClass | Storage provide ya dynamically provision karte hain |
+| Secret | MongoDB credentials provide karta hai |
+| Readiness probe | Basic TCP readiness check karta hai; authentication validate nahi karta |
+| Backup solution | Recovery ke liye separate backup provide karta hai |
+| Database operator / managed database | Production operations aur high availability requirements mein help kar sakta hai |
+
+**Interview-Ready Answer:**
+
+“I would first decide whether MongoDB should be managed externally or run inside Kubernetes. If self-hosting is required, I would use a StatefulSet with persistent storage through a PVC, a Service for stable network access, and a Secret for credentials. I would configure resource requests and limits, health monitoring, and secure access, then verify the Pod, Service, and PVC. For production, I would also implement tested backups, monitoring, upgrades, and a proper replica-set or operator-based design; a single StatefulSet replica alone does not provide high availability.”
+
 ---
