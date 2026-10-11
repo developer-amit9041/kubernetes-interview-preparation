@@ -5994,3 +5994,106 @@ If the container has no shell, use available executable commands or consider an 
 | Exit shell | `exit` |
 
 **Remember:** Use `kubectl exec -it <pod-name> -- /bin/sh` to open a shell inside a running Pod. Use `-c` when the Pod has multiple containers.
+---
+
+# 49. How Do You Check a Pod's IP Address?
+
+## 1. English Definition
+
+**A Pod IP address is the IP address assigned to a Pod by the Kubernetes cluster's networking system.** You can check it using `kubectl get pods -o wide` or retrieve it directly using a JSONPath query.
+
+Each Pod normally receives its own IP address, which allows workloads to communicate over the cluster network, subject to the cluster's networking configuration.
+
+## 2. Hindi Definition
+
+Kubernetes mein jab Pod create hota hai, toh cluster networking system usko usually ek IP address assign karta hai. Hum `kubectl get pods -o wide` command se Pod ka IP address dekh sakte hain. Is IP ki help se cluster ke andar doosre workloads Pod se communicate kar sakte hain.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application mein Node.js backend aur MongoDB alag-alag Pods mein chal rahe hain.
+
+- Backend Pod ka example IP: `10.244.1.5`
+- MongoDB Pod ka example IP: `10.244.2.8`
+
+Yeh sirf example IP addresses hain. Actual addresses tumhare Kubernetes cluster par depend karenge.
+
+Pod IP check karne ke liye `kubectl get pods -o wide` run karo. Output mein `IP` column milega.
+
+**Important:** Pod IP change ho sakta hai jab Pod recreate ya replace hota hai. Isliye applications ko generally doosre workloads tak pahunchne ke liye Kubernetes Service ka stable DNS name use karna chahiye, direct Pod IP nahi.
+
+## 4. Practical Example / Code
+
+Suppose your backend Pod is named `mern-backend-7d9c6f8b7f-abc12`.
+
+```bash
+# Show Pods with their IP addresses
+kubectl get pods -o wide
+
+# Show the IP of one Pod
+kubectl get pod mern-backend-7d9c6f8b7f-abc12 -o wide
+```
+
+## 5. Architecture Diagram
+
+```text
+       Kubernetes cluster
+               |
+       +-------+--------+
+       |                |
+       v                v
+  Backend Pod       MongoDB Pod
+  Example IP:       Example IP:
+  10.244.1.5        10.244.2.8
+       |                |
+       +------ network -+
+       (subject to cluster networking)
+```
+
+## 6. Practical Commands / Configuration
+
+**List all Pods and their IP addresses:**
+
+```bash
+kubectl get pods -o wide
+```
+
+**Check a specific Pod:**
+
+```bash
+kubectl get pod <pod-name> -o wide
+```
+
+**Print only the Pod IP:**
+
+```bash
+kubectl get pod <pod-name> -o jsonpath='{.status.podIP}'
+```
+
+**Check Pods in a specific namespace:**
+
+```bash
+kubectl get pods -n production -o wide
+```
+
+**Check the IP of Pods across all namespaces:**
+
+```bash
+kubectl get pods -A -o wide
+```
+
+**Recommended for application-to-application communication:**
+
+Use a Kubernetes Service DNS name, for example `mongodb-service` from the same namespace, rather than hard-coding a Pod IP. A Service provides a stable endpoint while backing Pods may be replaced.
+
+## 7. Summary Table
+
+| Requirement | Command / Guidance |
+|---|---|
+| View all Pod IPs | `kubectl get pods -o wide` |
+| View one Pod's IP | `kubectl get pod <pod-name> -o wide` |
+| Print only the IP | `kubectl get pod <pod-name> -o jsonpath='{.status.podIP}'` |
+| View IPs in a namespace | `kubectl get pods -n <namespace> -o wide` |
+| View IPs across namespaces | `kubectl get pods -A -o wide` |
+| Stable app-to-app access | Prefer a Kubernetes Service DNS name over a Pod IP |
+
+**Remember:** Use `kubectl get pods -o wide` for a quick view of Pod IP addresses. Pod IPs can change when Pods are replaced, so use Services for stable communication.
