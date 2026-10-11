@@ -5870,3 +5870,127 @@ Note: `kubectl logs` shows container output written to standard output and stand
 | Deployment logs | `kubectl logs deployment/<deployment-name>` |
 
 **Remember:** Start with `kubectl get pods` to find the Pod name, then use `kubectl logs <pod-name>`. If the container has restarted, try `--previous`.
+---
+
+# 48. How Do You Open a Shell Inside a Pod?
+
+## 1. English Definition
+
+**You can open an interactive shell inside a running Kubernetes Pod using the `kubectl exec` command.** It allows you to execute commands inside a container for debugging, inspecting files, checking environment variables, and troubleshooting application issues.
+
+The most common command is:
+
+```bash
+kubectl exec -it <pod-name> -- /bin/sh
+```
+
+## 2. Hindi Definition
+
+Kubernetes mein Pod ke andar shell open karne ke liye hum `kubectl exec` command use karte hain. Isse hum container ke andar jaakar commands chala sakte hain, files check kar sakte hain aur application ko debug kar sakte hain.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application ka Node.js backend Kubernetes mein chal raha hai. Tumhe check karna hai ki container ke andar kaun-si files hain ya environment variables set hain ya nahi.
+
+Pehle Pod ka naam check karo:
+
+```bash
+kubectl get pods
+```
+
+Phir shell open karo:
+
+```bash
+kubectl exec -it mern-backend-7d9c6f8b7f-abc12 -- /bin/sh
+```
+
+Ab tum container ke andar ho. Tum `ls`, `pwd` aur `printenv` jaise commands chala sakte ho.
+
+`-i` interactive input ke liye aur `-t` terminal allocate karne ke liye use hota hai.
+
+## 4. Practical Example / Code
+
+Suppose the Pod is named `mern-backend-7d9c6f8b7f-abc12` and the container includes `/bin/sh`.
+
+```bash
+# List Pods
+kubectl get pods
+
+# Open a shell
+kubectl exec -it mern-backend-7d9c6f8b7f-abc12 -- /bin/sh
+
+# These commands run inside the container
+pwd
+ls
+printenv
+
+# Exit the shell
+exit
+```
+
+## 5. Architecture Diagram
+
+```text
+     Developer terminal
+             |
+             v
+  kubectl exec -it <pod> -- /bin/sh
+             |
+             v
+      Kubernetes API
+             |
+             v
+       Target Pod/container
+             |
+             v
+   Interactive shell session
+```
+
+## 6. Practical Commands / Configuration
+
+**Open a shell using `/bin/sh`:**
+
+```bash
+kubectl exec -it <pod-name> -- /bin/sh
+```
+
+**Use Bash if it is installed in the image:**
+
+```bash
+kubectl exec -it <pod-name> -- /bin/bash
+```
+
+Minimal images such as Alpine-based or distroless images may not include Bash; some distroless images may not include any shell.
+
+**Choose a container in a multi-container Pod:**
+
+```bash
+kubectl exec -it <pod-name> -c <container-name> -- /bin/sh
+```
+
+**Open a shell in a Pod in a specific namespace:**
+
+```bash
+kubectl exec -it -n production <pod-name> -- /bin/sh
+```
+
+**Run one command without opening an interactive shell:**
+
+```bash
+kubectl exec <pod-name> -- ls
+```
+
+If the container has no shell, use available executable commands or consider an approved ephemeral debug container, subject to cluster permissions and policy. `kubectl exec` generally requires the target container to be running.
+
+## 7. Summary Table
+
+| Requirement | Command |
+|---|---|
+| Open shell | `kubectl exec -it <pod-name> -- /bin/sh` |
+| Open Bash if installed | `kubectl exec -it <pod-name> -- /bin/bash` |
+| Select container | `kubectl exec -it <pod-name> -c <container-name> -- /bin/sh` |
+| Specify namespace | `kubectl exec -it -n <namespace> <pod-name> -- /bin/sh` |
+| Run one command | `kubectl exec <pod-name> -- ls` |
+| Exit shell | `exit` |
+
+**Remember:** Use `kubectl exec -it <pod-name> -- /bin/sh` to open a shell inside a running Pod. Use `-c` when the Pod has multiple containers.
