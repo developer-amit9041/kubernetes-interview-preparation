@@ -27001,4 +27001,174 @@ kubectl rollout status deployment/node-backend
 ### Interview-ready answer
 “In a MERN application, I use ConfigMaps for non-sensitive configuration such as the backend port, environment name, log level, and feature flags. I use Secrets for sensitive values such as the MongoDB connection string when it contains credentials, JWT signing keys, and private third-party API keys. The backend Deployment references these resources through `envFrom`, `env`, or `secretKeyRef`, and Node.js reads the values from `process.env`. For React, I only expose public configuration because browser-delivered variables are visible to users. I also protect Secrets with RBAC, encryption at rest, and secure provisioning, and I never commit real credentials to GitHub.”
 
+## 196. How would you configure a readiness probe for a Node.js application?
+
+### English Definition
+A readiness probe is a Kubernetes health check that determines whether a container is ready to receive traffic. If the probe fails, Kubernetes marks the Pod as not ready and normally removes it from the ready endpoints used by Services, while continuing to run the container.
+
+### Hindi Definition
+Readiness probe Kubernetes ko batati hai ki Node.js application requests handle karne ke liye ready hai ya nahi. Agar application ready nahi hai, toh Kubernetes us Pod ko normal Service traffic se temporarily hata sakta hai. Jab application dobara ready ho jaati hai, toh Pod ko traffic mil sakta hai.
+
+### Step 1: Understand the real-world situation
+Maan lo MERN backend ke do Pods hain:
+- Backend Pod 1 is ready and can handle API requests.
+- Backend Pod 2 is still starting or waiting for a required database connection.
+
+Readiness probes help Kubernetes distinguish between a running container and an application that is ready to serve requests. A readiness failure does not restart the container; it changes the Pod's readiness and its eligibility for normal Service traffic.
+
+```text
+Backend Service
+      |
+      +---- Ready Pod 1 (receives traffic)
+      |
+      +---- Not-ready Pod 2 (excluded from ready endpoints)
+```
+
+### Step 2: Create a readiness endpoint in Express
+Example `server.js`:
+
+```javascript
+const express = require("express");
+
+const app = express();
+let isReady = false;
+
+app.get("/health/ready", (req, res) => {
+  if (!isReady) {
+    return res.status(503).json({ status: "not ready" });
+  }
+
+  return res.status(200).json({ status: "ready" });
+});
+
+async function startServer() {
+  try {
+    // Perform required startup work here, such as connecting to MongoDB.
+    // await connectDB();
+
+    isReady = true;
+
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log("Backend running on port " + PORT);
+    });
+  } catch (error) {
+    console.error("Backend startup failed:", error.message);
+    process.exit(1);
+  }
+}
+
+startServer();
+```
+
+**Explanation:**
+- Kubernetes requests `/health/ready`.
+- HTTP `200` means ready; HTTP `503` means not ready.
+- Set readiness to true only after the application's required startup work succeeds.
+- This is a simplified example. If readiness depends on MongoDB, maintain the readiness state according to the application's actual dependency and recovery logic; do not leave a stale ready flag after a critical dependency fails.
+- Do not make a health endpoint perform slow or expensive work on every probe.
+
+### Step 3: Configure readinessProbe in the Deployment
+Example `backend-deployment.yaml`:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: node-backend
+  template:
+    metadata:
+      labels:
+        app: node-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:v1
+          ports:
+            - containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+            successThreshold: 1
+```
+
+### Step 4: Understand each field
+
+| Field | Meaning |
+|---|---|
+| `httpGet.path` | Endpoint Kubernetes calls |
+| `httpGet.port` | Container port, here 5000 |
+| `initialDelaySeconds: 5` | Wait 5 seconds after container start before the first scheduled check |
+| `periodSeconds: 10` | Interval between checks |
+| `timeoutSeconds: 2` | Maximum time for a probe response |
+| `failureThreshold: 3` | Consecutive failures required before the Pod is considered not ready |
+| `successThreshold: 1` | Successful checks required to become ready again |
+
+These are example values. Tune them based on real startup and response times. After the probe starts, repeated failures can mark the Pod not ready while the container continues running.
+
+### Step 5: Apply and inspect
+```bash
+kubectl apply -f backend-deployment.yaml
+kubectl rollout status deployment/node-backend
+kubectl get pods
+```
+
+A Pod may show `STATUS Running` but `READY 0/1` when its container is running and the readiness probe has not succeeded.
+
+Inspect details and events:
+
+```bash
+kubectl describe pod <pod-name>
+kubectl logs <pod-name>
+kubectl get events --sort-by=.metadata.creationTimestamp
+```
+
+Check Service endpoints as well:
+
+```bash
+kubectl get services
+kubectl get endpointslices
+kubectl describe service node-backend
+```
+
+A readiness failure normally removes the Pod from the Service's ready endpoints. When the probe succeeds again, the Pod can become eligible for traffic.
+
+### Step 6: Readiness vs liveness vs startup probes
+
+| Probe | Purpose | What happens on failure? |
+|---|---|---|
+| Readiness | Is the app ready to handle requests? | Pod is marked not ready and excluded from ready Service endpoints |
+| Liveness | Is the app stuck or unhealthy enough to restart? | After the configured threshold, Kubernetes restarts the container |
+| Startup | Has a slow-starting app completed startup? | Liveness/readiness checks are held back until startup succeeds |
+
+Use different endpoints or logic when the checks have different meanings. Do not make a liveness check fail merely because a shared external dependency is temporarily unavailable; that can cause unnecessary restart loops.
+
+### Step 7: Common troubleshooting
+1. **Pod is Running but not Ready:** check the endpoint path, port, HTTP status, and probe events.
+2. **Connection refused:** verify the Node.js server listens on the expected port and on `0.0.0.0`.
+3. **Probe returns 404:** make sure `/health/ready` is registered on the correct Express app and path.
+4. **Probe times out:** check event messages and application latency; tune the timeout based on evidence.
+5. **Database is temporarily unavailable:** design readiness around actual service requirements and recovery behavior; avoid expensive database queries on every probe.
+6. **All replicas become unready:** inspect common configuration/dependency failures and make sure the readiness endpoint reflects genuine ability to serve traffic.
+
+### Summary
+1. Implement a lightweight HTTP endpoint that returns success only when the application is ready.
+2. Configure `readinessProbe.httpGet` with the endpoint path and container port.
+3. Tune delay, period, timeout, and thresholds to the application.
+4. Verify Pod readiness, probe events, and Service endpoints.
+5. Remember that readiness controls traffic eligibility; it does not restart the container.
+
+### Interview-ready answer
+“I configure a readiness probe in the Node.js Deployment using an HTTP GET endpoint such as `/health/ready`. The Express endpoint returns HTTP 200 when the application is ready and a non-success status, such as 503, when it is not. I set values such as `initialDelaySeconds`, `periodSeconds`, `timeoutSeconds`, and `failureThreshold` according to the application's startup and response times. If the probe fails, Kubernetes marks the Pod not ready and normally removes it from ready Service endpoints without restarting the container. I then verify the probe events, application logs, and Service endpoints.”
+
 ---
