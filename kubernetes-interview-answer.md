@@ -28892,4 +28892,230 @@ kubectl get events --sort-by=.metadata.creationTimestamp
 - **`CrashLoopBackOff`:** Repeated crashes ke beech back-off delay.
 - **Deployment controller:** Pod replace karke desired replica count maintain karne ki koshish karta hai.
 
+## 209. How would you migrate a Docker Compose application to Kubernetes?
+
+### 1. English Definition
+
+Migrating a Docker Compose application to Kubernetes means translating the application's container images, networking, configuration, storage, health checks, and deployment settings into Kubernetes resources such as Deployments, Services, ConfigMaps, Secrets, and PersistentVolumeClaims.
+
+### 2. Hindi Definition — Easy Hinglish
+
+Bhai, Docker Compose mein hum `compose.yaml` se batate hain ki frontend, backend aur database kaise run honge. Kubernetes mein wahi setup Kubernetes ke alag-alag YAML manifests mein define karte hain.
+
+**Direct one-to-one conversion hamesha possible nahi hota.** Compose ke `depends_on`, volumes, ports, environment variables aur health checks ko Kubernetes ke concepts ke saath sahi tarah map karna padta hai.
+
+### 3. Step-by-step migration process
+
+1. **Application inventory banao:** Compose file mein services, ports, environment variables, volumes, health checks aur dependencies identify karo.
+2. **Images build aur registry mein push karo:** Kubernetes nodes ko images registry se pull karni hoti hain. Sirf laptop par bani local image par depend mat karo.
+3. **Compose services ko Kubernetes resources se map karo:**
+   - Long-running frontend/backend services → Deployment
+   - Stable internal networking → Service
+   - Non-sensitive settings → ConfigMap
+   - Passwords/tokens/connection credentials → Secret
+   - Persistent database data → StatefulSet + PersistentVolumeClaim, or preferably a managed database where appropriate
+   - External HTTP/HTTPS access → Ingress or a suitable LoadBalancer Service
+4. **Configuration update karo:** Compose mein backend shayad `mongodb://mongo:27017/appdb` use karta ho. Kubernetes mein connection string ko actual MongoDB Service DNS name ke hisaab se set karo.
+5. **Health checks define karo:** Readiness probe traffic ke liye readiness check karti hai; liveness probe stuck/unhealthy container ko restart karwa sakti hai.
+6. **Resource requests/limits aur replica counts set karo.**
+7. **Manifests validate aur deploy karo.**
+8. **Logs, endpoints, storage, connectivity aur application behaviour test karo.**
+
+### 4. Compose-to-Kubernetes mapping
+
+| Docker Compose | Kubernetes equivalent |
+|---|---|
+| `services.backend` | Deployment + Service |
+| `ports` | Service `port` / `targetPort`; external access via Ingress or LoadBalancer |
+| `environment` | `env`, ConfigMap, Secret |
+| `volumes` | PersistentVolumeClaim or other suitable volume |
+| `healthcheck` | Readiness, liveness, and/or startup probes |
+| `depends_on` | No exact equivalent; application retries/readiness and orchestration design |
+| `deploy.replicas` (where supported) | Deployment `spec.replicas` |
+
+### 5. Example: Deploy a Node.js backend
+
+First, build and push an image to a registry accessible by your cluster:
+
+```bash
+docker build -t YOUR_DOCKERHUB_USERNAME/mern-backend:v1 ./backend
+docker push YOUR_DOCKERHUB_USERNAME/mern-backend:v1
+```
+
+Create `backend-k8s.yaml`:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: YOUR_DOCKERHUB_USERNAME/mern-backend:v1
+          ports:
+            - containerPort: 5000
+          env:
+            - name: PORT
+              value: "5000"
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-credentials
+                  key: uri
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 5000
+      targetPort: 5000
+  type: ClusterIP
+```
+
+**Explanation:**
+- Deployment maintains two backend Pod replicas.
+- Service named `backend` gives those Pods a stable internal endpoint.
+- The MongoDB URI comes from a Secret; create that Secret before deploying this manifest.
+- The readiness probe path must actually exist in your Express app and return success only when the app can accept traffic.
+- This example assumes the MongoDB Service/endpoint and database credentials are configured separately. Do not assume the database is migrated just because the backend starts.
+
+### 6. Deploy and verify
+
+```bash
+kubectl apply -f backend-k8s.yaml
+kubectl get deployments
+kubectl get pods
+kubectl get services
+kubectl rollout status deployment/backend
+kubectl logs deployment/backend
+kubectl describe deployment backend
+```
+
+If Pods are not starting, check `kubectl describe pod POD_NAME` and `kubectl logs POD_NAME`. Common causes include an image-pull error, a missing Secret, an incorrect MongoDB hostname, a wrong port, or a failing probe.
+
+### 7. Important migration cautions
+
+- **Database data:** A Compose named volume does not automatically move into a Kubernetes PersistentVolume. Plan and verify a database backup/restore or data migration.
+- **Startup order:** Compose `depends_on` does not translate directly. Applications should retry dependencies and expose meaningful readiness checks.
+- **Secrets:** Do not commit real credentials in YAML or source control.
+- **Networking:** Containers that used Compose service names need Kubernetes Service DNS names.
+- **External access:** A container's `ports` mapping is not identical to a Kubernetes Service or Ingress.
+- **Production:** Consider managed MongoDB, backups, TLS, resource sizing, monitoring, and rollback before cutover.
+
+### 8. Interview-ready answer
+
+“I would first inspect the Compose file and inventory its services, images, environment variables, ports, volumes, and health checks. I would push images to a registry, convert long-running services into Kubernetes Deployments, add Services for stable networking, move configuration into ConfigMaps and Secrets, and map persistent data to appropriate storage or a managed database. Then I would configure probes and resources, apply the manifests, verify Pods and Service connectivity, test the application, and migrate production traffic only after validating data and rollback plans.”
+
+---
+
+## 210. What is the difference between Docker Compose and Kubernetes?
+
+### 1. English Definition
+
+**Docker Compose** is a tool used to define and run multi-container applications, usually on a single machine, using a `compose.yaml` or `docker-compose.yml` file.
+
+**Kubernetes** is a container orchestration platform used to deploy, scale, manage, and recover containerized applications across a cluster of machines.
+
+### 2. Hindi Definition — Easy Hinglish
+
+Bhai, dono ka kaam containers ko run karna hai, lekin dono ka use-case alag hai.
+
+- **Docker Compose:** Ek hi machine par multiple containers ko saath mein run karne ke liye. Local development aur testing mein bahut useful hai.
+- **Kubernetes:** Containers ko cluster mein manage karne ke liye. Production mein scaling, self-healing, load balancing aur rolling updates jaise kaam karta hai.
+
+MERN example: Compose se React, Node.js aur MongoDB containers ko laptop par ek command se start kar sakte ho. Kubernetes mein application ko cluster mein deploy karke backend ki multiple replicas chala sakte ho aur failed containers ko recover karwa sakte ho.
+
+**Important:** Docker Compose sirf development ke liye nahi hai; iska production mein bhi use ho sakta hai. Lekin large-scale cluster orchestration ke liye Kubernetes zyada suitable hai.
+
+### 3. Main differences
+
+| Feature | Docker Compose | Kubernetes |
+|---|---|---|
+| Main purpose | Multi-container application run karna | Containers ko orchestrate karna |
+| Typical environment | Local machine ya single host | Multiple-node cluster; learning ke liye single-node clusters bhi possible |
+| Configuration | `compose.yaml` | Deployment, Service, ConfigMap, Secret, etc. |
+| Scaling | Service replicas configure kar sakte hain, depending on setup | Desired replica count maintain karta hai |
+| Self-healing | Kubernetes jaisa cluster-level reconciliation nahi | Failed containers/Pods ko recover karne ki koshish karta hai |
+| Load balancing | Compose networking aur configured proxy/load balancer par depend | Services traffic ko eligible Pods tak route karti hain |
+| Service discovery | Compose service names, jaise `backend` | Kubernetes Service DNS, jaise `backend.default.svc.cluster.local` |
+| Rolling updates | Kubernetes Deployment jaisi built-in orchestration nahi | Deployment strategy se rolling updates |
+| Storage | Volumes | Volumes, PersistentVolumes, PersistentVolumeClaims |
+| Complexity | Relatively easy | Zyada concepts aur configuration |
+| Best fit | Local development, testing, simpler deployments | Cluster orchestration and production workloads |
+
+### 4. Same MERN application: both approaches
+
+**Docker Compose flow:**
+
+```text
+compose.yaml
+   |
+   +--> React container
+   +--> Node.js container
+   +--> MongoDB container
+```
+
+Typical command:
+
+```bash
+docker compose up -d
+docker compose ps
+docker compose logs -f
+```
+
+**Kubernetes flow:**
+
+```text
+Ingress / LoadBalancer
+        |
+   Frontend Service
+        |
+   React Pods
+
+Browser/API traffic
+        |
+   Backend Service
+        |
+   Node.js Pods
+        |
+   MongoDB Service or managed MongoDB
+```
+
+Typical commands:
+
+```bash
+kubectl apply -f k8s/
+kubectl get deployments,pods,services
+kubectl rollout status deployment/backend
+```
+
+### 5. Which one should you choose?
+
+- **Local MERN development:** Docker Compose is usually simpler.
+- **Learning container orchestration:** Start with Compose, then learn Kubernetes resources.
+- **Multiple replicas, automated recovery, rolling updates, and cluster scheduling:** Kubernetes offers dedicated orchestration features.
+- **Small production application:** Choose based on reliability, operational expertise, hosting environment, cost, and scaling needs—not simply because Kubernetes is more advanced.
+
+### 6. Interview-ready answer
+
+“Docker Compose defines and runs a multi-container application through a Compose file and is commonly used for local development and simpler deployments. Kubernetes orchestrates containers across a cluster and provides declarative management of workloads, service discovery, scaling, self-healing, and rolling updates. Compose is generally simpler to operate; Kubernetes is more capable for cluster-level orchestration but has greater operational complexity. They are complementary tools, and the right choice depends on the application’s requirements.”
