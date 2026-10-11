@@ -17448,6 +17448,8 @@ The last command helps test the condition manually, but it is not identical to k
 
 ---
 
+## Part 11 — Resource Management
+
 # 136. What Is a CPU Request?
 
 ## 1. English Definition
