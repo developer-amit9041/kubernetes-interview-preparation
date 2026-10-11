@@ -18573,3 +18573,129 @@ Memory pressure mein BestEffort Pods generally pehle eviction ke candidates hote
 “The main difference between Kubernetes QoS classes is the CPU and memory requests/limits configuration. Guaranteed requires every container to have CPU and memory requests and limits, with each request equal to its corresponding limit. Burstable applies when the Pod does not qualify as Guaranteed but at least one container has a CPU or memory request/limit. BestEffort applies when no container has CPU or memory requests or limits. During node memory pressure, BestEffort Pods are generally considered for eviction first, while actual eviction also depends on resource usage relative to requests and Pod priority.”
 
 ---
+
+## 145. How Does Kubernetes Schedule a Pod on a Node?
+
+### 1. English Definition
+
+Kubernetes schedules a Pod by having the **kube-scheduler** identify an eligible Node for an unscheduled Pod. It filters out Nodes that do not satisfy the Pod's requirements, scores the remaining feasible Nodes, and selects a suitable Node. The scheduler records the decision by binding the Pod to that Node; the kubelet on the selected Node then works to run the Pod's containers.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+Jab hum Pod create karte hain, tab shuru mein uska Node assign nahi hota. Kubernetes ka **kube-scheduler** check karta hai ki kaunsa Node Pod ko run karne ke liye suitable hai. Woh CPU/memory requests, taints/tolerations, node selectors, affinity aur doosri constraints check karta hai. Eligible Nodes ko score karke ek Node select karta hai aur Pod ko us Node se bind kar deta hai. Uske baad selected Node ka **kubelet** containers ko run karne ki process handle karta hai.
+
+### 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application mein Node.js backend ka Pod create hua. Cluster mein teen Nodes hain:
+
+- **Node A:** Available CPU request capacity enough nahi hai.
+- **Node B:** Required resources available hain aur Pod ki constraints satisfy karta hai.
+- **Node C:** Required toleration ke bina ek taint laga hua hai, isliye Pod yahan schedule nahi ho sakta.
+
+Scheduler pehle unsuitable Nodes ko filter karta hai. Phir feasible Nodes ko score karta hai aur highest-scoring Node select karta hai. Agar Node B select hota hai, scheduler Pod ko Node B se bind karega. Node B ka kubelet image pull karne aur container start karne ki koshish karega.
+
+**Important:** Scheduler aam taur par CPU/memory requests ke basis par placement assess karta hai, current CPU usage ko akela dekhkar decision nahi leta. Scheduler Node ko select karta hai; actual containers ko kubelet start karwata hai.
+
+### 4. Practical Pod YAML
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: node-api-pod
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: worker-node-1
+  containers:
+    - name: node-api
+      image: node:20-alpine
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "128Mi"
+        limits:
+          cpu: "500m"
+          memory: "256Mi"
+```
+
+Yahan `nodeSelector` Pod ko `worker-node-1` label wale Node par schedule karne ki requirement deta hai. Agar koi Node is requirement ya resource constraints ko satisfy nahi karta, Pod `Pending` reh sakta hai. Example mein hostname label ko apne actual Node label se match karna hoga.
+
+### 5. Scheduling Process — Step by Step
+
+1. User Pod create karta hai, for example `kubectl apply -f pod.yaml`.
+2. API server Pod object ko validate karke etcd mein store karta hai.
+3. Scheduler un Pods ko observe karta hai jinke liye abhi Node assign nahi hua.
+4. **Filtering:** Scheduler insufficient requested resources, node selector/affinity rules, taints/tolerations aur doosri scheduling constraints ki wajah se ineligible Nodes ko remove karta hai.
+5. **Scoring:** Feasible Nodes ko scheduling policies ke according score diya jata hai.
+6. **Binding:** Scheduler selected Node ko Pod ke saath associate karta hai.
+7. Selected Node ka kubelet Pod ko observe karta hai, required images pull karwata hai aur containers start karne ki koshish karta hai.
+8. Container runtime, networking aur storage setup ke baad Pod ready ho sakta hai, agar application aur readiness checks successful hon.
+
+### 6. Architecture Diagram
+
+```text
+User runs kubectl apply
+          |
+          v
+      API Server
+          |
+          v
+    Stores Pod in etcd
+          |
+          v
+     kube-scheduler
+          |
+          v
+ Filter Nodes that fail constraints
+          |
+          v
+ Score feasible Nodes
+          |
+          v
+ Select and bind a Node
+          |
+          v
+   Selected Node's kubelet
+          |
+          v
+ Pull image and start containers
+          |
+          v
+       Pod may become Ready
+```
+
+### 7. Useful Commands
+
+```bash
+# Create the Pod
+kubectl apply -f pod.yaml
+
+# Check Pod and its assigned Node
+kubectl get pod node-api-pod -o wide
+
+# Inspect scheduling events and reasons
+kubectl describe pod node-api-pod
+
+# List Nodes and their labels
+kubectl get nodes --show-labels
+
+# Check Node resource information
+kubectl describe node <node-name>
+```
+
+If the Pod remains `Pending`, run `kubectl describe pod <pod-name>` and inspect the Events section. Messages such as `Insufficient cpu`, `Insufficient memory`, selector/affinity mismatch, or untolerated taints can explain why no Node was selected.
+
+### 8. Summary Table
+
+| Component / phase | Responsibility |
+|---|---|
+| API server and etcd | Accept and store the Pod specification |
+| kube-scheduler | Find an eligible Node, score candidates, and bind the Pod |
+| Filtering | Exclude Nodes that do not meet requirements |
+| Scoring | Rank feasible Nodes according to scheduling rules |
+| kubelet | On the selected Node, works to make the Pod's containers run |
+| Pod status / Events | Help inspect placement and startup progress |
+
+**Interview Answer:** Kubernetes uses the kube-scheduler to place a Pod on a suitable Node. The scheduler watches for Pods without an assigned Node, filters Nodes based on resource requests and scheduling constraints, scores the feasible Nodes, and binds the Pod to the selected Node. The kubelet on that Node then works with the container runtime to pull images and start the containers. If no Node meets the requirements, the Pod stays Pending and its events can help identify the reason.
+
+---
