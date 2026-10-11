@@ -4242,3 +4242,152 @@ Kubernetes resources inspect karne ke liye normally `kubectl` use karo. Direct e
 | Application business data | Usually MongoDB for a MERN app, not etcd |
 
 **Remember:** `etcd` stores Kubernetes resource state and configuration; MongoDB stores your MERN application's business data.
+
+
+---
+
+# 34. How Does the Scheduler Assign a Pod to a Node?
+
+## 1. English Definition
+
+**The Kubernetes Scheduler assigns an unbound Pod to a suitable Node by filtering out Nodes that do not meet the Pod's requirements and scoring the eligible Nodes to select an appropriate placement.**
+
+It considers factors such as resource requests, node selectors, affinity rules, taints and tolerations, and other scheduling constraints.
+
+## 2. Hindi Definition
+
+Kubernetes Scheduler unassigned Pod ke liye suitable Worker Node choose karta hai. Iske liye woh Nodes ki resources aur scheduling rules check karta hai, unsuitable Nodes ko filter karta hai aur eligible Nodes mein se appropriate Node select karta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapke MERN backend ke 3 replicas hain aur cluster mein 2 Worker Nodes available hain.
+
+- **Node 1:** Pod ki CPU aur memory requirements fulfill karta hai.
+- **Node 2:** Pod ki required memory available nahi hai.
+- **Scheduler:** Node 2 ko unsuitable maan sakta hai aur Node 1 ko select kar sakta hai, agar baaki scheduling constraints bhi satisfy hote hain.
+
+Scheduler ka process broadly 4 steps mein samjho:
+
+1. **Pod identify karna:** Aisa Pod dhoondhna jise abhi tak Node assign nahi hua.
+2. **Filtering:** Un Nodes ko remove karna jo resource requirements, taints ya placement rules satisfy nahi karte.
+3. **Scoring:** Eligible Nodes ko score karna, taaki suitable placement choose ki ja sake.
+4. **Binding:** Selected Node ko Pod ke saath associate karna. Uske baad Node ka `kubelet` Pod ko run karne ki process handle karta hai.
+
+**Important:** Scheduler normally container ko start nahi karta. Woh Pod ke liye Node select karta hai; `kubelet` aur Container Runtime execution handle karte hain.
+
+## 4. Practical Example / Code — MERN Backend
+
+Example Pod manifest mein CPU/memory requests specify karte hain:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mern-backend
+  labels:
+    app: mern-backend
+spec:
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:1.0
+      ports:
+        - containerPort: 5000
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "256Mi"
+```
+
+Apply karo:
+
+```bash
+kubectl apply -f backend-pod.yaml
+kubectl get pod mern-backend -o wide
+kubectl describe pod mern-backend
+```
+
+`kubectl get pod -o wide` ke `NODE` column mein assigned Node dikh sakta hai. Agar suitable Node available nahi hai, toh Pod `Pending` reh sakta hai; `kubectl describe pod` ke Events section mein scheduling reason check karo.
+
+### Optional placement constraint: nodeSelector
+
+Node ko label do:
+
+```bash
+kubectl label node <node-name> workload=backend
+```
+
+Pod spec mein ye add karo:
+
+```yaml
+spec:
+  nodeSelector:
+    workload: backend
+```
+
+Scheduler sirf matching label wale eligible Nodes consider karega. Agar koi suitable matching Node nahi hai, Pod schedule nahi ho payega.
+
+## 5. Architecture Diagram
+
+```text
+        Pod created without a Node
+                  |
+                  v
+          kube-scheduler
+                  |
+                  v
+       Filter unsuitable Nodes
+                  |
+                  v
+       Score eligible Nodes
+                  |
+                  v
+        Select and bind a Node
+                  |
+                  v
+          Node's kubelet
+                  |
+                  v
+         Container Runtime
+                  |
+                  v
+           MERN Backend Pod
+```
+
+## 6. Practical Commands / Configuration
+
+### Pod placement check karo
+
+```bash
+kubectl get pods -o wide
+kubectl get nodes
+```
+
+### Scheduling details aur Events dekho
+
+```bash
+kubectl describe pod mern-backend
+kubectl get events --sort-by=.metadata.creationTimestamp
+```
+
+### Node labels check karo
+
+```bash
+kubectl get nodes --show-labels
+```
+
+Agar Pod `Pending` hai, toh insufficient CPU/memory, node selector mismatch, taints/tolerations ya doosri scheduling constraints check karo.
+
+## 7. Summary Table
+
+| Stage / Factor | Role |
+|---|---|
+| Unassigned Pod | Scheduler placement ke liye consider karta hai |
+| Resource requests | CPU aur memory requirements batati hain |
+| Filtering | Ineligible Nodes ko exclude karta hai |
+| Scoring | Eligible Nodes ko rank karne mein help karta hai |
+| Node selector / affinity | Pod placement constrain karte hain |
+| Taints and tolerations | Node par Pod scheduling ki eligibility affect karte hain |
+| Binding | Selected Node ko Pod ke saath associate karta hai |
+| `kubelet` | Selected Node par Pod ko run karne ki process manage karta hai |
+
+**Remember:** Scheduler filters, scores, and binds an eligible Node to the Pod; the Node's kubelet and container runtime handle execution.
