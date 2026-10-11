@@ -4106,3 +4106,139 @@ Command ke output mein client aur server version ki information mil sakti hai, d
 | Workload execution | Containers khud run nahi karta; ye node components ka kaam hai |
 
 **Remember:** The API Server is Kubernetes' central API interface: it processes resource requests and coordinates state persistence, while controllers, Scheduler, kubelet, and the runtime handle reconciliation, placement, and execution.
+
+
+---
+
+# 33. What Data Is Stored in `etcd`?
+
+## 1. English Definition
+
+**`etcd` stores Kubernetes cluster state and resource configuration, including information about Pods, Deployments, Services, ConfigMaps, Secrets, and other Kubernetes API objects.**
+
+It provides persistent, consistent storage that Kubernetes uses to track the desired and recorded state of cluster resources.
+
+## 2. Hindi Definition
+
+`etcd` mein Kubernetes cluster ke resources ki configuration aur state store hoti hai, jaise Pods, Deployments, Services, ConfigMaps aur Secrets ki information. Kubernetes is data ka use cluster ke resources ko manage aur reconcile karne ke liye karta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application mein ye resources hain:
+
+- 3 backend replicas wala Deployment
+- Backend ke liye ek Service
+- MongoDB connection configuration
+- Application credentials wala Secret
+
+In resources ki Kubernetes configuration aur state `etcd` mein persist ho sakti hai.
+
+| Kubernetes resource | `etcd` mein kis tarah ki information |
+|---|---|
+| Pod | Pod specification aur recorded status |
+| Deployment | Desired replicas, selector aur Pod template |
+| Service | Service type, ports aur selector |
+| ConfigMap | Application configuration data |
+| Secret | Secret resource ka data |
+| Node | Node ki recorded information aur status |
+| Namespace | Namespace resource ki information |
+
+**Important:** `etcd` aapke MongoDB application ka database nahi hai. Ye Kubernetes cluster ka state store hai. Aapke MERN application ka business data — jaise users, orders aur products — MongoDB mein hi store hota hai, jab tak aap khud us data ko kisi aur jagah store karne ka design na karein.
+
+## 4. Practical Example / Code — MERN Backend
+
+Example Deployment:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+```
+
+Is manifest ko apply karne par Kubernetes API Server resource request process karta hai aur Deployment ki configuration `etcd` mein persist hoti hai.
+
+```bash
+kubectl apply -f backend-deployment.yaml
+kubectl get deployment mern-backend
+kubectl get pods
+```
+
+Ye commands API Server ke through resources read karti hain; ye directly `etcd` ko query nahi karti hain.
+
+## 5. Architecture Diagram
+
+```text
+        kubectl apply
+              |
+              v
+        kube-apiserver
+              |
+      Persist resource state
+              |
+              v
+            etcd
+      +------------------+
+      | Deployment       |
+      | Pod              |
+      | Service          |
+      | ConfigMap        |
+      | Secret           |
+      | Node / Namespace |
+      +------------------+
+
+ Application business data (users/orders)
+              |
+              v
+           MongoDB
+      (separate application database)
+```
+
+Diagram conceptual hai. Kubernetes API objects ka state etcd mein persist hota hai, jabki MERN application's business records normally MongoDB mein hote hain.
+
+## 6. Practical Commands / Configuration
+
+### Kubernetes resources inspect karo
+
+```bash
+kubectl get deployments
+kubectl get pods -A
+kubectl get services -A
+kubectl get configmaps -A
+kubectl get secrets -A
+```
+
+Secrets list karne se names aur metadata dikhte hain, normally secret values nahi. Secret data ko decode ya print karte waqt care karo, kyunki usmein credentials ho sakte hain.
+
+### etcd access ke baare mein
+
+Kubernetes resources inspect karne ke liye normally `kubectl` use karo. Direct etcd access administrative operation hai aur endpoint/certificates/permissions par depend karta hai. Production mein etcd data aur backups ko securely protect karo; Kubernetes Secrets by default necessarily encrypted-at-rest nahi hote unless encryption at rest is configured.
+
+## 7. Summary Table
+
+| Data category | Examples |
+|---|---|
+| Workload resources | Pods, Deployments, ReplicaSets, Jobs |
+| Networking resources | Services, EndpointSlices, network-related API objects |
+| Configuration | ConfigMaps |
+| Sensitive configuration | Secret resources |
+| Cluster metadata | Nodes, Namespaces and related API objects |
+| Desired and recorded state | Replica counts, resource specifications, status data |
+| Application business data | Usually MongoDB for a MERN app, not etcd |
+
+**Remember:** `etcd` stores Kubernetes resource state and configuration; MongoDB stores your MERN application's business data.
