@@ -5202,3 +5202,111 @@ kubectl logs mern-backend-state-demo -c backend
 | Container state | `Terminated` | Container process has finished or stopped |
 
 **Remember:** Pod phases describe overall Pod status; container states describe each container. `CrashLoopBackOff` and `ImagePullBackOff` are waiting reasons, not Pod phases.
+---
+
+# 42. What Do `Pending`, `Running`, `Succeeded`, `Failed`, and `Unknown` Mean?
+
+## 1. English Definition
+
+These are the five official Kubernetes Pod phases that describe the overall lifecycle status of a Pod:
+
+- **Pending:** The Pod has been accepted, but its setup or container startup is not yet complete.
+- **Running:** The Pod has been assigned to a Node, and at least one container has started or is starting.
+- **Succeeded:** All containers in the Pod have terminated successfully.
+- **Failed:** All containers in the Pod have terminated, and at least one terminated unsuccessfully.
+- **Unknown:** Kubernetes cannot determine the Pod's state, often because it cannot communicate with the Node.
+
+## 2. Hindi Definition
+
+Ye Kubernetes Pod ki paanch phases hain, jo batati hain ki Pod kis condition mein hai:
+
+- **Pending:** Pod create ho gaya hai, lekin setup ya startup abhi complete nahi hua.
+- **Running:** Pod Node par assign ho gaya hai aur kam se kam ek container start ho chuka hai ya start ho raha hai.
+- **Succeeded:** Pod ke saare containers successfully complete ho gaye.
+- **Failed:** Pod ke saare containers terminate ho gaye aur kam se kam ek fail hua.
+- **Unknown:** Kubernetes Pod ki current state ka pata nahi laga pa raha hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumne Kubernetes mein Node.js backend deploy kiya hai. Ab in five phases ko simple examples se samjho.
+
+- **`Pending` — Setup chal raha hai:** Pod schedule hone ka wait kar sakta hai, ya image pull aur volume setup jaise tasks complete ho rahe ho sakte hain. Example: Backend image download ho rahi hai.
+- **`Running` — Container start ho gaya:** Pod kisi Node par assigned hai aur uska container start ho gaya hai ya start ho raha hai. Example: Node.js process run kar raha hai, lekin API abhi Ready hona zaroori nahi.
+- **`Succeeded` — Successfully complete:** Pod ke saare containers success ke saath terminate ho gaye. Example: Database migration ka one-time Job complete ho gaya.
+- **`Failed` — Execution fail:** Saare containers terminate ho gaye aur kam se kam ek container unsuccessful exit hua. Example: One-time migration script error ke saath exit ho gayi.
+- **`Unknown` — State ka pata nahi:** Kubernetes ko Pod ki current state determine karne ke liye sufficient information nahi mil rahi. Example: Worker Node se communication lost ho gaya.
+
+**Interview point:** `Running` ka matlab yeh nahi ki application healthy ya ready hai. Application ki readiness check karne ke liye readiness probe aur Pod conditions bhi dekhni chahiye.
+
+## 4. Practical Example / Code — MERN Backend Pod
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mern-backend-phase-demo
+spec:
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:1.0
+      ports:
+        - containerPort: 5000
+```
+
+Use an existing image that listens on port 5000. A long-running backend will normally remain in the `Running` phase while its Pod exists; `Succeeded` and `Failed` are more commonly seen with finite tasks such as Jobs.
+
+## 5. Architecture Diagram
+
+```text
+             Pod accepted
+                  |
+                  v
+               Pending
+                  |
+                  v
+               Running
+              /        \
+       exits success   exits failure
+            |               |
+            v               v
+        Succeeded         Failed
+
+Unknown: Kubernetes cannot determine the current Pod state.
+```
+
+This is a simplified illustration, not a mandatory path for every Pod.
+
+## 6. Practical Commands / Configuration
+
+Check the Pod phase:
+
+```bash
+kubectl get pod mern-backend-phase-demo
+kubectl get pod mern-backend-phase-demo -o jsonpath='{.status.phase}'
+```
+
+Inspect events, conditions, and container status:
+
+```bash
+kubectl describe pod mern-backend-phase-demo
+kubectl get events --sort-by=.metadata.creationTimestamp
+kubectl get pod mern-backend-phase-demo -o wide
+```
+
+Check application logs:
+
+```bash
+kubectl logs mern-backend-phase-demo -c backend
+```
+
+## 7. Summary Table
+
+| Pod phase | Meaning | Example / clue |
+|---|---|---|
+| `Pending` | Setup or container startup is not complete | Scheduling, image pull, or volume setup |
+| `Running` | Assigned to a Node and at least one container has started or is starting | Backend process may be running but not Ready |
+| `Succeeded` | All containers terminated successfully | Completed one-time Job |
+| `Failed` | All containers terminated and at least one failed | Script exits unsuccessfully |
+| `Unknown` | Kubernetes cannot determine the Pod's state | Node communication issue |
+
+**Remember:** These five values are Pod phases. `CrashLoopBackOff` and `ImagePullBackOff` are container waiting reasons, not Pod phases.
