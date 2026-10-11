@@ -9923,3 +9923,153 @@ If DNS resolution fails, check the Service name and namespace, the Pod's DNS con
 | Important distinction | DNS resolves names; the Service/network routes the connection |
 
 **Remember:** Kubernetes DNS lets workloads find Services by name. CoreDNS commonly provides DNS resolution, while the Service routes traffic to eligible backend endpoints.
+---
+
+# 79. How Does One Pod Access Another Pod?
+
+## 1. English Definition
+
+One Kubernetes Pod can communicate with another Pod using the destination Pod's IP address or, preferably, through a Kubernetes Service DNS name. Kubernetes networking enables Pod-to-Pod communication across nodes, subject to network policies and cluster configuration.
+
+## 2. Hindi Definition
+
+Kubernetes mein ek Pod doosre Pod se network ke through communicate kar sakta hai.
+
+Iske do common tarike hain:
+
+1. **Pod IP address:** Destination Pod ka IP use karke directly request bhejna.
+2. **Kubernetes Service:** Service ke DNS name se request bhejna, jo matching backend Pods tak traffic pahunchati hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application mein do alag Pods hain: Backend Pod Node.js API run karta hai aur Payment Pod payment-related API run karta hai.
+
+### Method A: Direct Pod IP
+
+```text
+Backend Pod
+     |
+     | HTTP request to Pod IP
+     v
+Payment Pod
+```
+
+Example:
+
+```javascript
+const response = await fetch("http://10.244.1.8:4000/payments");
+```
+
+Yahan `10.244.1.8` sirf example IP hai. Direct Pod IP par depend karna fragile hai, kyunki Pod recreate hone par uska IP change ho sakta hai.
+
+### Method B: Kubernetes Service — Recommended
+
+Payment application ke liye `payment-service` naam ki Service bana sakte ho.
+
+```text
+Backend Pod
+     |
+     | http://payment-service:4000
+     v
+Payment Service
+     |
+     v
+Payment Pod(s)
+```
+
+Ab backend Service ke DNS name se request bhej sakta hai. Agar payment ke multiple replicas hain, toh Service eligible backend Pods tak traffic distribute kar sakti hai.
+
+**Real projects mein Service DNS name use karna generally better hota hai**, kyunki application ko individual Pod IP hard-code nahi karna padta.
+
+## 4. Practical Example / Code
+
+### Payment Service
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-service
+spec:
+  type: ClusterIP
+  selector:
+    app: payment
+  ports:
+    - port: 4000
+      targetPort: 4000
+```
+
+Ensure that the payment Pod or Deployment has the label `app: payment` and that its application listens on port `4000`.
+
+### Call the Service from the backend Pod
+
+```javascript
+const response = await fetch("http://payment-service:4000/payments");
+const data = await response.json();
+```
+
+This hostname works by default when the caller is in the same namespace as the Service. If the Service is in another namespace, use a qualified name such as `payment-service.payments.svc.cluster.local:4000` (assuming `payments` is the namespace and `cluster.local` is the cluster DNS domain).
+
+## 5. Architecture Diagram
+
+```text
++--------------------+
+| Backend Pod        |
+| Node.js API        |
++---------+----------+
+          |
+          | DNS: payment-service
+          v
++--------------------+
+| Payment Service    |
+| ClusterIP          |
++---------+----------+
+          |
+          v
++--------------------+
+| Payment Pod(s)     |
+| app=payment        |
++--------------------+
+```
+
+The Service selects matching Pods using labels and exposes stable discovery through DNS. Direct Pod IP communication is possible but couples the caller to an address that can change.
+
+## 6. Practical Commands / Configuration
+
+Check Pods and their IPs:
+
+```bash
+kubectl get pods -o wide
+```
+
+Check the Service:
+
+```bash
+kubectl get service payment-service
+kubectl describe service payment-service
+```
+
+Check selected endpoints:
+
+```bash
+kubectl get endpoints payment-service
+kubectl get endpointslices
+```
+
+Test Service DNS from a Pod that has DNS tools installed:
+
+```bash
+nslookup payment-service
+```
+
+If communication fails, check the Service selector, Pod readiness, listening port, DNS, network policies, and relevant firewall or cluster networking configuration.
+
+## 7. Summary Table
+
+| Method | How it works | Recommendation |
+|---|---|---|
+| Direct Pod IP | Sends traffic to a specific Pod IP | Useful for diagnostics; avoid relying on it for stable application discovery |
+| Service DNS | Resolves a stable Service name and sends traffic to eligible backends | Preferred for normal application-to-application communication |
+| Cross-namespace Service DNS | Uses Service name plus namespace/domain | Use when the destination Service is in another namespace |
+
+**Remember:** Pods can communicate through Pod IPs, but a Kubernetes Service DNS name is generally preferred because Pod IPs can change when Pods are replaced.
