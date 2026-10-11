@@ -15059,3 +15059,116 @@ Agar Service kisi specific namespace mein hai, to `-n <namespace>` add karein. E
 **Interview Answer:** Use `kubectl get services` to list Services and check their type, IP addresses, and ports. Use `kubectl describe service <name>` and inspect EndpointSlices when troubleshooting connectivity.
 
 **Remember:** `get services` shows Service configuration; verify its endpoints and Pods when traffic is not reaching the application.
+
+---
+
+# 116. How Do You Check Pod Logs?
+
+## 1. English Definition
+
+Use `kubectl logs` to view the logs written by a container in a Kubernetes Pod, which helps troubleshoot application errors and runtime issues.
+
+## 2. Hindi Definition
+
+Pod ke andar container ke logs dekhne ke liye `kubectl logs` command use karte hain. Isse application errors aur runtime problems ko troubleshoot karne mein help milti hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapka Node.js/Express backend Kubernetes par run ho raha hai, lekin API `500 Internal Server Error` de rahi hai. Aap backend Pod ke logs check karke error message ya stack trace dekh sakte ho.
+
+- `kubectl logs <pod-name>` — Pod ke default container ke logs dikhata hai.
+- `kubectl logs <pod-name> -c <container-name>` — specific container ke logs dikhata hai.
+- `kubectl logs <pod-name> --previous` — container ke previous instance ke logs dikhata hai, agar container restart hua ho aur previous logs available hon.
+- `kubectl logs -f <pod-name>` — naye logs live follow karta hai.
+
+## 4. Practical Example / Code
+
+First, find the backend Pod:
+
+```bash
+kubectl get pods
+```
+
+Then check its logs:
+
+```bash
+kubectl logs <backend-pod-name>
+```
+
+Example output:
+
+```text
+Server started on port 5000
+MongoDB connection failed: authentication error
+```
+
+Is example mein logs indicate karte hain ki backend start ho gaya, lekin MongoDB authentication fail ho rahi hai. Credentials, Secret configuration, aur database access verify karein.
+
+If the Pod contains multiple containers:
+
+```bash
+kubectl logs <pod-name> -c <container-name>
+```
+
+## 5. Practical Commands
+
+```bash
+# View logs from a Pod's default container
+kubectl logs <pod-name>
+
+# Follow logs live
+kubectl logs -f <pod-name>
+
+# View logs from a specific container
+kubectl logs <pod-name> -c <container-name>
+
+# View logs from the previous container instance
+kubectl logs <pod-name> --previous
+
+# Show recent logs
+kubectl logs <pod-name> --tail=100
+
+# View logs from a Pod in a specific namespace
+kubectl logs <pod-name> -n production
+
+# View logs for a Deployment's Pods
+kubectl logs deployment/backend
+```
+
+For a multi-container Pod, specify `-c <container-name>`. If the Pod is in another namespace, use `-n <namespace>`. The `--previous` option only works when a previous container instance's logs are available.
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+      Developer / Terminal
+               |
+               v
+   kubectl logs <pod-name>
+               |
+               v
+      Kubernetes API Server
+               |
+               v
+       Kubelet / Container runtime
+               |
+               v
+       Container stdout / stderr
+               |
+               v
+        Logs shown in terminal
+```
+
+## 7. Summary Table
+
+| Command | Purpose |
+|---|---|
+| `kubectl logs <pod-name>` | Displays container logs |
+| `kubectl logs -f <pod-name>` | Follows logs live |
+| `kubectl logs <pod-name> -c <container>` | Selects a container |
+| `kubectl logs <pod-name> --previous` | Shows previous container instance logs, if available |
+| `kubectl logs <pod-name> --tail=100` | Shows the last 100 lines |
+| `kubectl logs deployment/backend` | Retrieves logs from a Deployment's Pods |
+
+**Interview Answer:** Use `kubectl logs <pod-name>` to inspect application logs in a Pod. Use `-f` to follow logs live, `-c` to choose a container, and `--previous` to inspect logs from a previous container instance after a restart.
+
+**Remember:** `kubectl logs` helps you investigate what the application is writing to stdout and stderr.
