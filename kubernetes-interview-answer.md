@@ -19985,3 +19985,95 @@ If metrics show `<unknown>`, verify Metrics Server or the relevant custom-metric
 **Interview Answer:** HPA stands for Horizontal Pod Autoscaler. It automatically adjusts the number of replicas in a Kubernetes workload based on metrics such as CPU or memory utilization, or custom metrics. For example, if a Node.js API experiences increased traffic and CPU utilization rises above the configured target, HPA can increase its replicas within the configured minimum and maximum. HPA scales Pods, not Nodes, and CPU utilization-based scaling generally requires resource requests and available metrics.
 
 ---
+
+## 157. What Does the Horizontal Pod Autoscaler Do?
+
+### 1. English Definition
+
+The Horizontal Pod Autoscaler (HPA) automatically adjusts the number of replicas for a scalable Kubernetes workload, such as a Deployment or StatefulSet, based on observed metrics and configured targets. It periodically evaluates metrics and updates the workload's desired replica count within configured scaling limits.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+HPA ka kaam application ke Pods ki quantity ko workload ke load ke according automatically badhana ya ghatana hai.
+
+- Load ya CPU utilization target se upar jaaye, toh HPA replicas increase kar sakta hai.
+- Load kam ho, toh HPA replicas reduce kar sakta hai, minimum replicas aur scaling behavior ko follow karte hue.
+- Yeh manually replicas change karne ki zaroorat kam karta hai.
+
+HPA Pods ki quantity scale karta hai, Pod ke andar CPU/memory allocation nahi, aur directly Nodes ki quantity bhi nahi. Resource allocation adjust karna VPA ka use case hai; Nodes scale karna Cluster Autoscaler ya provider mechanism ka use case hai.
+
+### 3. MERN Stack Example
+
+Maan lo aapke Node.js API Deployment mein 2 replicas hain aur HPA ka CPU utilization target 60% hai. Traffic badhne se average CPU utilization target se upar chala jaata hai. Metrics available hone aur scaling rules allow karne par HPA Deployment ki desired replicas 2 se 4 tak badha sakta hai.
+
+Jab load kam ho jaata hai, HPA replicas ko reduce kar sakta hai, lekin configured `minReplicas` se neeche nahi. Actual replica count traffic, metrics, scaling behavior, stabilization windows aur cluster capacity par depend karta hai; HPA har metric change par instantly scale nahi karta.
+
+### 4. How HPA Decides the Replica Count
+
+For a basic single-metric target, the simplified calculation is:
+
+```text
+desired replicas = ceil(current replicas × current metric / target metric)
+```
+
+Example: Current replicas = 2, current average CPU utilization = 90%, target = 60%.
+
+```text
+ceil(2 × 90 / 60) = ceil(3) = 3 replicas
+```
+
+Yeh simplified illustration hai. Kubernetes HPA tolerance, missing metrics, stabilization rules, scaling policies, minimum/maximum replicas aur multiple metrics ko bhi consider karta hai.
+
+### 5. Main Responsibilities
+
+1. Configured metrics ko periodically observe karna, jaise CPU, memory, ya custom/external metrics.
+2. Observed values ko target ke saath compare karna.
+3. Desired replica count calculate karna.
+4. Target workload ke scale subresource ko update karna.
+5. Kubernetes ke controllers aur scheduler ko required replicas create/run karne dena.
+
+### 6. Practical Configuration Example
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: node-api-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: node-api
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+```
+
+Is configuration mein HPA `node-api` Deployment ko target karta hai, replicas ko 2 se 8 ke beech maintain karta hai, aur average CPU utilization ko 60% target karta hai. CPU utilization percentage CPU requests ke relative calculate hota hai, isliye containers ke CPU requests set hona aur resource metrics available hona important hai.
+
+Useful commands:
+
+```bash
+kubectl get hpa
+kubectl describe hpa node-api-hpa
+kubectl get deployment node-api
+kubectl top pods
+```
+
+### 7. Quick Comparison
+
+| Component | Responsibility |
+|---|---|
+| HPA | Pod replicas ki count adjust karta hai |
+| VPA | Container resource requests ko recommend ya adjust kar sakta hai, configuration par depend karta hai |
+| Cluster Autoscaler | Eligible pending Pods aur cluster conditions ke basis par Nodes add/remove kar sakta hai |
+
+**Interview Answer:** The Horizontal Pod Autoscaler automatically changes the replica count of a Kubernetes workload based on observed metrics such as CPU, memory, or custom metrics. It compares current metrics with configured targets, calculates the desired number of replicas, and updates the workload's scale. For example, it can scale a Node.js API from two replicas to three when CPU utilization rises above its target. HPA scales Pod count, not Node count, and its behavior depends on metrics availability, configured limits, and cluster capacity.
+
+---
