@@ -23453,4 +23453,167 @@ Job desired successful completions track karta hai. Task complete hone ke baad J
 
 ---
 
+
+## 181. What Is a CronJob?
+
+### 1. English Definition
+
+A **Kubernetes CronJob** is a workload resource that creates Jobs on a recurring schedule, using cron syntax. It is used to automate tasks that must run at specific times or intervals, such as database backups, report generation, and periodic cleanup.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+CronJob Kubernetes ka resource hai jo **schedule ke according automatically Jobs create karta hai**.
+
+Maan lo aapko har raat 2 baje MongoDB ka backup lena hai. Har din manually command run karne ke bajay CronJob configure kar sakte ho.
+
+Common use cases:
+- Database backup
+- Daily reports generate karna
+- Temporary files clean karna
+- Scheduled data processing
+- Periodic maintenance tasks
+
+**Yaad rakho:**
+- **Job:** Ek task complete karta hai.
+- **CronJob:** Schedule ke according baar-baar Jobs create karta hai.
+- **Deployment:** Application ko continuously run rakhta hai.
+
+### 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN Stack application production mein chal rahi hai aur aapko daily database backup ya report generate karni hai.
+
+CronJob ko schedule kar sakte ho ki woh har din raat 2 baje ek Job create kare. Job ka Pod backup script run karega, aur task finish hone ke baad Job complete ho jayega.
+
+Flow:
+1. CronJob ka schedule match hota hai.
+2. CronJob ek Job create karta hai.
+3. Job ek ya zyada Pods run karta hai.
+4. Pod scheduled task execute karta hai.
+5. Task successful hone par Job complete ho jata hai.
+
+CronJob schedule trigger karta hai, lekin backup ko durable storage par save karna aur restore test karna script/configuration ki responsibility hai. CronJob exact-once execution ki guarantee nahi deta, isliye task ko safely repeatable banana chahiye.
+
+### 4. Practical Example / YAML
+
+Example: har din raat 2 baje ek scheduled maintenance task run karna.
+
+File: `daily-maintenance-cronjob.yaml`
+
+```yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: daily-maintenance
+  namespace: development
+spec:
+  schedule: "0 2 * * *"
+  timeZone: "Asia/Kolkata"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: maintenance
+              image: busybox:1.36
+              command:
+                - sh
+                - -c
+                - "echo 'Running scheduled maintenance'; date"
+```
+
+**YAML explanation:**
+- `schedule: "0 2 * * *"` — har din 02:00 baje run karne ka schedule.
+- `timeZone: "Asia/Kolkata"` — schedule ko India Standard Time ke hisaab se interpret karta hai; cluster version ko is field ko support karna chahiye.
+- `concurrencyPolicy: Forbid` — previous Job abhi run ho raha ho toh overlapping Job start nahi karta.
+- `startingDeadlineSeconds: 300` — missed schedule ko 5 minutes ki deadline ke andar start karne ki koshish.
+- `successfulJobsHistoryLimit` aur `failedJobsHistoryLimit` — completed Job history ko limit karte hain.
+- `jobTemplate` — har scheduled run ke liye Job ka template.
+
+Ye maintenance command demonstration hai, real database backup nahi. Actual backup ke liye approved database tools, secure credentials, durable storage destination, retention policy aur restore testing configure karna hoga.
+
+### 5. Practical Commands
+
+**CronJob apply karo:**
+
+```bash
+kubectl apply -f daily-maintenance-cronjob.yaml
+```
+
+**CronJob aur generated Jobs check karo:**
+
+```bash
+kubectl get cronjobs -n development
+kubectl describe cronjob daily-maintenance -n development
+kubectl get jobs -n development
+kubectl get pods -n development
+```
+
+**Testing ke liye manually ek Job create karo:**
+
+```bash
+kubectl create job maintenance-test \
+  --from=cronjob/daily-maintenance \
+  -n development
+```
+
+**Generated Job ke logs dekho:**
+
+```bash
+kubectl logs job/maintenance-test -n development
+```
+
+**CronJob delete karo:**
+
+```bash
+kubectl delete cronjob daily-maintenance -n development
+```
+
+Deleting a CronJob stops future scheduled Jobs, but already-created Jobs and their Pods may remain. Unhe separately inspect aur clean up karo if needed.
+
+### 6. Kubernetes Architecture Diagram
+
+```text
+        CronJob: daily-maintenance
+              (schedule)
+                  |
+                  v
+             Create Job
+                  |
+                  v
+              Create Pod
+                  |
+                  v
+          Execute scheduled task
+                  |
+                  v
+             Job completes
+```
+
+CronJob schedule manage karta hai, Job execution track karta hai, aur Pod actual command run karta hai.
+
+### 7. Summary Table
+
+| Feature | CronJob |
+|---|---|
+| Main purpose | Scheduled recurring tasks |
+| Schedule format | Cron expression |
+| Creates | Jobs |
+| Actual task runs in | Job's Pod |
+| Common use cases | Backups, reports, cleanup |
+| Time zone | Can be configured with `timeZone` on supported Kubernetes versions |
+| Exact-once guarantee | No; tasks should be repeatable/idempotent |
+| Continuous application hosting | Deployment use karo |
+
+**Interview-Ready Answer:**
+
+“A Kubernetes CronJob creates Jobs on a recurring schedule defined by a cron expression. For example, I can schedule a task to run every day at 2 AM for database backups or report generation. The CronJob creates a Job, and the Job runs a Pod that executes the task. I also configure concurrency, retry behavior, history limits, and durable output storage as appropriate.”
+
+---
+
 ---
