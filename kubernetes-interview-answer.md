@@ -27450,4 +27450,109 @@ Common causes include an invalid image, image-pull errors, failed health probes,
 ### Interview-ready answer
 “I run multiple backend replicas by setting `spec.replicas` in a Kubernetes Deployment, for example to three. Kubernetes works to maintain the desired number of Node.js Pods. I create a ClusterIP Service whose selector matches the backend Pod labels, so other workloads can reach the replicas through a stable DNS name. I verify the rollout, ready Pods, and Service endpoints with kubectl. For production, I also configure health probes, resource requests, and suitable resilience and scaling policies.”
 
+## 199. How would traffic be distributed among multiple Node.js Pods?
+
+### English Definition
+Kubernetes distributes traffic among multiple Node.js Pods through a Service, which provides a stable virtual IP and DNS name and routes connections to eligible Pod endpoints selected by labels.
+
+### Hindi Definition
+Agar backend ke multiple Node.js Pods chal rahe hain, toh frontend ko har Pod ka IP separately use karne ki zaroorat nahi hoti. Backend Service ek stable endpoint deti hai aur Kubernetes networking traffic ko matching, ready Pod endpoints tak route karti hai.
+
+### Step 1: Understand the architecture
+
+```text
+React frontend / Ingress
+          |
+          v
+    Backend Service
+       /   |   \
+      v    v    v
+   Pod 1  Pod 2  Pod 3
+   Node.js Node.js Node.js
+```
+
+The Service uses a selector to identify backend Pods. Eligible ready endpoints can receive traffic. The distribution is not guaranteed to be perfectly equal: connection reuse, networking implementation, and traffic patterns affect which Pods handle requests.
+
+### Step 2: Create a backend Service
+
+Example `backend-service.yaml`:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+spec:
+  type: ClusterIP
+  selector:
+    app: node-backend
+  ports:
+    - port: 5000
+      targetPort: 5000
+```
+
+Explanation:
+- `type: ClusterIP` exposes a stable endpoint inside the cluster.
+- `selector` must match the labels on the backend Pod template.
+- `port: 5000` is the Service port.
+- `targetPort: 5000` is the port on the selected backend Pods.
+
+The Node.js server must actually listen on the target port. If the Service selector does not match the Pod labels, the Service may have no usable endpoints.
+
+### Step 3: Follow a request
+
+1. A browser request typically reaches an Ingress or another configured entry point.
+2. The request is sent to the backend Service.
+3. Kubernetes networking selects an eligible backend endpoint for the connection.
+4. The Node.js Pod processes the request and sends the response back.
+
+A ClusterIP Service is internal to the cluster. A browser generally cannot access its internal DNS name directly; use an Ingress or an externally reachable API endpoint for browser traffic.
+
+### Step 4: Apply and inspect the Service
+
+```bash
+kubectl apply -f backend-service.yaml
+kubectl get svc backend-service
+kubectl get pods -l app=node-backend
+kubectl get endpointslices
+kubectl describe svc backend-service
+```
+
+Check that EndpointSlices contain the expected backend Pod addresses and that those endpoints are ready. If endpoints are missing, check the Service selector against Pod labels and inspect Pod readiness.
+
+### Step 5: Does every request go to a different Pod?
+No. A Service does not guarantee round-robin distribution of every individual HTTP request. Kubernetes Service routing commonly acts at the connection level. HTTP keep-alive can reuse one connection for several requests, and long-lived connections can remain associated with one Pod. The exact behavior depends on the cluster networking implementation and configuration.
+
+### Step 6: What happens if a Pod is not ready?
+Readiness probes help determine whether a Pod should receive normal Service traffic. When a Pod is not ready, its endpoint is normally marked not ready and is excluded from regular Service traffic routing. This helps avoid sending new traffic to a Pod that is not ready to serve requests.
+
+### Step 7: Common troubleshooting commands
+
+```bash
+kubectl get svc backend-service
+kubectl get endpointslices
+kubectl get pods -l app=node-backend -o wide
+kubectl describe svc backend-service
+kubectl describe pod <pod-name>
+kubectl logs <pod-name>
+```
+
+Common issues:
+- Service selector does not match Pod labels.
+- Pods are not ready because a readiness probe fails.
+- `targetPort` does not match the port used by the Node.js server.
+- The browser is trying to call an internal ClusterIP DNS name directly.
+- Traffic looks uneven because of persistent connections, traffic volume, or the networking implementation.
+
+### Service vs Ingress
+
+| Resource | Responsibility |
+|---|---|
+| Service | Stable endpoint and routing to matching Pod endpoints |
+| Ingress | HTTP/HTTPS entry routing from outside the cluster, when an Ingress controller is installed and configured |
+| Deployment | Maintains the desired number of backend Pods |
+
+### Interview-ready answer
+“I expose multiple Node.js Pods through a Kubernetes Service. The Service uses a label selector to identify the backend Pods and provides a stable IP and DNS name. Kubernetes networking routes connections to eligible ready endpoints. I verify the selected endpoints with EndpointSlices and make sure the readiness probe, Service selector, and target port are correct. I also know that Service routing does not guarantee perfectly even distribution of every individual HTTP request, especially when connections are reused.”
+
 ---
