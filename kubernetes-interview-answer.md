@@ -6626,3 +6626,125 @@ kubectl scale deployment mern-backend --replicas=5
 | Typical use | Testing or specialized cases | Most stateless application workloads |
 
 **Remember:** A Pod runs containers; a Deployment manages Pods through ReplicaSets. For most stateless production applications, create a Deployment rather than managing standalone Pods.
+---
+
+# 54. What Is the Difference Between a Deployment and a ReplicaSet?
+
+## 1. English Definition
+
+**A Deployment is a Kubernetes resource that manages ReplicaSets and provides application updates and rollbacks. A ReplicaSet ensures that the desired number of matching Pod replicas are running.**
+
+In simple terms, a Deployment manages the application's rollout strategy, while a ReplicaSet maintains the desired number of Pods.
+
+## 2. Hindi Definition
+
+**Deployment:** Yeh application ke updates, rollbacks aur ReplicaSets ko manage karta hai.
+
+**ReplicaSet:** Yeh ensure karta hai ki jitne Pods ki requirement define ki gayi hai, utne matching Pods maintain karne ki koshish ho.
+
+Example: Agar Deployment mein `replicas: 3` hai, toh Deployment ReplicaSet ke through teen Pods maintain karwata hai. Agar ek Pod delete ho jaye, toh ReplicaSet replacement Pod create karne ki koshish karega.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application ka Node.js backend Kubernetes par deployed hai aur tumhe uske 3 Pods chahiye.
+
+- **Deployment:** Backend ki image `1.0` se `2.0` update karne aur rolling update manage karne mein help karta hai.
+- **ReplicaSet:** Ensure karta hai ki current version ke required number of Pods maintain hon.
+
+Jab tum image version change karte ho, Deployment aam taur par **naya ReplicaSet** create karta hai. Phir rollout strategy ke according old aur new ReplicaSets ke Pods ko manage karta hai.
+
+Isliye Deployment directly ReplicaSet ko replace nahi karta; woh rollout ke dauran multiple ReplicaSets manage kar sakta hai.
+
+## 4. Practical Example / Code
+
+Example Deployment:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+```
+
+The Deployment controller creates and manages a ReplicaSet for this Pod template. The ReplicaSet works to maintain three matching Pods.
+
+## 5. Architecture Diagram
+
+```text
+          Deployment
+      (rollouts and revisions)
+                |
+       +--------+--------+
+       |                 |
+       v                 v
+  ReplicaSet v1      ReplicaSet v2
+  (old template)    (new template)
+       |                 |
+    old Pods          new Pods
+```
+
+During a rolling update, both old and new ReplicaSets may exist at the same time. The Deployment adjusts their replica counts according to the rollout strategy.
+
+## 6. Practical Commands / Configuration
+
+**List Deployments and ReplicaSets:**
+
+```bash
+kubectl get deployments
+kubectl get replicasets
+kubectl get pods
+```
+
+**Inspect a Deployment:**
+
+```bash
+kubectl describe deployment mern-backend
+```
+
+**Inspect a ReplicaSet:**
+
+```bash
+kubectl describe replicaset <replicaset-name>
+```
+
+**Update the image through the Deployment:**
+
+```bash
+kubectl set image deployment/mern-backend backend=your-dockerhub-username/mern-backend:2.0
+kubectl rollout status deployment/mern-backend
+```
+
+**View rollout revisions:**
+
+```bash
+kubectl rollout history deployment/mern-backend
+```
+
+Usually, manage application rollouts through the Deployment rather than directly editing its generated ReplicaSets.
+
+## 7. Summary Table
+
+| Feature | Deployment | ReplicaSet |
+|---|---|---|
+| Main responsibility | Manages application rollouts and ReplicaSets | Maintains desired number of matching Pods |
+| Pod management | Indirectly, through ReplicaSets | Directly manages matching Pods |
+| Rolling updates | Coordinates rollout between ReplicaSets | Does not coordinate application rollout by itself |
+| Rollbacks | Supports rollout history and rollback | No equivalent Deployment rollout history interface |
+| Typical use | Recommended resource for most stateless applications | Usually managed by a Deployment rather than created directly |
+
+**Remember:** Deployment manages ReplicaSets; ReplicaSet maintains Pod replicas. For most application workloads, create a Deployment and let it manage the ReplicaSets.
