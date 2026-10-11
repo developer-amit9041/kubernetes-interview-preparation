@@ -17446,3 +17446,129 @@ The last command helps test the condition manually, but it is not identical to k
 
 **Interview Answer:** An exec probe runs a command inside a container and checks its exit code. Exit code `0` means success, while a non-zero exit code means failure. Depending on whether it is configured as liveness, readiness, or startup, the result can trigger a container restart, affect traffic routing, or determine whether startup has completed.
 
+---
+
+# 136. What Is a CPU Request?
+
+## 1. English Definition
+
+A CPU request is the amount of CPU resource that Kubernetes uses when scheduling a container onto a node. The scheduler uses CPU requests to check whether a node has enough allocatable CPU capacity for the Pod. A request is not a hard CPU usage limit.
+
+## 2. Hindi Definition
+
+CPU request woh CPU resource amount hai jo hum Kubernetes ko batate hain ki container ko schedule karne ke liye kitna CPU reserve ya account karna chahiye. Kubernetes scheduler node choose karte waqt CPU requests ko consider karta hai.
+
+Important: CPU request ka matlab yeh nahi hai ki container sirf utna hi CPU use kar sakta hai. Agar CPU limit set nahi hai aur node par CPU available hai, toh container request se zyada CPU use kar sakta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application ka Node.js backend Kubernetes mein run kar raha hai. Aap backend container ke liye `500m` CPU request set karte ho.
+
+```yaml
+resources:
+  requests:
+    cpu: "500m"
+```
+
+`500m` ka matlab half of one CPU core hai. Kubernetes scheduler aisa node choose karne ki koshish karega jahan Pod ke liye required requested CPU capacity available ho.
+
+CPU units:
+
+- `1000m` = 1 CPU core
+- `500m` = 0.5 CPU core
+- `250m` = 0.25 CPU core
+
+Scheduler CPU request ke basis par placement decide karta hai, actual momentary CPU usage ke basis par nahi. CPU requests scheduling capacity accounting ke liye hoti hain; yeh guaranteed exclusive physical core allocation nahi hoti.
+
+## 4. Practical Example / Code
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: node-backend
+spec:
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:latest
+      ports:
+        - containerPort: 5000
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "256Mi"
+        limits:
+          cpu: "1"
+          memory: "512Mi"
+```
+
+**Configuration explanation:**
+
+- `requests.cpu: "500m"`: Scheduler accounts for half a CPU core when placing the Pod.
+- `requests.memory: "256Mi"`: Scheduler accounts for 256 MiB of memory.
+- `limits.cpu: "1"`: Container CPU usage is capped at one CPU core; it may be throttled when it tries to exceed that limit.
+- `limits.memory: "512Mi"`: Memory usage is limited to 512 MiB; exceeding the limit can result in the container being terminated for out-of-memory.
+
+CPU requests and CPU limits serve different purposes. Requests affect scheduling and are also used in CPU-share decisions under contention; limits impose a CPU usage ceiling.
+
+## 5. Practical Commands
+
+```bash
+# Apply the Pod manifest
+kubectl apply -f backend-pod.yaml
+
+# Check Pod placement and status
+kubectl get pod node-backend -o wide
+
+# Inspect resource requests, limits, events, and scheduling
+kubectl describe pod node-backend
+
+# View resource requests and limits in YAML
+kubectl get pod node-backend -o yaml
+
+# View node allocatable resources
+kubectl describe node <node-name>
+
+# If Metrics Server is installed, view current usage
+kubectl top pod node-backend
+kubectl top nodes
+```
+
+`kubectl top` shows observed usage, not the configured request. Check the Pod specification or `kubectl describe` to inspect requests.
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+        Pod manifest
+             |
+             v
+       CPU request set
+        e.g. 500m
+             |
+             v
+     Kubernetes Scheduler
+             |
+     Check node allocatable
+       and requested CPU
+             |
+       +-----+------+
+       |            |
+ Capacity enough  No suitable capacity
+       |            |
+       v            v
+   Schedule Pod   Pod remains Pending
+```
+
+## 7. Summary Table
+
+| CPU request | Meaning |
+|---|---|
+| `1000m` | One CPU core worth of requested capacity |
+| `500m` | Half a CPU core worth of requested capacity |
+| `250m` | Quarter of a CPU core worth of requested capacity |
+| Main purpose | Helps scheduler choose a node with enough requested capacity |
+| Is it a hard usage cap? | No; a CPU limit is used for a hard CPU ceiling |
+| If no node has enough capacity | Pod may remain Pending until it can be scheduled |
+
+**Interview Answer:** A CPU request specifies the CPU amount Kubernetes uses for scheduling a Pod. The scheduler checks whether a node has enough allocatable capacity to accommodate the request. A CPU request is not a hard limit, so a container can use more CPU than its request when capacity is available and no lower CPU limit prevents it.
+
