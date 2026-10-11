@@ -1673,3 +1673,135 @@ Agar YAML mein Namespace pehle se specify hai, to uske saath command ka behaviou
 - Har Kubernetes resource namespaced nahi hota. Nodes aur PersistentVolumes jaise resources cluster-scoped hote hain.
 
 **Remember:** One cluster can contain multiple Namespaces, jaise `development`, `testing`, aur `production`.
+
+
+---
+
+# 15. What Is a Deployment in Kubernetes?
+
+## 1. English Definition
+
+A **Deployment** is a Kubernetes resource that manages application Pods through ReplicaSets. It helps maintain the desired number of replicas and supports rolling updates and rollbacks when application versions change.
+
+## 2. Hindi Definition
+
+Deployment Kubernetes ka ek resource hai jo application ke Pods ko manage karta hai. Ye ensure karne mein help karta hai ki required number mein Pods run karein, aur application update karte waqt naye version ko gradually deploy kar sakein.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapka Node.js + Express backend hai aur aap chahte ho ki uski **3 copies (replicas)** hamesha available rahen.
+
+Agar aap manually 3 Pods create karoge, toh unhe manage karna mushkil ho sakta hai. Yahin Deployment kaam aata hai.
+
+Aap Deployment mein specify karte ho ki 3 replicas chahiye. Kubernetes Deployment, ReplicaSet ke through, desired number of Pods maintain karne mein help karta hai.
+
+- Ek Pod fail ho jaye, toh controller replacement Pod create karne ki koshish karta hai.
+- Naya application version deploy karna ho, toh rolling update use kar sakte ho.
+- Update mein problem ho, toh previous revision par rollback kar sakte ho.
+
+**Important:** Deployment aur Pod same cheez nahi hain. Deployment Pods ko indirectly, ReplicaSet ke through manage karta hai.
+
+## 4. Deployment Architecture Diagram
+
+```text
+                 Deployment
+              (desired replicas: 3)
+                       |
+                       v
+                   ReplicaSet
+                       |
+          +------------+------------+
+          |            |            |
+          v            v            v
+       Pod 1         Pod 2         Pod 3
+      Backend       Backend       Backend
+```
+
+## 5. Practical Example — Node.js Backend Deployment
+
+File name: `backend-deployment.yaml`
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+```
+
+### YAML ko samjho
+
+- `kind: Deployment` — Kubernetes ko batata hai ki Deployment resource banana hai.
+- `replicas: 3` — Desired state mein 3 Pods chahiye.
+- `selector.matchLabels` — Deployment ko batata hai ki kaunse labels wale Pods iske hain.
+- `template` — Naye Pods banane ke liye Pod ka blueprint.
+- `image` — Backend ki container image.
+- `containerPort: 5000` — Application ke container port ko declare karta hai; external access ke liye Service ya doosri networking configuration chahiye.
+
+Apni actual published Docker image ka naam use karna.
+
+## 6. Useful Deployment Commands
+
+### Deployment create ya update karo
+
+```bash
+kubectl apply -f backend-deployment.yaml
+```
+
+### Deployment status dekho
+
+```bash
+kubectl get deployments
+kubectl describe deployment mern-backend
+kubectl rollout status deployment/mern-backend
+```
+
+### Pods dekho
+
+```bash
+kubectl get pods -l app=mern-backend
+```
+
+### Replicas ki count change karo
+
+```bash
+kubectl scale deployment mern-backend --replicas=5
+```
+
+### Image update karo
+
+```bash
+kubectl set image deployment/mern-backend backend=your-dockerhub-username/mern-backend:2.0
+kubectl rollout status deployment/mern-backend
+```
+
+### Previous revision par rollback karo
+
+```bash
+kubectl rollout undo deployment/mern-backend
+```
+
+## 7. Deployment vs Pod
+
+| Pod | Deployment |
+|---|---|
+| One or more containers run karta hai | ReplicaSet ke through Pods manage karta hai |
+| Directly create kiya ja sakta hai | Desired replicas aur Pod template define karta hai |
+| Pod replace hone par naya Pod alag identity/IP le sakta hai | Failed ya missing Pods ko replace karne ke liye desired state maintain karta hai |
+| Khud rolling update strategy provide nahi karta | Rolling updates aur rollbacks support karta hai |
+
+**Remember:** Deployment desired state define karta hai, ReplicaSet replicas maintain karta hai, aur Pod ke andar containers run karte hain. Production applications ke liye standalone Pods ke bajaye aksar Deployment use kiya jata hai.
