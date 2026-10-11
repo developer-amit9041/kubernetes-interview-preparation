@@ -13278,3 +13278,127 @@ Check whether an Ingress Controller is running in your cluster using the control
 | MERN use case | Route frontend and API traffic through one domain |
 
 **Remember:** Ingress defines HTTP/HTTPS routing rules; an Ingress Controller implements them and routes traffic to Kubernetes Services.
+
+---
+
+# 102. Why Do We Need Ingress?
+
+## 1. English Definition
+
+**Ingress provides a centralized way to route external HTTP and HTTPS traffic to multiple Kubernetes Services using host-based and path-based rules.** It can also support TLS termination when configured with a compatible Ingress Controller.
+
+## 2. Hindi Definition
+
+Bhai, Ingress ki zaroorat isliye hoti hai taaki hum ek common entry point se incoming web traffic ko alag-alag Kubernetes Services tak route kar sakein. Isse har application ke liye alag external endpoint configure karne ki zaroorat kam ho sakti hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application mein React frontend aur Node.js/Express backend alag-alag Kubernetes Services ke through run kar rahe hain.
+
+Ingress ke bina, aap har Service ko separately expose kar sakte ho, jaise alag LoadBalancer Services. Isse external endpoints aur configuration badh sakte hain.
+
+Ingress ke saath, ek domain par rules bana sakte ho:
+
+- `myapp.example.com/` → `frontend-service`
+- `myapp.example.com/api` → `backend-service`
+
+Iske benefits:
+
+1. **Centralized routing:** Ek jagah host/path routing rules define kar sakte ho.
+2. **Domain-based routing:** Different domains ko different Services par bhej sakte ho.
+3. **Path-based routing:** `/api` aur `/` ko alag Services tak route kar sakte ho.
+4. **TLS/HTTPS support:** Compatible controller ke through HTTPS termination configure kar sakte ho.
+5. **Simplified exposure:** Multiple web Services ke liye separate public LoadBalancer endpoints ki zaroorat kam ho sakti hai.
+
+Ingress resource ko implement karne ke liye compatible Ingress Controller aur appropriate network/DNS configuration zaroori hai.
+
+## 4. Practical Example / Code
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mern-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: myapp.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-service
+                port:
+                  number: 80
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-service
+                port:
+                  number: 5000
+```
+
+This assumes the two Services exist and an Ingress Controller for the selected IngressClass is installed. The controller's configuration determines the exact routing behavior.
+
+## 5. Architecture Diagram
+
+```text
+             Browser
+                |
+                v
+        myapp.example.com
+                |
+                v
+       Ingress Controller
+                |
+          Ingress Rules
+           /         \\
+          v           v
+ frontend-service  backend-service
+          |           |
+          v           v
+      React Pods  Express Pods
+```
+
+## 6. Practical Commands / Configuration
+
+Apply the Ingress:
+
+```bash
+kubectl apply -f ingress.yaml
+```
+
+Check the Ingress and controller class:
+
+```bash
+kubectl get ingress
+kubectl get ingressclass
+```
+
+Inspect the configured rules:
+
+```bash
+kubectl describe ingress mern-ingress
+```
+
+Check that the target Services exist:
+
+```bash
+kubectl get services
+```
+
+## 7. Summary Table
+
+| Need | How Ingress helps |
+|---|---|
+| Multiple web Services | Routes requests to different Services |
+| One domain, multiple apps | Uses path-based rules |
+| Multiple domains | Uses host-based rules |
+| HTTPS | Can configure TLS termination through a compatible controller |
+| External exposure | Can reduce the need for separate public LoadBalancer endpoints |
+| Central management | Keeps routing rules in Kubernetes resources |
+
+**Remember:** We use Ingress to manage HTTP/HTTPS routing from outside the cluster to multiple Kubernetes Services through a common entry point.
