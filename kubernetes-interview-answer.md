@@ -7353,3 +7353,112 @@ Replace `2` with a revision number available in the rollout history. Verify the 
 | `kubectl get pods` | Verify current Pods |
 
 **Remember:** Use `kubectl rollout undo deployment/<name>` to roll back a Deployment. Check rollout status afterward, and handle database migrations separately.
+---
+
+# 60. What Is `kubectl rollout`?
+
+## 1. English Definition
+
+**`kubectl rollout` is a Kubernetes command group used to manage and inspect the rollout of a Deployment.** It lets you check rollout status, view revision history, restart a Deployment, and roll back to a previous revision.
+
+## 2. Hindi Definition
+
+`kubectl rollout` Kubernetes ki commands ka ek group hai, jiska use application ke Deployment updates ko manage aur check karne ke liye hota hai.
+
+Iski help se tum update ka status check kar sakte ho, previous revision par rollback kar sakte ho, Deployment restart kar sakte ho aur rollout history dekh sakte ho.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application ka Node.js backend Kubernetes par chal raha hai. Initially backend ka version `1.0` hai. Tumne naya version `2.0` deploy kiya aur ab check karna hai ki update successfully complete hua ya nahi.
+
+Yahan `kubectl rollout` ka use hota hai. Yeh command group Deployment ke rollout lifecycle se related actions provide karta hai.
+
+- `rollout status`: update ki progress check karta hai.
+- `rollout history`: retained Deployment revisions dikhata hai.
+- `rollout undo`: previous available revision restore karta hai.
+- `rollout restart`: Deployment ke Pods ko restart karne ke liye rollout trigger karta hai.
+
+## 4. Practical Example / Code
+
+Suppose the backend Deployment is named `mern-backend` and its container is named `backend`.
+
+Update the image:
+
+```bash
+kubectl set image deployment/mern-backend backend=your-dockerhub-username/mern-backend:2.0
+```
+
+Check whether the rollout completes:
+
+```bash
+kubectl rollout status deployment/mern-backend
+```
+
+This command reports the progress of the Deployment rollout; it does not itself change the image.
+
+## 5. Architecture Diagram
+
+```text
+        MERN Backend Deployment
+                  |
+          Image/config update
+                  |
+                  v
+          Deployment rollout
+                  |
+       +----------+----------+
+       |          |          |
+       v          v          v
+     status     history     undo
+       |          |          |
+       v          v          v
+    Progress   Revisions   Previous revision
+                              
+     restart: triggers a restart rollout
+```
+
+`kubectl rollout` is a command group, not a separate Kubernetes resource. The exact behavior depends on the subcommand and resource type.
+
+## 6. Practical Commands / Configuration
+
+**Check rollout status:**
+
+```bash
+kubectl rollout status deployment/mern-backend
+```
+
+**View rollout history:**
+
+```bash
+kubectl rollout history deployment/mern-backend
+```
+
+**Roll back to the previous revision:**
+
+```bash
+kubectl rollout undo deployment/mern-backend
+```
+
+**Restart the Deployment:**
+
+```bash
+kubectl rollout restart deployment/mern-backend
+```
+
+**Watch Pods while a rollout is happening:**
+
+```bash
+kubectl get pods -w
+```
+
+## 7. Summary Table
+
+| Command | Purpose |
+|---|---|
+| `kubectl rollout status deployment/<name>` | Check rollout progress |
+| `kubectl rollout history deployment/<name>` | View retained rollout revisions |
+| `kubectl rollout undo deployment/<name>` | Roll back to a previous revision |
+| `kubectl rollout restart deployment/<name>` | Trigger a restart rollout |
+| `kubectl get pods -w` | Watch Pod changes live |
+
+**Remember:** `kubectl rollout` is a command group for managing and inspecting Deployment rollouts. Use `status` to monitor, `history` to inspect revisions, `undo` to roll back, and `restart` to restart Pods through a rollout.
