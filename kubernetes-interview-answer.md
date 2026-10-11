@@ -22508,4 +22508,167 @@ Secret ko secure rakhne ke liye har layer zaroori hai: storage encryption, restr
 
 ---
 
+
+## 175. What Is a StatefulSet?
+
+### 1. English Definition
+
+A **StatefulSet** is a Kubernetes workload controller used to manage stateful applications that need stable Pod identities, predictable Pod names and ordering, and persistent storage associated with each Pod.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+StatefulSet Kubernetes ka workload controller hai jo un applications ko manage karta hai jinhe stable identity aur persistent data ki zaroorat hoti hai.
+
+Iske Pods ke names predictable hote hain, jaise `mongo-0`, `mongo-1`, aur `mongo-2`. Har Pod ka apna persistent storage claim ho sakta hai, jo Pod recreate hone par bhi data ko retain karne mein help karta hai.
+
+### 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN Stack application mein MongoDB Kubernetes cluster par chal raha hai.
+
+MongoDB jaise stateful database ko data files store karni hoti hain. Agar normal Deployment ke Pod ko replace kiya jaye, toh naya Pod identity aur storage association mein same guarantees nahi deta.
+
+StatefulSet use karne par:
+- Pods ko stable names milte hain, jaise `mongo-0`, `mongo-1`.
+- Har Pod ko `volumeClaimTemplates` se apna PersistentVolumeClaim (PVC) mil sakta hai.
+- Pod recreate hone par Kubernetes usi ordinal identity aur associated PVC ko reuse karne ki koshish karta hai.
+- Headless Service stable network DNS identity provide karne mein help karti hai.
+
+**Important:** StatefulSet apne aap MongoDB replication, sharding, backup, ya high availability configure nahi karta. Ye Pod identity aur storage orchestration provide karta hai; database replication ko separately configure karna hota hai.
+
+### 4. Practical Example / YAML
+
+Example: headless Service aur MongoDB StatefulSet.
+
+File: `mongodb-statefulset.yaml`
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo
+  namespace: development
+spec:
+  clusterIP: None
+  selector:
+    app: mongo
+  ports:
+    - name: mongodb
+      port: 27017
+      targetPort: 27017
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo
+  namespace: development
+spec:
+  serviceName: mongo
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mongo
+  template:
+    metadata:
+      labels:
+        app: mongo
+    spec:
+      containers:
+        - name: mongodb
+          image: mongo:8
+          ports:
+            - containerPort: 27017
+              name: mongodb
+          volumeMounts:
+            - name: mongo-data
+              mountPath: /data/db
+  volumeClaimTemplates:
+    - metadata:
+        name: mongo-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
+```
+
+**YAML explanation:**
+- `clusterIP: None` — Service ko headless banata hai.
+- `serviceName: mongo` — StatefulSet ko governing Service se associate karta hai.
+- `replicas: 2` — do Pods create karne ke liye request karta hai.
+- Pod names predictable honge: `mongo-0` aur `mongo-1`.
+- `volumeClaimTemplates` — har Pod ke liye alag PVC create karta hai, jaise `mongo-data-mongo-0` aur `mongo-data-mongo-1`.
+- `mountPath: /data/db` — MongoDB container ka data directory hai.
+
+Cluster mein suitable StorageClass/provisioner hona chahiye. Ye YAML sirf StatefulSet aur storage pattern demonstrate karta hai; production MongoDB ke liye authentication, secure Secrets, resource settings, backup, monitoring, aur replica-set configuration separately karni hoti hai. Do independent MongoDB Pods create karna apne aap working replica set nahi banata.
+
+### 5. Practical Commands
+
+**Apply the YAML:**
+
+```bash
+kubectl apply -f mongodb-statefulset.yaml
+```
+
+**Check StatefulSet and Pods:**
+
+```bash
+kubectl get statefulsets -n development
+kubectl get pods -n development -o wide
+kubectl describe statefulset mongo -n development
+```
+
+**Check PVCs:**
+
+```bash
+kubectl get pvc -n development
+```
+
+**Check Pod DNS names:**
+
+```bash
+kubectl get service mongo -n development
+kubectl get endpoints mongo -n development
+```
+
+Expected Pod names include `mongo-0` and `mongo-1`. Their stable DNS names typically follow the pattern `mongo-0.mongo.development.svc.cluster.local` and `mongo-1.mongo.development.svc.cluster.local), assuming the cluster's default DNS domain is `cluster.local`.
+
+### 6. Kubernetes Architecture Diagram
+
+```text
+              Headless Service: mongo
+                       |
+              +--------+--------+
+              |                 |
+              v                 v
+          mongo-0             mongo-1
+              |                 |
+              v                 v
+       PVC: mongo-data-     PVC: mongo-data-
+            mongo-0              mongo-1
+              |                 |
+              v                 v
+       Persistent Volume   Persistent Volume
+```
+
+Har Pod ki apni stable ordinal identity aur storage claim hoti hai. Pod replace hone par uski identity aur PVC association ko preserve karne mein StatefulSet help karta hai.
+
+### 7. Summary Table
+
+| Feature | StatefulSet |
+|---|---|
+| Main purpose | Stateful applications manage karna |
+| Pod names | Stable and predictable, e.g. `mongo-0` |
+| Pod identity | Stable ordinal identity |
+| Storage | `volumeClaimTemplates` se per-Pod PVC |
+| Network identity | Usually a headless Service ke saath |
+| Creation/deletion | Default behavior mein ordered startup aur reverse ordered termination |
+| Common use cases | Databases, distributed stores, clustered stateful systems |
+| Automatic database replication | No; separately configure karni hoti hai |
+
+**Interview-Ready Answer:**
+
+“A StatefulSet is a Kubernetes controller for stateful applications that need stable Pod identities, predictable naming and persistent storage. For example, a MongoDB StatefulSet can create Pods named `mongo-0` and `mongo-1`, each with its own PersistentVolumeClaim and stable network identity through a headless Service. StatefulSet manages identity and storage association, but database replication and backups must be configured separately.”
+
+---
+
 ---
