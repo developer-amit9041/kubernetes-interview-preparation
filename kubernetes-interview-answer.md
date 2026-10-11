@@ -25804,4 +25804,137 @@ If all six Pods are created and become ready, the example has 3 frontend + 2 bac
 ### Interview-ready answer
 “I would not choose a fixed number of Pods for every MERN application. It depends on traffic, availability, and resource requirements. For example, I might start with three React frontend replicas, two Node.js/Express backend replicas, and one MongoDB StatefulSet replica in a basic learning environment, for six Pods total. I would expose the frontend and backend through appropriate Services, monitor resource utilization, and scale stateless workloads as needed. For production, I would separately plan database persistence, backups, security, and MongoDB high availability; increasing the MongoDB Pod count alone does not provide safe replication.”
 
+## 190. Why would you create separate Deployments for the frontend and backend?
+
+### English Definition
+Separate Deployments allow the frontend and backend to be managed, scaled, updated, and recovered independently. They often have different resource requirements, container images, and release cycles, so separate Deployments provide flexibility and operational control.
+
+### Hindi Definition
+Frontend aur backend ke liye separate Deployments banane ka matlab hai ki dono ko Kubernetes mein independently manage kar sakein. React frontend ko update ya scale karne ke liye backend ko change karna zaroori nahi hota, aur backend ko scale karne ke liye frontend ke replicas badhane ki zaroorat nahi hoti.
+
+### Step-by-step MERN example
+Maan lo ek e-commerce application hai:
+- **React frontend:** product pages, cart aur user interface.
+- **Node.js/Express backend:** login, product APIs, orders aur business logic.
+- **MongoDB:** application ka data.
+
+Frontend ke liye ek Deployment aur backend ke liye doosra Deployment banate hain. Har Deployment apne Pod replicas maintain karta hai. Services stable network endpoints provide karte hain jinke through components communicate karte hain.
+
+```text
+Users
+  |
+Frontend Service
+  |
+Frontend Deployment (3 React Pods)
+  |
+  | HTTP API requests
+  v
+Backend Service
+  |
+Backend Deployment (2 Node.js Pods)
+  |
+MongoDB Service
+  |
+MongoDB StatefulSet / database
+```
+
+### Why separate Deployments?
+
+1. **Independent scaling:** Agar API traffic badhta hai, backend replicas 2 se 5 kar sakte hain, bina frontend replicas badhaye. Agar frontend traffic badhe, frontend ko independently scale kar sakte hain.
+2. **Independent releases:** React UI ka naya version deploy karne ke liye backend ko redeploy karna zaroori nahi; backend API update ke liye bhi frontend image ko rebuild karna zaroori nahi.
+3. **Different container images and ports:** Frontend web server aur backend Node.js process alag images, ports, environment variables aur startup commands use kar sakte hain.
+4. **Different resource requirements:** Frontend aur backend ke CPU/memory requests aur limits alag configure kar sakte hain.
+5. **Failure isolation and recovery:** Ek Deployment ke Pods fail hon, toh uska controller unhe independently replace karne ki koshish karta hai. Isse dono components ka lifecycle separate rehta hai, though shared dependencies or network failures can still affect the application.
+6. **Different rollout strategies:** Frontend aur backend ke rolling updates, rollout status, rollback aur release timing independently manage kar sakte hain.
+7. **Security and configuration:** Backend ke Secrets, database credentials, service account permissions, and configuration ko frontend workload se separate rakhna easier hota hai. Sensitive credentials ko frontend bundle mein kabhi include nahi karna chahiye.
+
+### Example YAML: separate Deployments
+
+#### React frontend Deployment
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: react-frontend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: react-frontend
+  template:
+    metadata:
+      labels:
+        app: react-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: your-dockerhub-username/mern-frontend:v1
+          ports:
+            - containerPort: 80
+```
+
+#### Node.js backend Deployment
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: node-backend
+  template:
+    metadata:
+      labels:
+        app: node-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:v1
+          ports:
+            - containerPort: 5000
+```
+
+**Explanation:**
+- Dono Deployments ke names aur Pod labels alag hain.
+- Frontend Deployment 3 replicas aur backend Deployment 2 replicas maintain karne ki koshish karta hai.
+- Image names alag hain, isliye dono components independently build aur release ho sakte hain.
+- Ye snippets Deployment examples hain; cluster mein communication ke liye corresponding Services aur frontend/API routing configuration bhi chahiye.
+
+### Scaling commands
+```bash
+# Scale only the backend
+kubectl scale deployment/node-backend --replicas=5
+
+# Scale only the frontend
+kubectl scale deployment/react-frontend --replicas=4
+
+# Inspect both Deployments
+kubectl get deployments
+
+# Watch Pod changes
+kubectl get pods -w
+
+# Check rollout status independently
+kubectl rollout status deployment/react-frontend
+kubectl rollout status deployment/node-backend
+```
+
+Scaling command current replica count set karti hai. Agar Horizontal Pod Autoscaler configure kiya hai, toh woh metrics aur configured limits ke basis par replicas adjust kar sakta hai.
+
+### Summary table
+
+| Concern | Separate Deployments ka benefit |
+|---|---|
+| Scaling | Frontend/backend replicas independently adjust hote hain |
+| Releases | Ek component update karne par doosre ko automatically redeploy nahi karna padta |
+| Resources | CPU aur memory requirements separately configure kar sakte hain |
+| Rollback | Har component ka rollout aur rollback separately manage hota hai |
+| Configuration | Component-specific environment variables and settings |
+| Security | Backend permissions and sensitive configuration ko isolate karna easier |
+
+### Interview-ready answer
+“I create separate Deployments for the React frontend and Node.js/Express backend because they have different responsibilities, images, resource requirements, and release cycles. Separate Deployments let me scale the backend independently when API traffic increases, update the frontend without redeploying the backend, and manage rollouts and rollbacks separately. I expose the workloads through appropriate Kubernetes Services and keep backend secrets and database credentials separate from the frontend. This gives the application more flexibility and easier operations.”
+
 ---
