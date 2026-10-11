@@ -23027,4 +23027,133 @@ Har Pod ki stable ordinal identity aur apna storage claim ho sakta hai. Pod repl
 
 ---
 
+
+## 178. What Is a DaemonSet?
+
+### 1. English Definition
+
+A **DaemonSet** is a Kubernetes workload controller that ensures a copy of a specified Pod runs on each eligible node in a cluster. It is commonly used for node-level tasks such as log collection, monitoring agents, and networking components.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+DaemonSet Kubernetes ka workload controller hai jo cluster ke **har eligible node par ek Pod run karne** ke liye use hota hai.
+
+Maan lo aapke Kubernetes cluster mein 3 worker nodes hain. Agar aap DaemonSet se monitoring agent deploy karte ho, toh normally har eligible node par us agent ka ek Pod run hoga.
+
+Iske main uses:
+- Logs collect karna
+- Node monitoring karna
+- Networking components run karna
+- Security agents deploy karna
+
+**Yaad rakho:** Deployment mein hum usually replicas ki count specify karte hain. DaemonSet mein Kubernetes eligible nodes ke hisaab se Pods manage karta hai.
+
+### 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN Stack application Kubernetes par chal rahi hai aur cluster mein 3 worker nodes hain.
+
+Aapko har node par log collection agent run karna hai, taaki us node ke containers ke logs collect ho sakein. Is case mein DaemonSet useful hai.
+
+- Worker Node 1 → log-agent Pod
+- Worker Node 2 → log-agent Pod
+- Worker Node 3 → log-agent Pod
+
+Agar baad mein ek naya eligible node cluster mein add hota hai, toh DaemonSet us node par bhi Pod create kar sakta hai. Agar node eligible nahi hai—for example, node selector ya taints/tolerations ki wajah se—toh wahan Pod run hona guaranteed nahi hai.
+
+### 4. Practical Example / YAML
+
+Example: har eligible node par log-agent run karna.
+
+File: `log-agent-daemonset.yaml`
+
+```yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: log-agent
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: log-agent
+  template:
+    metadata:
+      labels:
+        app: log-agent
+    spec:
+      containers:
+        - name: log-agent
+          image: busybox:1.36
+          command: ["sh", "-c", "while true; do sleep 3600; done"]
+```
+
+**Explanation:**
+- `kind: DaemonSet` — DaemonSet controller create karta hai.
+- `selector` aur Pod labels — controller ko batate hain ki kaunse Pods is DaemonSet ke hain.
+- `template` — Pod ka specification define karta hai.
+- Har eligible node par is DaemonSet ka ek Pod schedule hota hai.
+
+Ye YAML DaemonSet ka basic demonstration hai; actual log collector ke liye appropriate logging image, configuration, permissions aur log sources set karne padenge. `monitoring` namespace pehle se create hona chahiye.
+
+### 5. Practical Commands
+
+**Namespace aur DaemonSet create karo:**
+
+```bash
+kubectl create namespace monitoring
+kubectl apply -f log-agent-daemonset.yaml
+```
+
+Agar namespace pehle se exist karta hai, toh create command ka error harmless hai; alternatively `kubectl get namespace monitoring` se check kar lo.
+
+**DaemonSet aur Pods check karo:**
+
+```bash
+kubectl get daemonsets -n monitoring
+kubectl describe daemonset log-agent -n monitoring
+kubectl get pods -n monitoring -o wide
+```
+
+**Node list check karo:**
+
+```bash
+kubectl get nodes
+```
+
+DaemonSet status mein `DESIRED`, `CURRENT`, `READY` aur `AVAILABLE` counts dekho. Ye counts node eligibility aur Pod readiness ke mutabik differ kar sakte hain.
+
+### 6. Kubernetes Architecture Diagram
+
+```text
+                DaemonSet: log-agent
+                         |
+          +--------------+--------------+
+          |              |              |
+          v              v              v
+      Worker Node 1  Worker Node 2  Worker Node 3
+          |              |              |
+          v              v              v
+      log-agent Pod  log-agent Pod  log-agent Pod
+```
+
+Har eligible node par DaemonSet ek Pod maintain karne ki koshish karta hai. Node add ya remove hone par DaemonSet Pods ko accordingly adjust karta hai.
+
+### 7. Summary Table
+
+| Feature | DaemonSet |
+|---|---|
+| Main purpose | Node-level agent run karna |
+| Pod placement | One Pod per eligible node |
+| Replica count | Nodes aur eligibility ke hisaab se |
+| New eligible node | Pod automatically create ho sakta hai |
+| Common use cases | Logging, monitoring, networking, security agents |
+| Example | Log collector on every worker node |
+| Manual scaling | Usually replica count set nahi karte; node eligibility controls placement |
+
+**Interview-Ready Answer:**
+
+“A DaemonSet is a Kubernetes controller that runs a copy of a Pod on every eligible node. It is commonly used for node-level services such as log collectors, monitoring agents, and networking components. When a new eligible node joins the cluster, the DaemonSet can schedule a Pod on that node automatically. Unlike a Deployment, its Pod placement is driven by node eligibility rather than a user-defined replica count.”
+
+---
+
 ---
