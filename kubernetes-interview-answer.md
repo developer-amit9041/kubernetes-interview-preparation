@@ -778,3 +778,167 @@ Compose file automatically Kubernetes manifest nahi ban jaati; Kubernetes Deploy
 | `docker compose up -d` | `kubectl apply -f ...` |
 
 **Remember:** Docker Compose containers ko ek saath run karne mein help karta hai; Kubernetes containers ko cluster mein orchestrate, scale aur recover karne mein help karta hai.
+
+
+---
+
+# 7. What Is Kubernetes Architecture?
+
+## 1. English Definition
+
+Kubernetes architecture consists of a **Control Plane** and **Worker Nodes**. The Control Plane manages the cluster and makes decisions about scheduling and desired state, while Worker Nodes run application workloads inside Pods.
+
+## 2. Hindi Definition
+
+Kubernetes architecture do main parts se milkar banti hai: **Control Plane** aur **Worker Nodes**. Control Plane cluster ko manage karta hai, aur Worker Nodes par application ke Pods run hote hain.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN Stack application hai:
+- React — Frontend
+- Node.js + Express — Backend
+- MongoDB — Database
+
+Aap chahte ho ki application Kubernetes par run ho. Kaun decide karega ki application kahan run hogi, kitne Pods hone chahiye, aur agar koi Pod fail ho jaaye toh kya karna hai?
+
+- **Control Plane:** Cluster ka brain; desired state manage karta hai.
+- **Worker Nodes:** Jahan application ke Pods run hote hain.
+- **Pods:** Kubernetes ki smallest deployable units, jinmein containers run hote hain.
+
+## 4. Kubernetes Architecture Diagram
+
+```text
+                  CONTROL PLANE
+       +-----------------------------------+
+       | API Server     | etcd             |
+       | Scheduler     | Controller Manager|
+       +------------------+----------------+
+                          |
+                  manages / coordinates
+                          |
+           +--------------+--------------+
+           |                             |
+           v                             v
+   +------------------+         +------------------+
+   | Worker Node 1    |         | Worker Node 2    |
+   | Kubelet          |         | Kubelet          |
+   | Container Runtime|         | Container Runtime|
+   | Kube-proxy*      |         | Kube-proxy*      |
+   | Backend Pod(s)   |         | Frontend/API Pods|
+   +------------------+         +------------------+
+```
+
+* Kube-proxy is common in many clusters, but some networking implementations replace its functionality. This is a conceptual diagram; actual workload placement depends on scheduling rules and available resources.
+
+## 5. Control Plane Components
+
+### 1. API Server — kube-apiserver
+
+**Kaam:** Kubernetes API ka main entry point. `kubectl` aur other clients iske through requests bhejte hain.
+
+Example:
+
+```bash
+kubectl get pods
+```
+
+Is command par `kubectl` API Server se Pod information request karta hai.
+
+### 2. etcd
+
+**Kaam:** Kubernetes cluster ki state aur configuration data store karta hai, jaise resource metadata aur desired configuration.
+
+Example: Deployment mein 3 replicas define karne par cluster ki desired configuration etcd mein persist hoti hai.
+
+### 3. Scheduler — kube-scheduler
+
+**Kaam:** Naye, unscheduled Pods ke liye suitable Worker Node select karta hai.
+
+Example: Backend ke 3 replicas define kiye gaye hain, toh scheduler resource availability aur scheduling rules ke basis par suitable nodes select karta hai.
+
+### 4. Controller Manager — kube-controller-manager
+
+**Kaam:** Controllers run karta hai, jo actual state ko desired state ke saath match karne ki koshish karte hain.
+
+Example: Agar Deployment ka ek Pod terminate ho jaaye, toh Deployment aur ReplicaSet controllers replacement Pod create karne mein help karte hain.
+
+## 6. Worker Node Components
+
+### 1. Kubelet
+
+Har Worker Node par agent hota hai. Ye ensure karne mein help karta hai ki assigned Pods aur unke containers configured state ke according run karein.
+
+### 2. Container Runtime
+
+Containers ko actually run karta hai. Examples: `containerd` aur `CRI-O`.
+
+### 3. Kube-proxy
+
+Common Kubernetes setups mein network rules manage karta hai, jisse Service traffic appropriate backends tak pahunch sake. Kuch clusters mein networking implementation iska kaam replace kar sakti hai.
+
+## 7. Practical Example — MERN Backend Deployment
+
+Maan lo aap ye command chalate ho:
+
+```bash
+kubectl apply -f backend-deployment.yaml
+```
+
+High-level flow:
+
+1. `kubectl` Deployment manifest API Server ko bhejta hai.
+2. API Server request validate karta hai aur desired configuration cluster state store mein persist hoti hai.
+3. Deployment aur ReplicaSet controllers desired Pod replicas create karne ki koshish karte hain.
+4. Scheduler har naye Pod ke liye suitable Worker Node select karta hai.
+5. Node ka Kubelet container runtime ke through container start karwata hai.
+6. Controllers desired state maintain karne ki koshish karte rehte hain.
+
+Example `backend-deployment.yaml`:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+```
+
+Apply aur verify:
+
+```bash
+kubectl apply -f backend-deployment.yaml
+kubectl get deployments
+kubectl get pods -o wide
+```
+
+`replicas: 3` ka matlab Kubernetes 3 desired Pod replicas maintain karne ki koshish karega. Image name aur port ko apne project ke according set karein.
+
+## 8. Summary Table
+
+| Component | Main responsibility |
+|---|---|
+| Control Plane | Cluster ko manage karta hai |
+| API Server | Kubernetes API requests handle karta hai |
+| etcd | Cluster state aur configuration store karta hai |
+| Scheduler | Pods ke liye suitable nodes select karta hai |
+| Controller Manager | Desired state maintain karne ke liye controllers run karta hai |
+| Worker Node | Application workloads run karta hai |
+| Kubelet | Node par assigned Pods ko manage karta hai |
+| Container Runtime | Containers run karta hai |
+| Kube-proxy | Common setups mein Service networking rules manage karta hai |
+
+**Remember:** Control Plane cluster ko manage karta hai; Worker Nodes application Pods run karte hain. Inke components milkar desired state maintain karne mein help karte hain.
