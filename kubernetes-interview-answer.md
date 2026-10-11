@@ -3166,3 +3166,116 @@ Kubernetes mein different controllers different resources manage karte hain. Exa
 | kubelet | Assigned Node par Pod ko run karne ki process handle karta hai |
 
 **Remember:** `kube-controller-manager` runs controllers; controllers continuously reconcile actual state toward the desired state.
+
+
+---
+
+# 26. What Is `cloud-controller-manager`?
+
+## 1. English Definition
+
+**`cloud-controller-manager` is a Kubernetes control plane component that integrates Kubernetes with a cloud provider's APIs and runs cloud-specific controllers.**
+
+It can manage cloud-related functionality such as node information, routes, and external load balancers, depending on the cloud provider and its configuration.
+
+## 2. Hindi Definition
+
+`cloud-controller-manager` Kubernetes ka control plane component hai jo Kubernetes cluster ko AWS jaise cloud provider ke saath connect karta hai aur cloud-specific resources ko manage karne mein help karta hai.
+
+## 3. Hinglish Explanation — MERN Stack + AWS Example
+
+Maan lo aapki MERN application AWS par Kubernetes ke through deploy hai.
+
+Aapke paas React frontend, Node.js/Express backend aur MongoDB database hai. Aap chahte ho ki internet se users aapke backend ko access kar sakein. Kubernetes Service ko `type: LoadBalancer` configure karne par, supported cloud integration external load balancer provision karne mein help kar sakti hai.
+
+Yahan `cloud-controller-manager` cloud provider ke saath integration mein role play karta hai.
+
+**Important distinction:** `cloud-controller-manager` har AWS resource ko automatically manage nahi karta. Actual behavior cloud provider integration, controller implementation aur cluster configuration par depend karta hai.
+
+## 4. Practical Example / Code — MERN Backend on AWS
+
+Backend ke liye ek Kubernetes Service ka example:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mern-backend-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: mern-backend
+  ports:
+    - port: 80
+      targetPort: 5000
+```
+
+Is Service ko apply karo:
+
+```bash
+kubectl apply -f backend-service.yaml
+kubectl get service mern-backend-service
+```
+
+Supported cloud integration aur correct permissions/configuration hone par, Kubernetes external load balancer provision karne ki request initiate kar sakta hai. Load balancer ka address aane mein time lag sakta hai.
+
+**AWS-specific note:** AWS EKS mein AWS Load Balancer Controller commonly AWS Elastic Load Balancing resources provision karne ke liye use hota hai, especially Ingress aur supported Service configurations ke liye. Isliye har EKS setup mein ye assume nahi karna chahiye ki built-in `cloud-controller-manager` hi load balancer create kar raha hai. Exact implementation cluster networking setup par depend karti hai.
+
+## 5. Architecture Diagram
+
+```text
+       MERN Backend Service
+       type: LoadBalancer
+                |
+                v
+          kube-apiserver
+                |
+                v
+    Cloud integration/controller
+                |
+                v
+       Cloud provider API
+          (for example AWS)
+                |
+                v
+       External Load Balancer
+                |
+                v
+       Kubernetes backend Pods
+```
+
+Diagram conceptual hai. AWS EKS mein external load balancer provision karne ka actual controller configuration ke hisaab se AWS Load Balancer Controller ya another supported integration ho sakta hai.
+
+## 6. Practical Commands / Configuration
+
+### Service check karna
+
+```bash
+kubectl get services
+kubectl describe service mern-backend-service
+```
+
+`EXTERNAL-IP` column mein address aa sakta hai. Kuch cloud providers hostname return karte hain; provisioning complete hone tak value `<pending>` bhi reh sakti hai.
+
+### Cluster aur controller context
+
+```bash
+kubectl get nodes -o wide
+kubectl get pods -A
+```
+
+Cloud-controller-manager ki deployment aur visibility cluster distribution par depend karti hai. Managed Kubernetes mein cloud integration components provider-managed ho sakte hain aur user ko normal Pods ke roop mein visible na hon.
+
+## 7. Summary Table
+
+| Component / Concept | Role |
+|---|---|
+| `cloud-controller-manager` | Kubernetes ko cloud-provider APIs ke saath integrate karta hai |
+| Node controller | Cloud environment se related node information manage kar sakta hai |
+| Route controller | Supported cloud environments mein network routes manage kar sakta hai |
+| Service / LoadBalancer integration | Configuration ke mutabik external load balancer provision karne mein help kar sakti hai |
+| AWS Load Balancer Controller | EKS par AWS load balancer resources manage karne ke liye commonly used controller |
+| kube-apiserver | Kubernetes resources ke liye API interface |
+| Cloud provider API | Cloud resources create/update karne ka interface |
+
+**Remember:** `cloud-controller-manager` cloud-specific Kubernetes integration provide karta hai; exact responsibilities cluster aur cloud-provider setup par depend karti hain.
