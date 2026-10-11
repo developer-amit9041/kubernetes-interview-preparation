@@ -8118,3 +8118,125 @@ If the replacement Pod is not becoming ready, inspect its events and logs. `Cras
 | Check status | `kubectl get pods` and `kubectl get deployment mern-backend` |
 
 **Remember:** For a Deployment-managed workload, Kubernetes attempts to replace a failed Pod to maintain the desired replica count. Recovery can take time, and the new Pod must start successfully before it becomes ready.
+---
+
+# 66. What Is a Kubernetes Service?
+
+## 1. English Definition
+
+A **Kubernetes Service** is an abstraction that provides a stable network endpoint for accessing a group of Pods. It lets applications communicate with Pods without relying on their changing IP addresses and can route traffic to matching, ready Pods.
+
+## 2. Hindi Definition
+
+Kubernetes Service ek networking resource hai jo Pods ko access karne ke liye stable IP address aur DNS name provide karti hai. Jab Pods recreate hote hain aur unki IP change ho jaati hai, tab bhi doosri applications Service ke through unhe access kar sakti hain.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application mein React frontend aur Node.js backend hai. Backend ke 3 Pods chal rahe hain, aur har Pod ki apni IP address hai. Agar Pod recreate hota hai, toh uski IP change ho sakti hai.
+
+Agar frontend directly kisi Pod ki IP use kare, toh IP change hone par connection fail ho sakta hai. Is problem ko solve karne ke liye Kubernetes Service use hoti hai.
+
+Service backend Pods ko ek stable endpoint, jaise `mern-backend`, ke through access karne deti hai. Ye configured networking ke through traffic ko matching, ready backend Pods tak route kar sakti hai.
+
+**Important:** Service khud Node.js application run nahi karti. Ye networking layer hai jo applications ko Pods tak reliably pahunchne mein help karti hai.
+
+## 4. Practical Example / Code
+
+Assume the Node.js backend Deployment already exists and its Pods have the label `app: mern-backend`. Create a file named `backend-service.yaml`:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mern-backend
+spec:
+  type: ClusterIP
+  selector:
+    app: mern-backend
+  ports:
+    - protocol: TCP
+      port: 5000
+      targetPort: 5000
+```
+
+Configuration explained:
+
+- `kind: Service` — creates a Kubernetes Service.
+- `type: ClusterIP` — exposes the Service on a cluster-internal IP by default.
+- `selector` — selects Pods whose label matches `app: mern-backend`.
+- `port: 5000` — the port clients use on the Service.
+- `targetPort: 5000` — the port on the selected Pods where the backend listens.
+
+Within the same namespace, another Pod can typically call the backend using `http://mern-backend:5000`, provided the application is listening on that port and the Service has ready endpoints.
+
+## 5. Architecture Diagram
+
+```text
+              React Frontend Pod
+                       |
+                 API request
+                       v
+             +-------------------+
+             | Kubernetes Service|
+             | mern-backend:5000 |
+             +---------+---------+
+                       |
+              routes to ready Pods
+                 /     |     \
+                v      v      v
+          +--------+ +--------+ +--------+
+          | Pod 1  | | Pod 2  | | Pod 3  |
+          | API    | | API    | | API    |
+          +--------+ +--------+ +--------+
+```
+
+The Service's stable endpoint hides the changing Pod IPs from clients. Actual routing depends on the Service selector, ready endpoints and cluster networking.
+
+## 6. Practical Commands / Configuration
+
+**Create the Service:**
+
+```bash
+kubectl apply -f backend-service.yaml
+```
+
+**Check Services:**
+
+```bash
+kubectl get services
+```
+
+**Inspect the Service and its selector:**
+
+```bash
+kubectl describe service mern-backend
+```
+
+**Check which Pods match the Service selector:**
+
+```bash
+kubectl get pods -l app=mern-backend
+```
+
+**Check Service endpoints:**
+
+```bash
+kubectl get endpoints mern-backend
+```
+
+**Note:** `ClusterIP` is accessible inside the cluster by default. To expose an application outside the cluster, options include `NodePort`, `LoadBalancer`, or an Ingress/Gateway configured for the application.
+
+## 7. Summary Table
+
+| Term | Meaning |
+|---|---|
+| Kubernetes Service | Stable network endpoint for accessing selected Pods |
+| Stable endpoint | Clients do not need to track each Pod IP |
+| `ClusterIP` | Exposes the Service internally within the cluster by default |
+| `selector` | Matches Pods using labels |
+| `port` | Port exposed by the Service |
+| `targetPort` | Port on the selected Pod receiving traffic |
+| Service DNS | Lets in-cluster clients access a Service by name |
+| `kubectl get services` | Lists Kubernetes Services |
+
+**Remember:** Pods can be recreated and their IPs can change. A Kubernetes Service provides a stable way to reach matching Pods, and a `ClusterIP` Service is the common choice for internal communication between a MERN frontend and backend.
