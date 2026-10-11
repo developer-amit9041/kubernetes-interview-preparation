@@ -17817,3 +17817,128 @@ kubectl top nodes
 
 **Interview Answer:** A memory request specifies the amount of memory Kubernetes uses when scheduling a Pod. The scheduler checks whether a node has enough allocatable memory for the Pod's requests. A memory request is not a hard usage cap; a separate memory limit can constrain usage, and exceeding that limit may result in an OOM kill.
 
+---
+
+# 139. What Is a Memory Limit?
+
+## 1. English Definition
+
+A memory limit specifies the maximum amount of memory a container is allowed to use. If the container exceeds its memory limit, it can be terminated by the Linux out-of-memory (OOM) mechanism. Kubernetes may then restart the container according to the Pod's restart policy.
+
+## 2. Hindi Definition
+
+Memory limit woh maximum memory quantity hai jo container use kar sakta hai. Agar container configured memory limit cross kar deta hai, toh Linux ka OOM mechanism us container ko terminate kar sakta hai. Kubernetes Pod ki restart policy ke according container ko dobara start kar sakta hai.
+
+CPU limit se yeh important difference hai: CPU limit exceed karne par usually throttling hoti hai, jabki memory limit exceed hone par container OOM-killed ho sakta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapka Node.js backend Kubernetes mein run kar raha hai. Aap memory limit `512Mi` set karte ho:
+
+```yaml
+resources:
+  requests:
+    memory: "256Mi"
+  limits:
+    memory: "512Mi"
+```
+
+Iska matlab:
+
+- `requests.memory: "256Mi"`: Scheduler 256 MiB requested memory account karega.
+- `limits.memory: "512Mi"`: Container ke liye 512 MiB memory limit set hai.
+
+Agar backend normal operation mein 300Mi memory use karta hai, toh woh limit ke andar hai. Agar memory usage 512Mi se zyada ho jaati hai, toh container OOM-killed ho sakta hai aur restart ho sakta hai. Exact behavior node memory pressure, runtime, and Pod restart policy par depend karta hai.
+
+## 4. Practical Example / Code
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: node-backend
+spec:
+  restartPolicy: Always
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:latest
+      ports:
+        - containerPort: 5000
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "256Mi"
+        limits:
+          cpu: "1"
+          memory: "512Mi"
+```
+
+**Configuration explanation:**
+
+- `requests.memory: "256Mi"`: Memory capacity used for scheduling.
+- `limits.memory: "512Mi"`: Maximum configured memory for the container.
+- `restartPolicy: Always`: For a Pod managed this way, Kubernetes restarts a terminated container, subject to back-off behavior.
+- `OOMKilled`: A termination reason you may see when the container is killed due to exceeding its memory limit.
+
+A container can also be OOM-killed under node-level memory pressure. The exact victim selection depends on factors including QoS class, requests, and system conditions.
+
+## 5. Practical Commands
+
+```bash
+# Apply the Pod manifest
+kubectl apply -f backend-pod.yaml
+
+# Check Pod status and restart count
+kubectl get pods
+
+# Inspect resource limits and termination events
+kubectl describe pod node-backend
+
+# Check the last terminated container state
+kubectl get pod node-backend -o jsonpath='{.status.containerStatuses[0].lastState.terminated.reason}'
+
+# Inspect previous container logs after a restart
+kubectl logs node-backend --previous
+
+# View current memory usage (Metrics Server required)
+kubectl top pod node-backend
+```
+
+If the termination reason is `OOMKilled`, investigate memory usage, leaks, workload spikes, and whether the configured request and limit are appropriate.
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+       Node.js container uses memory
+                    |
+                    v
+          Memory limit configured
+                e.g. 512Mi
+                    |
+          Usage exceeds limit?
+                    |
+                   Yes
+                    |
+                    v
+          Linux OOM mechanism
+                    |
+                    v
+          Container may be killed
+                    |
+                    v
+       Kubernetes restart policy applies
+```
+
+## 7. Summary Table
+
+| Setting / situation | Meaning |
+|---|---|
+| `limits.memory: "512Mi"` | Container memory limit is 512 MiB |
+| Usage remains below limit | Container can continue running, subject to other conditions |
+| Usage exceeds its limit | Container may be OOM-killed |
+| `restartPolicy: Always` | Kubernetes attempts to restart a terminated container |
+| CPU limit exceeded | Typically throttling, not an automatic restart |
+| Memory request vs limit | Request helps scheduling; limit constrains memory usage |
+
+**Interview Answer:** A memory limit defines the maximum memory a container is allowed to use. If it exceeds that limit, the Linux OOM mechanism may terminate it. Kubernetes then follows the Pod's restart policy, which commonly restarts containers in Deployments and ordinary application Pods.
+
