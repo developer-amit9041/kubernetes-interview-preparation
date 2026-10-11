@@ -17694,3 +17694,126 @@ kubectl top pod node-backend
 
 **Interview Answer:** A CPU limit defines the maximum CPU resource a container can consume. If the container tries to exceed this limit, it is typically CPU-throttled rather than restarted. CPU requests help Kubernetes schedule Pods, while CPU limits restrict CPU usage.
 
+---
+
+# 138. What Is a Memory Request?
+
+## 1. English Definition
+
+A memory request specifies the amount of memory Kubernetes uses when scheduling a container onto a node. The scheduler checks whether the node has enough allocatable memory to accommodate the Pod's requested resources. A memory request is not a hard memory usage limit.
+
+## 2. Hindi Definition
+
+Memory request woh memory quantity hoti hai jo Kubernetes scheduler Pod ko node par schedule karte waqt account karta hai. Scheduler check karta hai ki node par Pod ki requested memory ke liye enough allocatable capacity hai ya nahi.
+
+Important: Memory request ka matlab yeh nahi hai ki container sirf utni hi memory use kar sakta hai. Agar memory limit set nahi hai, toh container request se zyada memory use kar sakta hai, jab tak node aur system conditions allow karein. Lekin zyada memory use karne par node memory pressure ya OOM-kill ka risk ho sakta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapka Node.js backend Kubernetes Pod mein run ho raha hai. Aap memory request `256Mi` set karte ho:
+
+```yaml
+resources:
+  requests:
+    memory: "256Mi"
+```
+
+`256Mi` ka matlab 256 mebibytes memory hai. Kubernetes scheduler aisa node choose karega jahan Pod ki requested memory aur baaki requested resources accommodate ho sakein.
+
+Agar kisi node par enough allocatable memory nahi hai, toh Pod `Pending` reh sakta hai, chahe us moment par node ki actual memory usage kam dikh rahi ho. Scheduling primarily resource requests aur allocatable capacity ko consider karti hai.
+
+Memory units:
+
+- `1Ki` = 1024 bytes
+- `1Mi` = 1024 KiB
+- `1Gi` = 1024 MiB
+
+## 4. Practical Example / Code
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: node-backend
+spec:
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:latest
+      ports:
+        - containerPort: 5000
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "256Mi"
+        limits:
+          cpu: "1"
+          memory: "512Mi"
+```
+
+**Configuration explanation:**
+
+- `requests.memory: "256Mi"`: Scheduler accounts for 256 MiB of requested memory.
+- `limits.memory: "512Mi"`: Sets the container's memory limit to 512 MiB.
+- If the container uses more than its request but remains below its limit, it can continue running.
+- If it exceeds its memory limit, it may be terminated by an out-of-memory (OOM) kill. A container can also be OOM-killed under node memory pressure depending on QoS and system conditions.
+
+Unlike CPU, memory is not a compressible resource: Kubernetes cannot throttle memory consumption in the same way it throttles CPU.
+
+## 5. Practical Commands
+
+```bash
+# Apply the Pod manifest
+kubectl apply -f backend-pod.yaml
+
+# Check Pod status and assigned node
+kubectl get pod node-backend -o wide
+
+# Inspect requests, limits, scheduling events, and termination reasons
+kubectl describe pod node-backend
+
+# View resource configuration
+kubectl get pod node-backend -o yaml
+
+# Check current usage (Metrics Server required)
+kubectl top pod node-backend
+kubectl top nodes
+```
+
+`kubectl top` shows observed memory usage, not the configured memory request. Use `kubectl describe pod` or the Pod YAML to inspect requests.
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+          Pod manifest
+               |
+               v
+       Memory request set
+            e.g. 256Mi
+               |
+               v
+       Kubernetes Scheduler
+               |
+       Check node allocatable
+             memory
+               |
+         +-----+-----+
+         |           |
+   Enough capacity  Not enough capacity
+         |           |
+         v           v
+   Schedule Pod   Pod may remain Pending
+```
+
+## 7. Summary Table
+
+| Memory request | Meaning |
+|---|---|
+| `128Mi` | 128 MiB of requested memory |
+| `256Mi` | 256 MiB of requested memory |
+| `1Gi` | 1 GiB of requested memory |
+| Main purpose | Helps scheduler choose a node with enough requested capacity |
+| Is it a hard memory limit? | No; the memory limit defines the container's configured ceiling |
+| If no node has enough capacity | Pod may remain Pending |
+
+**Interview Answer:** A memory request specifies the amount of memory Kubernetes uses when scheduling a Pod. The scheduler checks whether a node has enough allocatable memory for the Pod's requests. A memory request is not a hard usage cap; a separate memory limit can constrain usage, and exceeding that limit may result in an OOM kill.
+
