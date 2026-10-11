@@ -16782,3 +16782,123 @@ kubectl get deployment backend -o yaml
 
 **Remember:** Startup probe protects the initialization phase; liveness checks whether a container should restart, and readiness checks whether a Pod should receive traffic.
 
+---
+
+# 131. What Happens If a Liveness Probe Fails?
+
+## 1. English Definition
+
+If a liveness probe fails repeatedly and reaches its configured `failureThreshold`, Kubernetes restarts the container. This helps recover applications that have become unresponsive or stuck.
+
+## 2. Hindi Definition
+
+Agar Kubernetes ki liveness probe baar-baar fail hoti hai aur configured `failureThreshold` tak pahunch jaati hai, toh Kubernetes container ko restart kar deta hai. Iska purpose hai application ko recover karna jab woh hang ho jaaye ya properly respond na kare.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN Stack application ka Node.js backend Kubernetes Pod mein run kar raha hai. Normally, backend `/health` endpoint par successful response deta hai. Lekin kisi issue ki wajah se Node.js process hang ho jaata hai aur health check fail hone lagta hai.
+
+Agar liveness probe ki configuration yeh hai:
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 5000
+  periodSeconds: 10
+  failureThreshold: 3
+```
+
+Toh process kuch is tarah work karega:
+
+1. Kubernetes har 10 seconds mein liveness check karta hai.
+2. Agar 3 consecutive checks fail ho jaate hain, toh probe failure threshold reach kar leti hai.
+3. Kubernetes affected container ko restart karta hai.
+4. Container restart hone ke baad application dobara start hoti hai.
+
+Ek probe fail hote hi container restart nahi hota. Restart tab hota hai jab consecutive failures configured threshold tak pahunchte hain. Startup probe configured ho toh liveness probe startup probe successful hone ke baad hi shuru hoti hai.
+
+## 4. Practical Example / Code
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: backend
+spec:
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:latest
+      ports:
+        - containerPort: 5000
+      livenessProbe:
+        httpGet:
+          path: /health
+          port: 5000
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        timeoutSeconds: 2
+        failureThreshold: 3
+```
+
+**Configuration explanation:**
+
+- `initialDelaySeconds: 10`: Container start hone ke 10 seconds baad probe checks start karta hai, unless startup probe behavior supersedes this timing.
+- `periodSeconds: 10`: Probe approximately har 10 seconds mein check karta hai.
+- `timeoutSeconds: 2`: Ek check ko response ke liye maximum 2 seconds milte hain.
+- `failureThreshold: 3`: 3 consecutive failed checks ke baad Kubernetes container restart karta hai.
+- `/health`: Application ka endpoint hona chahiye jo healthy hone par successful HTTP status, jaise `200`, return kare.
+
+## 5. Practical Commands
+
+```bash
+# Check Pods and restart counts
+kubectl get pods
+
+# Inspect Pod events and container state
+kubectl describe pod backend
+
+# Check current and previous container logs
+kubectl logs backend
+kubectl logs backend --previous
+
+# Watch Pod status
+kubectl get pods -w
+
+# Inspect liveness probe configuration
+kubectl get pod backend -o yaml
+```
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+       Kubernetes runs liveness check
+                    |
+                    v
+            Probe successful?
+              /          \
+            Yes           No
+             |             |
+       Keep running    Count failure
+                           |
+                 Threshold reached?
+                    /         \
+                  No           Yes
+                  |             |
+            Check again    Restart container
+                                |
+                                v
+                         Application starts
+```
+
+## 7. Summary Table
+
+| Situation | Kubernetes behavior |
+|---|---|
+| One probe fails | Counts a failed check; no immediate restart just from one failure when threshold is higher |
+| Consecutive failures reach `failureThreshold` | Restarts the affected container |
+| Probe succeeds again before threshold | Failure sequence is reset by a successful probe |
+| Container restarts | Application process starts again inside that container |
+
+**Interview Answer:** When a liveness probe fails for the configured number of consecutive attempts, Kubernetes restarts the affected container. This helps recover an application that is stuck or unresponsive. A single failed check does not necessarily trigger a restart.
+
