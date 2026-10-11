@@ -5397,3 +5397,124 @@ kubectl get pod mern-backend-restart-demo -o jsonpath='{.status.containerStatuse
 | `Never` | No restart | No restart |
 
 **Remember:** `Always` is the default. Pods managed by Deployments/ReplicaSets use `Always`; Jobs commonly use `OnFailure` or `Never`. Kubernetes may back off between repeated restart attempts.
+---
+
+# 44. What Is `CrashLoopBackOff`?
+
+## 1. English Definition
+
+**`CrashLoopBackOff` is a Kubernetes container status reason that indicates a container is repeatedly crashing and Kubernetes is delaying restart attempts using an increasing backoff delay.**
+
+It is not a Pod phase. It usually indicates that the container starts, exits or crashes, and Kubernetes attempts to restart it according to the Pod's restart policy.
+
+## 2. Hindi Definition
+
+`CrashLoopBackOff` tab hota hai jab Pod ke andar koi container baar-baar crash ho raha hota hai aur Kubernetes use restart karne ki koshish ke beech delay badhata jaata hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari Node.js backend application Kubernetes mein deploy hai. Application start hote hi MongoDB se connect karne ki koshish karti hai, lekin connection configuration galat hone ke kaaran process crash ho jaata hai.
+
+Typical cycle:
+
+1. Backend container start hota hai.
+2. Application error ki wajah se exit ho jaati hai.
+3. Kubernetes restart attempt karta hai.
+4. Container phir crash hota hai.
+5. Kubernetes restart attempts ke beech wait badhata hai.
+6. `kubectl get pods` mein `CrashLoopBackOff` dikh sakta hai.
+
+**Important:** `CrashLoopBackOff` Pod phase nahi hai. Yeh container ke `Waiting` state ka reason hai. Sirf restart karte rehna underlying error ko fix nahi karta.
+
+## 4. Practical Example / Code — MERN Backend
+
+Suppose the backend starts but exits because a required environment variable is missing. A simplified example of the relevant Pod configuration is:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mern-backend-crash-demo
+spec:
+  restartPolicy: Always
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:1.0
+      ports:
+        - containerPort: 5000
+      env:
+        - name: MONGO_URI
+          value: "mongodb://mongo-service:27017/myapp"
+```
+
+This URI is only an example; the MongoDB Service and database must actually be configured and reachable. An invalid image, missing configuration, application exception, or incorrect startup command can also cause repeated crashes.
+
+## 5. Architecture Diagram
+
+```text
+       Container starts
+              |
+              v
+       Application crashes
+              |
+              v
+       Kubernetes restarts it
+              |
+              v
+       Container crashes again
+              |
+              v
+        CrashLoopBackOff
+     (backoff before retry)
+              |
+              v
+       Another restart attempt
+```
+
+## 6. Practical Commands / Configuration
+
+Check Pod status and restart count:
+
+```bash
+kubectl get pods
+kubectl describe pod mern-backend-crash-demo
+```
+
+Read the current container logs:
+
+```bash
+kubectl logs mern-backend-crash-demo -c backend
+```
+
+Read logs from the previous crashed container instance:
+
+```bash
+kubectl logs mern-backend-crash-demo -c backend --previous
+```
+
+Check recent events:
+
+```bash
+kubectl get events --sort-by=.metadata.creationTimestamp
+```
+
+**Troubleshooting checklist:**
+
+- Check logs for the actual application error.
+- Verify environment variables and Secret/ConfigMap references.
+- Confirm the image, startup command, and required dependencies.
+- Check resource limits and whether the container was terminated for `OOMKilled`.
+- Fix the root cause, then verify the Pod's status and restart count.
+
+## 7. Summary Table
+
+| Point | Explanation |
+|---|---|
+| Meaning | Container repeatedly exits or crashes; restart attempts are delayed |
+| Kubernetes category | Container waiting reason, not a Pod phase |
+| Common causes | App errors, invalid configuration, missing dependencies, wrong command, or memory limit issues |
+| First troubleshooting step | Inspect `kubectl logs` and `kubectl describe pod` |
+| Previous crash logs | `kubectl logs <pod> -c <container> --previous` |
+| Resolution | Fix the underlying cause and verify recovery |
+
+**Remember:** `CrashLoopBackOff` tells you Kubernetes is backing off between restart attempts. Use logs and Pod events to find out why the container keeps crashing.
