@@ -27972,4 +27972,141 @@ The Deployment manifest must reference the pushed image, for example `your-docke
 ### Interview-ready answer
 “Docker and Kubernetes complement each other. I use Docker tooling to package my React or Node.js application into container images, test those images, and push them to a registry. I then use Kubernetes Deployments and Services to run and expose the containerized application, maintain replicas, perform health checks, and support scaling and rollouts. Kubernetes does not require Docker Engine specifically; it uses a compatible container runtime through the Container Runtime Interface, such as containerd or CRI-O.”
 
+## 202. How does Kubernetes use a Docker image?
+
+### English Definition
+Kubernetes uses a container image specified in a Pod's container configuration. The container runtime pulls the image from a registry if it is not already available locally, creates a container from the image, and runs it according to the Pod specification.
+
+### Hindi Definition
+Docker se banayi hui image mein application aur uski required files/dependencies package hoti hain. Kubernetes Deployment ya Pod YAML mein image ka naam specify karte hain. Kubernetes workload schedule karta hai, aur node par configured container runtime image ko available karke container start karta hai.
+
+### Step 1: Understand the workflow
+
+```text
+Node.js source code + Dockerfile
+             |
+             v
+       Build image
+    mern-backend:v1
+             |
+             v
+    Container registry
+    Docker Hub / Amazon ECR
+             |
+             v
+      Kubernetes Deployment
+             |
+             v
+            Pod
+             |
+             v
+     Container runtime
+   (containerd / CRI-O, etc.)
+             |
+             v
+    Running Node.js container
+```
+
+Kubernetes does not normally build the application image. It uses an image reference from the Pod specification and relies on the node's container runtime to pull or find the image and start a container.
+
+### Step 2: Build and push the Docker image
+
+Example Node.js `Dockerfile`:
+
+```dockerfile
+FROM node:22-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+EXPOSE 5000
+CMD ["npm", "start"]
+```
+
+Build the image and push it to a registry:
+
+```bash
+docker build -t your-dockerhub-username/mern-backend:v1 .
+docker login
+docker push your-dockerhub-username/mern-backend:v1
+```
+
+This assumes the application starts with `npm start` and listens on port 5000. In a real project, use the correct Dockerfile for the repository and keep secrets out of the image.
+
+### Step 3: Reference the image in a Deployment
+
+Example `backend-deployment.yaml`:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: node-backend
+  template:
+    metadata:
+      labels:
+        app: node-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:v1
+          ports:
+            - containerPort: 5000
+```
+
+The `image` field identifies the image and tag. The `replicas: 2` setting asks Kubernetes to maintain two Pods. `containerPort: 5000` declares the application's container port; it does not itself make the Node.js server listen on that port.
+
+### Step 4: Apply and inspect
+
+```bash
+kubectl apply -f backend-deployment.yaml
+kubectl rollout status deployment/node-backend
+kubectl get pods
+kubectl describe pod <pod-name>
+kubectl logs <pod-name>
+```
+
+Kubernetes schedules Pods onto suitable nodes. The container runtime on each node obtains the image if needed and starts the container. The image does not have to be downloaded again every time if a usable copy is already cached, subject to the image pull policy and runtime behavior.
+
+### Step 5: Understand imagePullPolicy
+
+| Setting | Behavior |
+|---|---|
+| `IfNotPresent` | Pull the image only if it is not already present on the node |
+| `Always` | Ask the runtime to resolve/pull the image when starting the container; cached layers can still be reused |
+| `Never` | Do not pull the image; it must already be available on the node |
+
+If `imagePullPolicy` is omitted, Kubernetes chooses a default based on the image tag and related rules. For predictable production releases, prefer unique immutable tags or image digests rather than reusing a mutable `latest` tag.
+
+### Step 6: What if the image cannot be pulled?
+
+Inspect the Pod:
+
+```bash
+kubectl describe pod <pod-name>
+kubectl get events --sort-by=.metadata.creationTimestamp
+```
+
+Common reasons include:
+- Incorrect image name or tag.
+- Image has not been pushed to the registry.
+- Private registry credentials or cloud permissions are missing.
+- Registry/network access is unavailable.
+- The image architecture is incompatible with the node.
+
+A Pod may show `ErrImagePull` or `ImagePullBackOff` while Kubernetes retries according to its backoff behavior. Fix the underlying issue rather than repeatedly deleting the Pod.
+
+### Step 7: Important clarification
+Kubernetes does not require Docker Engine specifically. It uses a compatible container runtime through the Container Runtime Interface (CRI), such as containerd or CRI-O. Images built using Docker tooling can run on Kubernetes when they use a supported image format and are accessible to the runtime.
+
+A locally built Docker image is not automatically available to every cluster node. Push it to a registry or use the cluster environment's supported image-loading workflow.
+
+### Interview-ready answer
+“Kubernetes uses the image reference specified in a Pod or Deployment manifest. It schedules the Pod onto a node, and that node's container runtime obtains the image from a registry if necessary and creates and starts the container. I usually build the image with Docker tooling, push it to Docker Hub or Amazon ECR, and reference its tag or digest in the Deployment. I verify the rollout and inspect Pod events for image-pull errors. Kubernetes does not require Docker Engine specifically; it works with compatible CRI runtimes such as containerd or CRI-O.”
+
 ---
