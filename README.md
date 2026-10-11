@@ -35,4 +35,33 @@ Study one topic at a time. Practise commands and YAML manifests in a local test 
 
 Use a test cluster for destructive commands. Never commit passwords, tokens, production credentials, real kubeconfig files, or `.env` secrets.
 
+## Priority Checklist for Amit
 
+If you are preparing for interviews as a MERN developer with 3–4 years of experience, master these topics first.
+
+### Must-Know Topics
+
+1. What is Kubernetes?
+2. Docker vs. Kubernetes
+3. Kubernetes architecture
+4. Pods
+5. Deployments
+6. ReplicaSets
+7. Services
+8. ClusterIP, NodePort, and LoadBalancer
+9. ConfigMaps
+10. Secrets
+11. Ingress
+12. Liveness and readiness probes
+13. Resource requests and limits
+14. HPA
+15. Namespaces
+16. PV and PVC
+17. StatefulSets
+18. RBAC
+19. `kubectl` commands
+20. Deploying a MERN application on Kubernetes
+21. Debugging `CrashLoopBackOff`
+22. Zero-downtime deployment
+23. Docker and Kubernetes
+24. Kubernetes with AWS/EKS
