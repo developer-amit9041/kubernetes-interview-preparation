@@ -17942,3 +17942,132 @@ If the termination reason is `OOMKilled`, investigate memory usage, leaks, workl
 
 **Interview Answer:** A memory limit defines the maximum memory a container is allowed to use. If it exceeds that limit, the Linux OOM mechanism may terminate it. Kubernetes then follows the Pod's restart policy, which commonly restarts containers in Deployments and ordinary application Pods.
 
+---
+
+# 140. What Is the Difference Between a Request and a Limit?
+
+## 1. English Definition
+
+In Kubernetes, a resource request specifies the amount of CPU or memory used for scheduling a Pod, while a resource limit defines the maximum amount a container is allowed to consume. Requests help the scheduler choose a suitable node; limits constrain resource usage at runtime.
+
+## 2. Hindi Definition
+
+Kubernetes mein **request** batata hai ki Pod ko schedule karte waqt kitni CPU ya memory capacity account karni hai. **Limit** batati hai ki container maximum kitna resource use kar sakta hai.
+
+Simple words mein:
+
+- Request = Scheduling ke liye required resource amount.
+- Limit = Runtime par resource usage ki maximum boundary.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapka Node.js backend Kubernetes mein run kar raha hai aur aap yeh configuration set karte ho:
+
+```yaml
+resources:
+  requests:
+    cpu: "250m"
+    memory: "256Mi"
+  limits:
+    cpu: "1"
+    memory: "512Mi"
+```
+
+Iska matlab:
+
+- CPU request `250m`: Scheduler 0.25 CPU core ki requested capacity account karega.
+- Memory request `256Mi`: Scheduler 256 MiB memory account karega.
+- CPU limit `1`: Container ka CPU usage one core ke equivalent tak limit hota hai; excess demand par throttling ho sakti hai.
+- Memory limit `512Mi`: Container is limit ko exceed kare toh OOM-killed ho sakta hai.
+
+Agar node ke paas Pod ki requests accommodate karne ke liye enough allocatable resources nahi hain, toh Pod `Pending` reh sakta hai. Request hard usage cap nahi hoti; container request se zyada CPU ya memory use kar sakta hai, subject to limits and system conditions.
+
+## 4. Practical Example / Code
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: node-backend
+spec:
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:latest
+      ports:
+        - containerPort: 5000
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "256Mi"
+        limits:
+          cpu: "1"
+          memory: "512Mi"
+```
+
+**What happens at runtime?**
+
+1. Scheduler Pod place karte waqt requested CPU aur memory ko node ki allocatable capacity ke against evaluate karta hai.
+2. Container apni request se zyada CPU use kar sakta hai, agar capacity available ho aur limit allow kare.
+3. CPU limit par pahunchne par container ko throttle kiya ja sakta hai.
+4. Container memory limit exceed kare toh OOM kill ho sakta hai.
+
+Agar limit set ki jaati hai aur request explicitly set nahi hoti, Kubernetes aam taur par us resource ki request ko limit ke equal set kar deta hai. Namespace ke `LimitRange` defaults bhi values affect kar sakte hain.
+
+## 5. Practical Commands
+
+```bash
+# Deploy the Pod
+kubectl apply -f backend-pod.yaml
+
+# Inspect requests, limits, scheduling events and status
+kubectl describe pod node-backend
+
+# View resource configuration
+kubectl get pod node-backend -o yaml
+
+# Check current CPU and memory usage (Metrics Server required)
+kubectl top pod node-backend
+
+# Check whether a Pod is Pending and why
+kubectl get pods
+kubectl describe pod node-backend
+```
+
+`kubectl top` actual usage dikhata hai, configured requests aur limits nahi. Unhe Pod YAML ya `kubectl describe` se inspect karein.
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+           Pod resource settings
+                    |
+          +---------+---------+
+          |                   |
+          v                   v
+       REQUEST               LIMIT
+          |                   |
+          v                   v
+  Scheduler checks     Runtime enforces
+  node allocatable     usage ceiling
+  capacity                    |
+          |            +------+------+
+          v            |             |
+     Place Pod       CPU limit     Memory limit
+                     reached       exceeded
+                        |             |
+                        v             v
+                    Throttling     Possible OOM kill
+```
+
+## 7. Summary Table
+
+| Feature | Request | Limit |
+|---|---|---|
+| Main purpose | Pod scheduling and resource accounting | Restrict container resource usage |
+| CPU behavior | Helps scheduling; not a hard cap | Excess CPU demand is typically throttled |
+| Memory behavior | Helps scheduling; not a hard cap | Exceeding the limit can cause OOM kill |
+| Can usage exceed it? | Yes, subject to limit and system conditions | CPU demand is throttled; memory excess may trigger termination |
+| If node cannot accommodate it | Pod may remain Pending | Does not by itself determine node placement |
+| Example | `cpu: "250m"`, `memory: "256Mi"` | `cpu: "1"`, `memory: "512Mi"` |
+
+**Interview Answer:** A request tells Kubernetes how much CPU or memory to account for when scheduling a Pod. A limit sets the maximum resource usage allowed for a container. CPU limits typically cause throttling when exceeded, while exceeding a memory limit can result in an OOM kill.
+
