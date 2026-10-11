@@ -18071,3 +18071,148 @@ kubectl describe pod node-backend
 
 **Interview Answer:** A request tells Kubernetes how much CPU or memory to account for when scheduling a Pod. A limit sets the maximum resource usage allowed for a container. CPU limits typically cause throttling when exceeded, while exceeding a memory limit can result in an OOM kill.
 
+---
+
+# 141. What Problems Can Occur If You Do Not Specify Resources for a Pod?
+
+## 1. English Definition
+
+If CPU and memory requests and limits are not specified for a Pod, Kubernetes may have less information for scheduling and resource control. Containers can compete for node resources, become CPU-throttled by other limits or node contention, or consume memory that contributes to node memory pressure and OOM kills. The exact behavior can be affected by namespace defaults such as a `LimitRange`.
+
+## 2. Hindi Definition
+
+Agar Pod ke liye CPU aur memory requests aur limits specify nahi karte, toh Kubernetes ke paas resource scheduling aur runtime control ke liye kam information hoti hai.
+
+Isse kuch problems ho sakti hain:
+
+- Scheduler requested CPU/memory ke basis par placement plan nahi kar paata, kyunki requests defined nahi hain.
+- Container zyada memory use karke node par memory pressure create kar sakta hai.
+- CPU usage predictable nahi rehti aur workloads ek doosre se resources compete kar sakte hain.
+- Node memory pressure mein container OOM-killed ho sakta hai.
+
+Agar namespace mein `LimitRange` defaults configured hain, toh Kubernetes automatically default requests/limits apply kar sakta hai; isliye resources omit karne ka result har cluster mein same nahi hota.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application ke 3 Node.js backend Pods ek hi worker node par run kar rahe hain. Aapne kisi Pod ke resources configure nahi kiye:
+
+```yaml
+containers:
+  - name: backend
+    image: your-dockerhub-username/mern-backend:latest
+```
+
+Agar ek backend ko traffic spike ki wajah se bahut zyada memory chahiye, toh woh node ki available memory consume kar sakta hai. Node par memory pressure badh sakta hai aur kernel kisi container ko OOM-kill kar sakta hai. Kaunsa container select hoga, yeh QoS class, requests aur node conditions jaise factors par depend karta hai.
+
+CPU ke case mein bhi resource usage ko plan karna mushkil ho sakta hai. Containers node ke CPU ke liye compete karte hain, aur agar node par CPU limits ya heavy workloads hain toh latency badh sakti hai.
+
+Resources specify karne se Kubernetes scheduler ko placement ke liye better information milti hai aur limits se runtime usage control karne mein help milti hai. Lekin bahut high ya bahut low values set karna bhi problem create kar sakta hai, isliye realistic workload measurements ke basis par values choose karo.
+
+## 4. Practical Example / Code
+
+### Without resource configuration
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: backend-no-resources
+spec:
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:latest
+      ports:
+        - containerPort: 5000
+```
+
+### With resource requests and limits
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: backend-with-resources
+spec:
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:latest
+      ports:
+        - containerPort: 5000
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "256Mi"
+        limits:
+          cpu: "1"
+          memory: "512Mi"
+```
+
+**Explanation:**
+
+- Requests help the scheduler choose a node with enough allocatable capacity.
+- CPU limits can cause throttling if the container demands more CPU than allowed.
+- Memory limits can cause an OOM kill if exceeded.
+- These example values are illustrative; choose values based on actual application behavior and load testing.
+- A namespace `LimitRange` may provide default resource requests or limits even when the Pod YAML omits them.
+
+## 5. Practical Commands
+
+```bash
+# Check Pod placement and status
+kubectl get pods -o wide
+
+# Inspect resources, events, and termination reasons
+kubectl describe pod <pod-name>
+
+# View the Pod's effective resource configuration
+kubectl get pod <pod-name> -o yaml
+
+# Check current resource usage (Metrics Server required)
+kubectl top pods
+kubectl top nodes
+
+# Inspect namespace LimitRange defaults
+kubectl get limitrange
+kubectl describe limitrange <limitrange-name>
+
+# Check namespace quota constraints
+kubectl get resourcequota
+kubectl describe resourcequota <quota-name>
+```
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+        Pod without explicit resources
+                    |
+                    v
+        Scheduler has fewer resource
+        requests for capacity planning
+                    |
+                    v
+         Containers share node resources
+                    |
+          +---------+---------+
+          |                   |
+          v                   v
+      CPU contention      Memory pressure
+          |                   |
+          v                   v
+    Higher latency       Possible OOM kill
+
+   Requests help scheduling; limits constrain usage.
+```
+
+## 7. Summary Table
+
+| Potential problem | Why it can happen |
+|---|---|
+| Less predictable scheduling | No explicit CPU/memory requests for scheduler accounting, unless defaults apply |
+| CPU contention and latency | Workloads compete for available CPU; actual impact depends on node load and configured limits |
+| Memory pressure | A container may consume substantial memory when no effective limit applies |
+| OOM kills | Kernel may terminate containers under memory-limit exceedance or node memory pressure |
+| Harder capacity planning | Actual demand is less explicitly declared |
+| Cluster-specific defaults | `LimitRange` may inject default requests or limits |
+
+**Interview Answer:** If you do not specify resources for a Pod, Kubernetes has less explicit information for scheduling and resource control. This can make capacity planning less predictable and increase the risk of CPU contention, node memory pressure, and OOM kills. Namespace policies such as `LimitRange` may supply defaults, so the exact behavior depends on cluster configuration. Defining appropriate requests and limits improves predictability, but values should be based on measured workload requirements.
+
