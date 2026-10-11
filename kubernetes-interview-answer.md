@@ -23930,4 +23930,168 @@ If mongo-1 is recreated:
 
 “Stable network identity means every StatefulSet Pod has a predictable hostname and DNS name based on its ordinal, such as `mongo-0` or `mongo-1`. If a Pod is recreated, it keeps the same identity, although its IP address may change. This is useful for distributed systems such as database clusters that need to discover specific members reliably.”
 
+
+## 184. What Kubernetes Resource Would You Use to Deploy a Database?
+
+### 1. English Definition
+
+A **StatefulSet** is generally the preferred Kubernetes workload resource for deploying databases that require stable Pod identities and persistent storage. A **PersistentVolumeClaim (PVC)** provides a way to request persistent storage, and a **Service** can provide network access to the database.
+
+The appropriate resource depends on the database architecture and operational requirements. For production databases, a database operator or a managed database service may be preferable.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+Agar Kubernetes mein MongoDB, PostgreSQL ya MySQL jaisa database deploy karna hai, toh generally **StatefulSet** use kar sakte hain.
+
+Lekin sirf StatefulSet banana enough nahi hai:
+
+- **StatefulSet:** Database Pods ki stable identity maintain karta hai.
+- **PVC:** Database ka persistent data store karne ke liye storage request karta hai.
+- **Service:** Database ko network ke through access karne deta hai.
+- **Secret:** Database credentials ko configure karne mein help karta hai.
+
+**Yaad rakho:** StatefulSet Pod ko manage karta hai, PVC data ke liye storage provide karta hai, aur Service network access provide karti hai.
+
+### 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aap apni MERN application Kubernetes par deploy kar rahe ho aur MongoDB bhi cluster ke andar run karna chahte ho.
+
+Typical setup mein:
+
+1. StatefulSet MongoDB Pod ko manage karega aur stable identity dega.
+2. PVC database files ke liye persistent storage request karega.
+3. Service backend ko MongoDB tak pahunchne ka stable network endpoint degi.
+4. Secret credentials ko configuration mein provide karne ke liye use hoga.
+
+Agar MongoDB Pod delete ho jaye aur recreate ho, toh PVC se attached persistent data ko retain kiya ja sakta hai, provided storage and reclaim policies correctly configured hain. StatefulSet akela data durability ya MongoDB replication configure nahi karta.
+
+### 4. Practical Example / YAML
+
+Yeh simplified example ek MongoDB instance ke liye hai. Production use ke liye authentication, resource limits, backup, monitoring, storage policies, and database replication/availability ki additional configuration zaroori hai.
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo
+  namespace: development
+spec:
+  selector:
+    app: mongo
+  ports:
+    - name: mongodb
+      port: 27017
+      targetPort: 27017
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo
+  namespace: development
+spec:
+  serviceName: mongo
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo
+  template:
+    metadata:
+      labels:
+        app: mongo
+    spec:
+      containers:
+        - name: mongodb
+          image: mongo:7
+          ports:
+            - containerPort: 27017
+          volumeMounts:
+            - name: mongo-data
+              mountPath: /data/db
+  volumeClaimTemplates:
+    - metadata:
+        name: mongo-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
+```
+
+**How it works:**
+
+- `StatefulSet` creates a Pod named `mongo-0`.
+- `volumeClaimTemplates` creates a PVC for that Pod.
+- The PVC requests 5 GiB of storage; a suitable StorageClass or provisioned PersistentVolume must be available.
+- The Service named `mongo` exposes port 27017 inside the cluster.
+
+This example does not configure database credentials. Do not expose an unauthenticated MongoDB instance in a real environment.
+
+### 5. Practical Commands
+
+**Apply the manifest:**
+
+```bash
+kubectl apply -f mongo-statefulset.yaml
+```
+
+**Check database resources:**
+
+```bash
+kubectl get statefulset,pods,svc,pvc -n development
+kubectl describe pod mongo-0 -n development
+kubectl describe pvc mongo-data-mongo-0 -n development
+```
+
+**Check the database logs:**
+
+```bash
+kubectl logs mongo-0 -n development
+```
+
+**Open a local port-forward for testing:**
+
+```bash
+kubectl port-forward svc/mongo 27017:27017 -n development
+```
+
+This makes the Service reachable through localhost on the machine running the command; it is intended for development/testing, not as a production exposure strategy.
+
+### 6. Kubernetes Architecture Diagram
+
+```text
+MERN Backend Pod
+       |
+       v
+  Service: mongo
+       |
+       v
+StatefulSet: mongo
+       |
+       v
+    Pod: mongo-0
+       |
+       v
+ PersistentVolumeClaim (PVC)
+       |
+       v
+ PersistentVolume / Storage
+```
+
+The StatefulSet manages the database Pod, while the PVC requests storage and the Service provides network access.
+
+### 7. Summary Table
+
+| Resource | Role in database deployment |
+|---|---|
+| StatefulSet | Manages Pods with stable identities |
+| PVC | Requests persistent storage |
+| PV / StorageClass | Provides or dynamically provisions storage |
+| Service | Provides a stable network endpoint |
+| Secret | Stores/configures sensitive credentials |
+| Database operator | Automates database-specific operations, depending on the operator |
+
+**Interview-Ready Answer:**
+
+“For a database that needs stable Pod identity and persistent storage, I would generally use a StatefulSet with a PersistentVolumeClaim and a Service. The StatefulSet manages the database Pod, the PVC requests persistent storage, and the Service provides network access. For production, I would also evaluate a database operator or a managed database service, and configure authentication, backups, monitoring, and high availability as required.”
+
 ---
