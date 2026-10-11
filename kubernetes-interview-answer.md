@@ -11975,3 +11975,144 @@ Note: Har cluster mein PVs pre-created hona zaroori nahi; StorageClass aur dynam
 | ConfigMap / Secret volume | Configuration ya sensitive values ko files ke roop mein provide karta hai |
 
 **Remember:** A Kubernetes Volume provides storage to containers in a Pod. Choose the volume type based on whether the data is temporary or must persist beyond the Pod's lifecycle.
+
+---
+
+# 92. How Do You Persist Data Used by a Pod?
+
+## 1. English Definition
+
+To persist data used by a Kubernetes Pod, use persistent storage such as a PersistentVolume (PV) and PersistentVolumeClaim (PVC), then mount the PVC into the container. This allows data to survive Pod deletion or recreation, depending on the storage type and reclaim policy.
+
+## 2. Hindi Definition
+
+Pod ka data uske delete ya recreate hone ke baad bhi bachakar rakhne ke liye hum PersistentVolumeClaim (PVC) ke through persistent storage attach karte hain. Phir us storage ko container ke andar kisi directory par mount kar dete hain. Isse data sirf Pod ke temporary filesystem par depend nahi karta.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application mein MongoDB database Kubernetes Pod ke andar run ho raha hai. Agar MongoDB ka data sirf container ke writable filesystem mein save hoga, toh Pod ya container recreate hone par data lose ho sakta hai.
+
+Isliye persistent storage use karte hain:
+
+1. **PersistentVolume (PV):** Cluster mein available persistent storage resource.
+2. **PersistentVolumeClaim (PVC):** Application ki storage request, jaise 5 GiB.
+3. **Volume mount:** PVC ko container ke andar database data directory par mount karna.
+
+MongoDB ke liye data directory commonly `/data/db` hoti hai. Production mein MongoDB ko properly managed persistent storage ke saath chalana chahiye; managed database service bhi ek option hai.
+
+## 4. Practical Example / Code
+
+### Step 1: Create a PersistentVolumeClaim
+
+Create `mongodb-pvc.yaml`:
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+```
+
+Yeh PVC 5 GiB storage request karta hai. Iske bind ya provision hone ke liye cluster mein suitable StorageClass ya matching PersistentVolume configured hona chahiye.
+
+### Step 2: Mount the PVC into a MongoDB Pod
+
+Create `mongodb-pod.yaml`:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mongodb
+spec:
+  containers:
+    - name: mongodb
+      image: mongo:7
+      ports:
+        - containerPort: 27017
+      volumeMounts:
+        - name: mongodb-storage
+          mountPath: /data/db
+  volumes:
+    - name: mongodb-storage
+      persistentVolumeClaim:
+        claimName: mongodb-pvc
+```
+
+Is configuration mein MongoDB apna database data `/data/db` par store karta hai, jo PVC ke through persistent storage se connected hai. Image version ko apni compatibility requirements ke mutabik pin aur maintain karo.
+
+## 5. Architecture Diagram
+
+```text
+          MongoDB Pod
+               |
+               v
+       Container /data/db
+               |
+               v
+       PersistentVolumeClaim
+             (5 GiB)
+               |
+               v
+       PersistentVolume / Storage
+               |
+               v
+          Database Data
+        survives Pod recreation
+```
+
+PVC use karne se data Pod lifecycle se alag storage par rehta hai. Actual durability storage provider, volume configuration, deletion behavior aur reclaim policy par depend karti hai. PVC ya underlying storage delete karne se data loss ho sakta hai, isliye backups bhi zaroori hain.
+
+## 6. Practical Commands / Configuration
+
+PVC create karo:
+
+```bash
+kubectl apply -f mongodb-pvc.yaml
+```
+
+PVC ka status check karo:
+
+```bash
+kubectl get pvc
+kubectl describe pvc mongodb-pvc
+```
+
+MongoDB Pod create karo:
+
+```bash
+kubectl apply -f mongodb-pod.yaml
+kubectl get pods
+```
+
+Pod aur mounted volume details inspect karo:
+
+```bash
+kubectl describe pod mongodb
+```
+
+Storage resources check karo:
+
+```bash
+kubectl get pv
+kubectl get storageclass
+```
+
+## 7. Summary Table
+
+| Concept | Purpose |
+|---|---|
+| PersistentVolume (PV) | Persistent storage resource |
+| PersistentVolumeClaim (PVC) | Application ki storage request |
+| `volumeMounts` | Container ke andar storage path define karta hai |
+| `/data/db` | MongoDB ka common data directory |
+| `emptyDir` | Temporary storage; Pod remove hone par data delete hota hai |
+| Backup | Storage ya accidental deletion ke against recovery mein help karta hai |
+
+**Remember:** To persist Pod data, create or obtain a PVC and mount it into the container. Persistent storage survives Pod recreation, but backups and correct storage lifecycle settings are still necessary.
