@@ -17184,3 +17184,127 @@ Kubernetes evaluates probe
 
 **Interview Answer:** Configure an HTTP health check by defining an HTTP probe with `httpGet`, specifying the endpoint path and container port, and setting appropriate timing and failure thresholds. Kubernetes sends HTTP GET requests and uses the response to determine whether the container is alive, ready, or has started, depending on which probe is configured.
 
+---
+
+# 134. What Is a TCP Probe?
+
+## 1. English Definition
+
+A TCP probe is a Kubernetes health check that attempts to open a TCP connection to a specified port on a container. If the connection succeeds, the probe is considered successful; if the connection cannot be established, it fails. TCP probes can be used for liveness, readiness, or startup checks.
+
+## 2. Hindi Definition
+
+TCP probe Kubernetes ka health check hai jo container ke specified port par TCP connection establish karne ki koshish karta hai. Agar connection successfully ban jaata hai, toh probe successful hoti hai. Agar connection nahi banta ya timeout ho jaata hai, toh probe fail hoti hai.
+
+Yeh check karta hai ki port par connection accept ho raha hai ya nahi. Yeh verify nahi karta ki application ka business logic ya database query sahi kaam kar rahi hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapka Node.js Express backend port `5000` par run kar raha hai. Aap TCP probe configure karte ho:
+
+```yaml
+livenessProbe:
+  tcpSocket:
+    port: 5000
+  periodSeconds: 10
+  failureThreshold: 3
+```
+
+Kubernetes port `5000` par TCP connection open karne ki koshish karega.
+
+- Port open hai aur connection establish ho gaya: probe successful.
+- Application band hai ya port par connection accept nahi ho raha: probe fail.
+- Liveness probe ki failures configured threshold tak pahunchti hain: Kubernetes container restart karta hai.
+
+Important: TCP probe sirf connection establish hone ko check karti hai. Agar Express server port par listen kar raha hai lekin `/health` endpoint ya MongoDB dependency mein problem hai, toh TCP probe phir bhi successful ho sakti hai. Aise cases mein HTTP readiness probe zyada meaningful ho sakti hai.
+
+## 4. Practical Example / Code
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: backend
+spec:
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:latest
+      ports:
+        - containerPort: 5000
+      readinessProbe:
+        tcpSocket:
+          port: 5000
+        initialDelaySeconds: 5
+        periodSeconds: 10
+        timeoutSeconds: 2
+        failureThreshold: 3
+```
+
+**Configuration explanation:**
+
+- `tcpSocket.port`: The port Kubernetes attempts to connect to.
+- `initialDelaySeconds`: Initial delay before checks begin, subject to startup-probe behavior if configured.
+- `periodSeconds`: Time between probe attempts.
+- `timeoutSeconds`: Maximum time allowed for the connection attempt.
+- `failureThreshold`: Consecutive failures needed before the probe is considered failed.
+
+Here it is a `readinessProbe`, so a failed probe marks the container as not ready and removes the Pod from ready Service endpoints; it does not itself restart the container. The same `tcpSocket` configuration can be placed under `livenessProbe` or `startupProbe` for those respective purposes.
+
+## 5. Practical Commands
+
+```bash
+# Apply the Pod YAML
+kubectl apply -f backend-pod.yaml
+
+# Check Pod readiness and restart count
+kubectl get pods
+
+# Inspect probe configuration and events
+kubectl describe pod backend
+
+# Check application logs
+kubectl logs backend
+
+# Forward local port to the Pod
+kubectl port-forward pod/backend 5000:5000
+```
+
+From another terminal, test whether the port accepts a TCP connection:
+
+```bash
+# If netcat is installed
+nc -vz localhost 5000
+```
+
+A successful connection indicates the port is accepting TCP connections through the port-forward; it does not prove that application endpoints or dependencies are healthy.
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+          Kubernetes Kubelet
+                  |
+                  | TCP connection attempt
+                  v
+          Container port 5000
+                  |
+          Connection established?
+              /          \
+            Yes           No
+             |             |
+       Probe succeeds  Probe fails
+                           |
+                Apply configured probe behavior
+                (readiness, liveness, or startup)
+```
+
+## 7. Summary Table
+
+| Probe type | What it checks | Failure behavior at threshold |
+|---|---|---|
+| TCP liveness probe | Can Kubernetes connect to the port? | Restarts the container |
+| TCP readiness probe | Is the port accepting connections? | Marks the Pod not ready for Service traffic |
+| TCP startup probe | Has the application opened the port? | Restarts the container if startup keeps failing |
+| HTTP probe | HTTP response from a specific path | Depends on liveness/readiness/startup usage |
+
+**Interview Answer:** A TCP probe checks whether Kubernetes can establish a TCP connection to a specified container port. It is useful when an application does not expose an HTTP health endpoint. A successful TCP connection only proves that the port accepts connections; the effect of a failed probe depends on whether it is used as a liveness, readiness, or startup probe.
+
