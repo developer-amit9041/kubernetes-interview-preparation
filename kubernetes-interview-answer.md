@@ -3802,3 +3802,167 @@ Node details mein container runtime aur version ki information available ho sakt
 | `kube-scheduler` | Pod ke liye suitable Node select karta hai |
 
 **Remember:** Scheduler chooses the Node, kubelet manages the Pod, and the container runtime runs the container.
+
+
+---
+
+# 31. How Is a Request Processed Internally by Kubernetes?
+
+## 1. English Definition
+
+**Kubernetes processes a resource request through the API Server, which authenticates and authorizes the request, validates it, and persists the desired state. Controllers reconcile the desired state, the Scheduler selects a suitable node for an unscheduled Pod, and the node's kubelet works with the container runtime to run it.**
+
+## 2. Hindi Definition
+
+Jab hum Kubernetes ko koi configuration dete hain, toh API Server request ko verify aur process karta hai. Configuration store hone ke baad controllers required resources banaye rakhte hain, Scheduler Pod ke liye Node choose karta hai, aur us Node ka `kubelet` container runtime ki help se Pod ko run karne ki process handle karta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aap apni Node.js backend application ko Kubernetes par deploy karna chahte ho. Aap `backend-deployment.yaml` file banate ho aur command chalate ho:
+
+```bash
+kubectl apply -f backend-deployment.yaml
+```
+
+### Step-by-step request flow
+
+1. **`kubectl` sends the request:** `kubectl` Kubernetes API Server ko request bhejta hai.
+2. **`kube-apiserver` verifies the request:** API Server authentication, authorization aur request validation karta hai. Invalid ya unauthorized request reject ho sakti hai.
+3. **`etcd` stores the state:** Valid resource changes API Server ke through persist hote hain. `etcd` Kubernetes ka backing store hai.
+4. **Controller reconciles the state:** Deployment controller required ReplicaSet aur Pods ki desired state maintain karne ke liye actions leta hai.
+5. **`kube-scheduler` selects a Node:** Naye, unassigned Pod ke liye Scheduler ek suitable Worker Node choose karta hai.
+6. **`kubelet` and Container Runtime run the Pod:** Selected Node ka `kubelet` Pod specification follow karta hai. Container Runtime image pull kar sakta hai aur container ko create aur start karta hai.
+7. **Status is reported:** Kubelet Pod aur container ki status report karta hai. API Server ke through status available hoti hai, jise aap `kubectl get pods` se check kar sakte ho.
+
+**Important:** `kubectl apply` ka successful hona zaroori nahi ki application already ready ho. Request accept hone aur Pod ke `Ready` hone ke beech time lag sakta hai.
+
+## 4. Practical Example / Code — MERN Backend
+
+Example Deployment manifest:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+```
+
+Apply karo aur rollout observe karo:
+
+```bash
+kubectl apply -f backend-deployment.yaml
+kubectl get deployment mern-backend
+kubectl get pods -o wide
+kubectl rollout status deployment/mern-backend
+```
+
+- Deployment mein `replicas: 3` desired replica count specify karta hai.
+- Controller ReplicaSet aur Pods ko reconcile karta hai.
+- Scheduler har unassigned Pod ke liye eligible Node select karta hai.
+- Node ka kubelet aur container runtime Pod ko run karne ki process handle karte hain.
+- `kubectl rollout status` rollout progress batata hai; failure ya readiness issue hone par rollout complete nahi bhi ho sakta.
+
+## 5. Architecture Diagram
+
+```text
+     kubectl apply -f backend-deployment.yaml
+                       |
+                       v
+               +----------------+
+               | kube-apiserver |
+               | Auth / Validate|
+               +----------------+
+                       |
+                 Persist state
+                       v
+                    +------+
+                    | etcd |
+                    +------+
+                       |
+             Controllers reconcile
+                       v
+              Deployment / ReplicaSet
+                       |
+                   Pod created
+                       v
+               +----------------+
+               | kube-scheduler |
+               +----------------+
+                       |
+                 Selects Node
+                       v
+                 Worker Node
+                       |
+                    kubelet
+                       |
+               Container Runtime
+                       |
+                 Backend Pod
+                       |
+               Pod status update
+                       v
+                 kube-apiserver
+```
+
+Ye conceptual workflow hai. Controllers aur Scheduler API Server ke through cluster state observe aur update karte hain; har step ek synchronous chain mein complete hona zaroori nahi hai.
+
+## 6. Practical Commands / Configuration
+
+### Request apply karo
+
+```bash
+kubectl apply -f backend-deployment.yaml
+```
+
+### Resources aur placement check karo
+
+```bash
+kubectl get deployment mern-backend
+kubectl get pods -o wide
+kubectl describe pod <pod-name>
+```
+
+### Rollout status check karo
+
+```bash
+kubectl rollout status deployment/mern-backend
+```
+
+### Agar Pod Pending ya fail ho
+
+```bash
+kubectl describe pod <pod-name>
+kubectl get events --sort-by=.metadata.creationTimestamp
+```
+
+Events scheduling problems, image pull failures, probe failures ya doosre operational issues ke clues de sakte hain.
+
+## 7. Summary Table
+
+| Component | Request processing mein role |
+|---|---|
+| `kubectl` | API Server ko resource request bhejta hai |
+| `kube-apiserver` | Authentication, authorization, validation aur Kubernetes API operations |
+| `etcd` | Cluster state persistently store karta hai |
+| Controller manager/controllers | Desired state ko actual state ke saath reconcile karte hain |
+| `kube-scheduler` | Unassigned Pod ke liye suitable Node choose karta hai |
+| `kubelet` | Assigned Node par Pod ki execution manage karta hai |
+| Container Runtime | Container image se container create aur run karta hai |
+| `kubectl get pods` | Pod status aur placement dekhne mein help karta hai |
+
+**Remember:** API Server accepts and processes the request, etcd stores state, controllers reconcile resources, Scheduler chooses the Node, and kubelet plus the container runtime get the Pod running.
