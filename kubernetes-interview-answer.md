@@ -28375,4 +28375,127 @@ Use a versioned immutable tag or image digest for predictable releases instead o
 ### Interview-ready answer
 “I build the application image using Docker, tag it, and push it to a registry such as Docker Hub or Amazon ECR. I then reference that image in a Kubernetes Deployment manifest, configure the desired replicas, and apply the manifest with `kubectl apply`. Kubernetes schedules the Pods and the node's container runtime obtains the image if necessary and starts the containers. I verify the rollout and inspect Pod events and logs if there are image-pull or startup errors. If the application needs network access, I expose the Pods through a Service and, when appropriate, an Ingress.”
 
+## 205. How does Kubernetes pull an image from Docker Hub?
+
+### English Definition
+Kubernetes pulls an image from Docker Hub through the container runtime on the node where a Pod is scheduled. The runtime downloads the image when required, using the configured image pull policy and registry credentials, and then creates and starts the container.
+
+### Hindi Definition
+Kubernetes Deployment ya Pod YAML mein image ka naam aur tag specify kiya jata hai. Pod node par schedule hone ke baad us node ka container runtime check karta hai ki image available hai ya nahi. Agar image pull karna required hai, toh runtime Docker Hub se image download karta hai aur usse container start karta hai.
+
+### Step 1: Understand the workflow
+
+```text
+Deployment / Pod specification
+          |
+          v
+Pod scheduled on a worker node
+          |
+          v
+Node's container runtime
+          |
+          | image unavailable or policy requires resolving/pulling
+          v
+      Docker Hub
+          |
+          v
+Image layers available on node
+          |
+          v
+Container created and started
+```
+
+Kubernetes itself does not normally download image layers directly. The container runtime on the selected node performs the image pull and container creation according to the Pod specification.
+
+### Step 2: Push the image to Docker Hub
+
+Example for a Node.js backend:
+
+```bash
+docker build -t your-dockerhub-username/mern-backend:v1 .
+docker login
+docker push your-dockerhub-username/mern-backend:v1
+```
+
+The image name and tag must exist in Docker Hub, and the cluster node must be able to reach the registry. For private images, registry credentials or suitable cluster/cloud integration are needed.
+
+### Step 3: Reference the image in a Deployment
+
+Example `backend-deployment.yaml`:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: node-backend
+  template:
+    metadata:
+      labels:
+        app: node-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:v1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5000
+```
+
+- `image` specifies the Docker Hub repository and tag.
+- `replicas: 2` asks Kubernetes to maintain two Pods.
+- `imagePullPolicy: IfNotPresent` means the runtime normally pulls the image only when it is not already present on the node.
+- `containerPort: 5000` declares the intended application port; the Node.js process must actually listen on it.
+
+### Step 4: Apply and verify
+
+```bash
+kubectl apply -f backend-deployment.yaml
+kubectl rollout status deployment/node-backend
+kubectl get pods
+kubectl describe pod <pod-name>
+```
+
+When the image is available and the application starts successfully, the Pod can become Ready. If the image cannot be pulled, Pod events can show errors such as `ErrImagePull` or `ImagePullBackOff`.
+
+### Step 5: Understand imagePullPolicy
+
+| Policy | Behavior |
+|---|---|
+| `IfNotPresent` | Pull the image if it is not already present on the node |
+| `Always` | Ask the runtime to resolve/pull the image reference when starting a container; cached layers can still be reused |
+| `Never` | Do not pull; the image must already be available locally on the node |
+
+If omitted, Kubernetes sets a default based on the image tag and rules at object creation time. The `latest` tag normally defaults to `Always`; other tags normally default to `IfNotPresent`. For predictable releases, prefer unique immutable tags or image digests over a mutable `latest` tag.
+
+### Step 6: What if the Docker Hub image is private?
+
+For private images, configure credentials using an appropriate Kubernetes image pull Secret, commonly of type `kubernetes.io/dockerconfigjson`, and reference it using `imagePullSecrets` in the Pod specification. The Secret must be available in the same namespace as the Pod. Alternatively, use an appropriate cloud/registry identity integration supported by the cluster.
+
+Do not commit registry passwords to source control. Restrict Secret access with least-privilege RBAC and protect Secret data appropriately.
+
+### Step 7: Troubleshoot image pull failures
+
+```bash
+kubectl describe pod <pod-name>
+kubectl get events --sort-by=.metadata.creationTimestamp
+kubectl get pods
+```
+
+Common causes:
+- Image repository or tag is incorrect.
+- The image has not been pushed.
+- The image is private and credentials are missing or invalid.
+- The node cannot connect to Docker Hub due to network, DNS, firewall, or rate-limit issues.
+- The image does not support the node's CPU architecture.
+
+Fix the underlying cause, then let Kubernetes retry or trigger a new rollout if needed. Repeatedly deleting Pods without addressing the cause will not solve the pull failure.
+
+### Interview-ready answer
+“When a Pod is scheduled, the container runtime on its node uses the image reference from the Pod specification. Depending on the imagePullPolicy and whether the image is already available, the runtime pulls the image from Docker Hub if needed, then creates and starts the container. For private images, I configure image-pull credentials or a supported registry identity integration. I verify the result with `kubectl describe pod` and inspect events for `ErrImagePull` or `ImagePullBackOff`.”
+
 ---
