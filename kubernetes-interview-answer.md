@@ -3007,3 +3007,162 @@ Dhyan rahe: `nodeSelector` scheduling constraint hai. Agar koi eligible Node is 
 | Pending Pod | Scheduling abhi complete nahi hui ya Pod kisi aur wajah se start nahi ho pa raha |
 
 **Remember:** `kube-scheduler` decides *where* a Pod should run; `kubelet` on the selected Node manages getting that Pod running.
+
+
+---
+
+# 25. What Does `kube-controller-manager` Do?
+
+## 1. English Definition
+
+**`kube-controller-manager` is a Kubernetes control plane component that runs controllers responsible for monitoring the cluster state and taking corrective actions to maintain the desired state.**
+
+For example, the Deployment controller ensures that the required number of application replicas are maintained.
+
+## 2. Hindi Definition
+
+`kube-controller-manager` Kubernetes ka control plane component hai jo alag-alag controllers chalata hai. Ye controllers cluster ki current condition ko monitor karte hain aur use configured desired state ke according maintain karne ke liye actions lete hain.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application ke backend ke liye 3 replicas configure kiye hain:
+
+```yaml
+spec:
+  replicas: 3
+```
+
+Ab ye process samjho:
+
+1. **Desired state:** Aap chahte ho ki 3 backend Pods run karein.
+2. **Actual state:** Abhi 3 Pods run ho rahe hain.
+3. **Problem:** Kisi wajah se ek Pod fail ho gaya, toh sirf 2 healthy replicas bach sakte hain.
+4. **Controller ka action:** Deployment controller desired state aur actual state mein difference detect karta hai.
+5. **Recovery:** Controller Kubernetes API ke through required replacement Pod create karwane ki process initiate karta hai.
+
+Is tarah Kubernetes configured replicas maintain karne ki koshish karta hai.
+
+**Important:** `kube-controller-manager` khud containers ko directly start nahi karta. Controllers API Server ke through resources manage karte hain; Scheduler node select karta hai aur us Node ka `kubelet` Pod ko run karne ki process handle karta hai.
+
+## 4. Practical Example / Code — MERN Backend
+
+Ye Deployment backend ke 3 replicas specify karta hai:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+```
+
+File apply karo:
+
+```bash
+kubectl apply -f backend-deployment.yaml
+kubectl get deployments
+kubectl get pods
+```
+
+Ab kisi ek Pod ko delete karke controller reconciliation observe kar sakte ho:
+
+```bash
+kubectl get pods
+kubectl delete pod <one-backend-pod-name>
+kubectl get pods -w
+```
+
+Deployment controller desired replica count maintain karne ke liye replacement Pod create karwayega. Pod ka naam badal sakta hai. Naya Pod ready hone mein kuch samay lag sakta hai; image pull ya scheduling issues hon toh woh turant Ready nahi hoga.
+
+## 5. Architecture Diagram
+
+```text
+       User applies Deployment YAML
+                  |
+                  v
+           kube-apiserver
+                  |
+                  v
+                etcd
+       (persists cluster state)
+                  |
+                  v
+     Deployment Controller
+      (inside controller manager)
+                  |
+       compares desired vs actual
+                  |
+                  v
+        Creates replacement Pod
+                  |
+                  v
+          kube-scheduler
+          selects a Node
+                  |
+                  v
+              kubelet
+                  |
+                  v
+          Container Runtime
+                  |
+                  v
+           Backend Container
+```
+
+Diagram conceptual hai. Controllers API Server ke through state observe aur update karte hain; scheduling aur container execution alag components handle karte hain.
+
+## 6. Practical Commands / Configuration
+
+### Deployment status check karna
+
+```bash
+kubectl get deployment mern-backend
+kubectl describe deployment mern-backend
+kubectl get pods -l app=mern-backend
+```
+
+### Pod replacement observe karna
+
+```bash
+kubectl delete pod <pod-name>
+kubectl get pods -w
+```
+
+`-w` ka matlab watch hai; command resource updates ko continuously show karti hai. Production environment mein Pod delete karne se pehle impact aur availability requirements consider karo.
+
+### Other controllers
+
+Kubernetes mein different controllers different resources manage karte hain. Examples:
+
+- **Deployment controller:** Deployments aur unke replica-management workflow ko reconcile karta hai.
+- **Node controller:** Nodes ki status monitor karne aur node-related conditions handle karne mein help karta hai.
+- **Job controller:** Jobs ke tasks aur completion state ko manage karta hai.
+- **EndpointSlice controller:** Services ke liye backend endpoint information maintain karta hai.
+
+## 7. Summary Table
+
+| Concept | Role |
+|---|---|
+| `kube-controller-manager` | Control plane process that runs multiple controllers |
+| Controller | Desired aur actual state ko reconcile karta hai |
+| Deployment controller | Deployment ke desired replicas maintain karne mein help karta hai |
+| API Server | Controllers ke resource reads/writes ka API interface |
+| etcd | Cluster state persistently store karta hai |
+| kube-scheduler | Unsheduled Pod ke liye suitable Node select karta hai |
+| kubelet | Assigned Node par Pod ko run karne ki process handle karta hai |
+
+**Remember:** `kube-controller-manager` runs controllers; controllers continuously reconcile actual state toward the desired state.
