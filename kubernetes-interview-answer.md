@@ -4391,3 +4391,153 @@ Agar Pod `Pending` hai, toh insufficient CPU/memory, node selector mismatch, tai
 | `kubelet` | Selected Node par Pod ko run karne ki process manage karta hai |
 
 **Remember:** Scheduler filters, scores, and binds an eligible Node to the Pod; the Node's kubelet and container runtime handle execution.
+
+
+---
+
+# 35. What Does the Controller Manager Monitor?
+
+## 1. English Definition
+
+The **Kubernetes Controller Manager** runs controllers that continuously monitor the cluster's current state and compare it with the desired state. When a difference is detected, the controllers take action to bring the cluster closer to the desired state.
+
+## 2. Hindi Definition
+
+Kubernetes Controller Manager un controllers ko run karta hai jo continuously cluster ki current state ko monitor karte hain aur check karte hain ki woh desired state ke according hai ya nahi. Agar difference milta hai, toh controllers usse correct karne ki koshish karte hain.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application mein backend ke **3 replicas** chahiye.
+
+Aap Deployment mein specify karte ho:
+
+```yaml
+spec:
+  replicas: 3
+```
+
+Ab Controller Manager ke andar chalne wala **Deployment Controller** aur **ReplicaSet Controller** desired state maintain karne mein help karte hain.
+
+- Desired state: 3 backend Pods.
+- Current state: 3 backend Pods.
+- Agar ek Pod delete ho jata hai, current state sirf 2 Pods reh jaati hai.
+- Controller detect karta hai ki ek Pod kam hai aur replacement create karne ki process initiate karta hai.
+- Scheduler replacement Pod ko suitable Node assign karta hai, aur kubelet use run karne ki process handle karta hai.
+
+**Yaad rakho:** Controller Manager monitor aur reconciliation ka kaam karta hai; Scheduler Node select karta hai aur kubelet Node par Pod run karwata hai.
+
+### What does it monitor?
+
+Controllers monitor Kubernetes API objects and conditions relevant to their responsibility, for example:
+
+- **Deployment and ReplicaSet state:** Whether the desired number of Pods is maintained.
+- **Node state:** Whether Nodes are reporting healthy/ready conditions; the Node Controller responds to Node state changes.
+- **Job state:** Whether Jobs complete and their required Pods are managed.
+- **Namespace and ServiceAccount-related state:** Dedicated controllers handle particular lifecycle and account-related tasks.
+
+The exact set of controllers depends on the Kubernetes configuration and enabled controllers.
+
+## 4. Practical Example / Code — MERN Backend
+
+Create a Deployment with three backend replicas:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+```
+
+Apply it and observe the Pods:
+
+```bash
+kubectl apply -f backend-deployment.yaml
+kubectl get deployment mern-backend
+kubectl get pods -l app=mern-backend
+```
+
+Delete one Pod for a controlled demonstration:
+
+```bash
+kubectl delete pod <one-backend-pod-name>
+kubectl get pods -l app=mern-backend -w
+```
+
+The Deployment/ReplicaSet controllers notice the replica count is below the desired count and create a replacement Pod. The Scheduler then selects a Node for the replacement, and the kubelet starts it. The replacement Pod may take some time to become Ready.
+
+## 5. Architecture Diagram
+
+```text
+        Deployment says replicas: 3
+                   |
+                   v
+        Kubernetes API Server
+                   |
+                   v
+      Controllers in Controller Manager
+                   |
+                   v
+       Compare desired vs current state
+                   |
+          Only 2 Pods exist
+                   |
+                   v
+       Create a replacement Pod
+                   |
+                   v
+            kube-scheduler
+           selects a Node
+                   |
+                   v
+       Node kubelet runs the Pod
+                   |
+                   v
+       Cluster moves toward 3 Pods
+```
+
+## 6. Practical Commands / Configuration
+
+### Check desired and available replicas
+
+```bash
+kubectl get deployment mern-backend
+kubectl describe deployment mern-backend
+kubectl get replicasets
+kubectl get pods -l app=mern-backend
+```
+
+### Inspect cluster events
+
+```bash
+kubectl get events --sort-by=.metadata.creationTimestamp
+```
+
+These commands show the effects of reconciliation. In many managed clusters, the control-plane processes themselves may not be directly accessible to inspect.
+
+## 7. Summary Table
+
+| What is monitored? | Controller responsibility |
+|---|---|
+| Deployment and ReplicaSet state | Maintain the desired number of Pods |
+| Node conditions | React to Node health and availability changes |
+| Job state | Manage Job execution and completion state |
+| Namespace lifecycle | Handle namespace-related lifecycle actions |
+| ServiceAccount state | Handle service-account-related resources |
+| Desired vs current state | Reconcile differences by taking corrective actions |
+
+**Remember:** The Controller Manager runs controllers; controllers watch relevant Kubernetes resources and reconcile actual state toward desired state. They do not replace the Scheduler or kubelet.
