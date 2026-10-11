@@ -26452,4 +26452,167 @@ When the example connection succeeds, logs may include `MongoDB connected succes
 ### Interview-ready answer
 “I connect the Node.js backend to MongoDB using Mongoose or the MongoDB driver and a connection URI stored in the backend's environment. In Kubernetes, I use the MongoDB Service DNS name and port 27017 rather than a Pod IP. I store credentials in a Kubernetes Secret in the backend's namespace, reference them in the Deployment, and configure the correct authentication database. I verify Service endpoints, Pod readiness, and backend logs, and implement retry handling, persistent storage, backups, and appropriate database security for production.”
 
+## 193. How would you store a MongoDB connection string in Kubernetes?
+
+### English Definition
+A MongoDB connection string should be stored in a Kubernetes Secret when it contains sensitive information such as database credentials. The Secret can be exposed to the backend container through an environment variable or mounted file, allowing the application to access the connection string without hardcoding it in source code or a container image.
+
+### Hindi Definition
+MongoDB connection string mein database username aur password ho sakte hain, isliye ise Kubernetes Secret mein store karna chahiye. Backend Deployment Secret ki value ko `MONGO_URI` environment variable ke through access kar sakta hai. Isse credentials ko application code aur Docker image mein hardcode karne ki zaroorat nahi padti.
+
+### Step 1: Understand the MongoDB URI
+Example URI:
+
+```text
+mongodb://appuser:password@mongodb.database.svc.cluster.local:27017/myapp?authSource=admin
+```
+
+| Part | Meaning |
+|---|---|
+| `mongodb://` | MongoDB connection protocol |
+| `appuser` | Database username |
+| `password` | Database password |
+| `mongodb.database.svc.cluster.local` | Kubernetes Service DNS name |
+| `27017` | MongoDB default port |
+| `myapp` | Application database |
+| `authSource=admin` | Authenticate against the `admin` database |
+
+This assumes a Service named `mongodb` exists in namespace `database`, and the user authenticates against `admin`. Use the actual Service name, namespace, database, and authentication database in your deployment.
+
+Do not hardcode a credential-bearing connection string in application source code or commit it to GitHub.
+
+### Step 2: Create a Kubernetes Secret
+Example learning file `mongo-connection-secret.yaml`:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongo-connection
+  namespace: mern-app
+type: Opaque
+stringData:
+  MONGO_URI: "mongodb://appuser:YOUR_PASSWORD@mongodb.database.svc.cluster.local:27017/myapp?authSource=admin"
+```
+
+Replace `YOUR_PASSWORD` with the actual application user's password through a secure deployment process. Do not commit the populated file to source control.
+
+Apply it after the namespace exists:
+
+```bash
+kubectl create namespace mern-app
+kubectl apply -f mongo-connection-secret.yaml
+```
+
+If the namespace already exists, do not create it again. Kubernetes Secret values are not automatically guaranteed to be encrypted at rest. Configure encryption at rest, least-privilege RBAC, and appropriate Secret access controls. In production, consider injecting values from an external secrets manager rather than keeping populated Secret manifests in Git.
+
+### Step 3: Reference the Secret in the backend Deployment
+Example `backend-deployment.yaml`:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-backend
+  namespace: mern-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: node-backend
+  template:
+    metadata:
+      labels:
+        app: node-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:v1
+          ports:
+            - containerPort: 5000
+          env:
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-connection
+                  key: MONGO_URI
+```
+
+The Secret and backend Pod must be in the same namespace. Kubernetes injects the Secret key's value into the container as the `MONGO_URI` environment variable.
+
+### Step 4: Read the URI in Node.js
+Example `db.js` using Mongoose:
+
+```javascript
+const mongoose = require("mongoose");
+
+async function connectDB() {
+  const mongoURI = process.env.MONGO_URI;
+
+  if (!mongoURI) {
+    throw new Error("MONGO_URI is missing");
+  }
+
+  await mongoose.connect(mongoURI);
+  console.log("MongoDB connected successfully");
+}
+
+module.exports = connectDB;
+```
+
+The password is not hardcoded in the JavaScript file. The backend reads the value injected by Kubernetes and uses it to establish the database connection. Add appropriate connection failure handling, retry/backoff, and readiness logic for production.
+
+### Step 5: Deploy and verify
+```bash
+# Create only if it does not already exist
+kubectl create namespace mern-app
+
+# Apply Secret and backend Deployment
+kubectl apply -f mongo-connection-secret.yaml
+kubectl apply -f backend-deployment.yaml
+
+# Verify rollout and Pods
+kubectl rollout status deployment/node-backend -n mern-app
+kubectl get pods -n mern-app
+
+# Inspect application logs
+kubectl logs deployment/node-backend -n mern-app
+
+# Inspect Secret metadata and key names without printing values
+kubectl describe secret mongo-connection -n mern-app
+```
+
+A successful connection may produce the log message `MongoDB connected successfully`. Avoid printing the full URI, passwords, or Secret contents in logs or terminal output.
+
+### Step 6: Rotate the connection string safely
+When a Secret value changes, an already running container's environment variable does not automatically change. After updating the Secret, restart the backend Deployment so new Pods receive the updated value:
+
+```bash
+kubectl rollout restart deployment/node-backend -n mern-app
+kubectl rollout status deployment/node-backend -n mern-app
+```
+
+Coordinate credential rotation with MongoDB so the application and database credentials stay consistent and downtime is avoided.
+
+### Common interview follow-ups
+
+| Question | Answer |
+|---|---|
+| Where should the URI be stored? | Kubernetes Secret |
+| How does the backend read it? | `secretKeyRef` injects it as `MONGO_URI` |
+| Should it be hardcoded in JavaScript? | No |
+| Are Secret values automatically encrypted at rest? | Not necessarily; configure encryption at rest and access controls |
+| Must the Secret be in the same namespace as the Pod? | Yes, for a normal Pod Secret reference |
+| Does updating a Secret update an existing environment variable? | No; create new Pods/restart the workload or use a suitable mounted-file approach and reload logic |
+
+### Summary
+1. Store the credential-bearing connection string in a Kubernetes Secret.
+2. Reference the Secret key from the backend Deployment using `secretKeyRef`.
+3. Read it in Node.js using `process.env.MONGO_URI`.
+4. Keep populated Secret manifests and connection strings out of GitHub and logs.
+5. Configure RBAC, encryption at rest, credential rotation, and an external secrets manager when appropriate.
+
+### Interview-ready answer
+“I store the MongoDB connection string in a Kubernetes Secret rather than hardcoding it in the Node.js source code or container image. In the backend Deployment, I reference the Secret using `secretKeyRef` and expose it as the `MONGO_URI` environment variable. The application reads it through `process.env.MONGO_URI` and uses Mongoose or the MongoDB driver to connect. I keep the Secret in the same namespace as the backend Pod, restrict access with RBAC, configure encryption at rest, and never commit populated credentials to GitHub or print them in logs.”
+
 ---
