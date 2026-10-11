@@ -7123,3 +7123,124 @@ kubectl rollout undo deployment/mern-backend
 | Rollback | `kubectl rollout undo deployment/<name>` |
 
 **Remember:** A rolling update gradually moves a Deployment to the new version. It can reduce downtime risk, but availability depends on readiness, capacity, rollout settings, and application behavior.
+---
+
+# 58. What Is a Rollback in Kubernetes?
+
+## 1. English Definition
+
+**A rollback in Kubernetes is the process of reverting a Deployment to a previous revision when a new application update causes problems.** It restores the previous Pod template and Deployment configuration when that revision is available.
+
+## 2. Hindi Definition
+
+Kubernetes mein rollback ka matlab hai application ke naye version mein problem aane par Deployment ko uske pichhle working revision par wapas le jaana.
+
+Rollback Deployment ke version/configuration ko restore karta hai; yeh database mein kiye gaye data changes ya migrations ko automatically undo nahi karta.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application ka Node.js backend version `1.0` par sahi chal raha hai. Tumne version `2.0` deploy kiya, lekin usmein API bug aa gaya aur frontend ko errors milne lage.
+
+Rollback se tum previous Deployment revision par wapas ja sakte ho:
+
+1. Version `1.0` sahi chal raha tha.
+2. Tumne version `2.0` deploy kiya.
+3. Version `2.0` mein issue aaya.
+4. `kubectl rollout undo` use karke previous revision restore kar diya.
+
+Kubernetes Deployment apni rollout history mein retained revisions ke basis par rollback kar sakta hai. Previous revision available hona zaroori hai.
+
+## 4. Practical Example / Code
+
+Example Deployment:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+```
+
+Suppose the Deployment was updated to image version `2.0`, and the new version is causing errors. If the previous revision is retained, undo the rollout to return to that revision.
+
+## 5. Architecture Diagram
+
+```text
+Deployment v1.0
+     |
+     v
+Working backend Pods
+     |
+     | Deploy v2.0
+     v
+New backend Pods (bug / errors)
+     |
+     | kubectl rollout undo
+     v
+Previous Deployment revision restored
+     |
+     v
+Backend Pods return to the previous Pod template
+```
+
+Rollback restores a previous Deployment revision; it does not guarantee that every external side effect or database change is reversed.
+
+## 6. Practical Commands / Configuration
+
+**Check rollout history:**
+
+```bash
+kubectl rollout history deployment/mern-backend
+```
+
+**Roll back to the previous revision:**
+
+```bash
+kubectl rollout undo deployment/mern-backend
+```
+
+**Roll back to a specific revision:**
+
+```bash
+kubectl rollout undo deployment/mern-backend --to-revision=2
+```
+
+Replace `2` with the revision number shown in your rollout history.
+
+**Check rollback progress and Pods:**
+
+```bash
+kubectl rollout status deployment/mern-backend
+kubectl get pods
+kubectl describe deployment mern-backend
+```
+
+**Important:** A rollback changes the Deployment's Pod template back to a previous revision. Check application logs and database compatibility afterward. Database migrations may require a separate recovery plan.
+
+## 7. Summary Table
+
+| Term / Command | Meaning |
+|---|---|
+| Rollback | Revert a Deployment to a previous revision |
+| `kubectl rollout history deployment/mern-backend` | View retained rollout revisions |
+| `kubectl rollout undo deployment/mern-backend` | Undo the latest rollout to a previous revision |
+| `--to-revision=2` | Target a specific retained revision |
+| `kubectl rollout status deployment/mern-backend` | Check rollout or rollback progress |
+| Database recovery | Must be handled separately if data or migrations changed |
+
+**Remember:** If a new backend version causes problems, use `kubectl rollout undo deployment/<name>` to restore a previous Deployment revision, provided the revision is available.
