@@ -20634,3 +20634,126 @@ If HPA metrics are `<unknown>`, check Metrics Server, CPU requests, and HPA even
 **Interview Answer:** To implement automatic scaling, I configure an HPA for the application workload using metrics such as CPU utilization, ensure resource requests and a working metrics pipeline are in place, and set minimum and maximum replicas. In a cloud cluster, I also configure Cluster Autoscaler or a supported node-provisioning solution so that additional Nodes can be added when new Pods cannot fit on existing Nodes. HPA scales Pods, while the node autoscaler scales cluster capacity. I then verify behavior using `kubectl get hpa`, `kubectl describe hpa`, and Pod scheduling events.
 
 ---
+
+## Part 14 — Security
+
+
+## 164. How Does Kubernetes Handle Security?
+
+### 1. English Definition
+
+Kubernetes handles security through multiple layers, including authentication, authorization (RBAC), admission control, network policies, workload security settings, Secrets management, and protection of the control plane and worker Nodes. These controls work together to reduce unauthorized access and limit the impact of compromised workloads.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+Kubernetes security ka matlab hai cluster, applications aur unke data ko unauthorized access aur attacks se protect karna. Iske liye Kubernetes check karta hai:
+
+- **Authentication:** Request karne wala kaun hai?
+- **Authorization (RBAC):** Us user ya service account ko kya karne ki permission hai?
+- **Admission Control:** Resource create/update karne se pehle request allowed policies follow karti hai ya nahi.
+- **Network Policies:** Pods ke beech network traffic ko restrict karna.
+- **Pod Security:** Containers ko minimum required privileges ke saath run karna.
+- **Secrets:** Passwords, tokens aur certificates jaise sensitive data ko manage karna.
+- **Cluster Security:** API server, Nodes aur Kubernetes components ko secure rakhna.
+
+### 3. MERN Stack Example
+
+Maan lo aapka MERN application Kubernetes par deployed hai:
+
+- React frontend users ko interface deta hai.
+- Node.js API backend requests process karta hai.
+- MongoDB database sensitive application data store karta hai.
+
+Security controls ke example:
+
+1. Developer ko sirf required namespace mein Deployments manage karne ki RBAC permission mile.
+2. MongoDB credentials Kubernetes Secret mein store hon, source code mein hardcode na hon.
+3. NetworkPolicy se MongoDB traffic sirf authorized API Pods se allow kiya ja sake, agar cluster CNI NetworkPolicy support karta ho.
+4. Containers non-root user ke roop mein run hon aur unnecessary Linux capabilities drop ki jaayen.
+5. Images trusted sources se aayen, regularly scan/update ki jaayen, aur API server/Nodes ko secure configuration aur patches ke saath maintain kiya jaaye.
+
+Important: Kubernetes Secret by default sirf base64-encoded hota hai; base64 encryption nahi hai. Sensitive data ke liye encryption at rest, tightly scoped RBAC, and suitable external secret-management controls consider karein.
+
+### 4. Example — RBAC for Limited Access
+
+Example Role jo ek namespace mein Pods ko read karne ki permission deta hai:
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: production
+  name: pod-reader
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+```
+
+Is Role ko kisi user ya ServiceAccount se use karwane ke liye suitable RoleBinding bhi create karni hoti hai. Role akela kisi identity ko permission assign nahi karta.
+
+### 5. Example — Restrict Network Traffic
+
+Illustrative NetworkPolicy jo `production` namespace mein `app: mongo` label wale Pods ko sirf `app: node-api` label wale Pods se ingress allow karti hai:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-to-mongo
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: mongo
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: node-api
+```
+
+Yeh policy tabhi effective hogi jab cluster ka networking plugin NetworkPolicy enforcement support karta ho. Yeh example sirf ingress restrict karta hai; complete policy design mein required ports, egress, DNS aur other traffic ko bhi consider karein.
+
+### 6. Practical Security Checklist
+
+```bash
+# Inspect RBAC permissions for the current identity
+kubectl auth can-i get pods -n production
+kubectl auth can-i create deployments -n production
+
+# Review namespace workloads
+kubectl get pods -n production
+kubectl get networkpolicy -n production
+
+# Inspect a workload's configuration and events
+kubectl describe pod <pod-name> -n production
+
+# Review service accounts
+kubectl get serviceaccounts -n production
+```
+
+- Follow least privilege: users and ServiceAccounts ko sirf required permissions dein.
+- Production workloads ke liye resource requests/limits aur appropriate Pod security settings configure karein.
+- Privileged containers aur unnecessary host access avoid karein.
+- Secrets ko source control mein commit na karein; access tightly restrict karein.
+- Images scan karein, patching maintain karein, audit logs monitor karein, aur backups/restore procedures test karein.
+
+### 7. Quick Revision Table
+
+| Security Layer | Purpose |
+|---|---|
+| Authentication | Identity verify karna |
+| RBAC Authorization | Identity ki allowed actions control karna |
+| Admission Control | Resource requests par policy enforce karna |
+| NetworkPolicy | Pod network traffic restrict karna |
+| Pod/container security | Privileges aur container access limit karna |
+| Secrets management | Credentials aur sensitive configuration protect karna |
+| Control-plane and Node security | Cluster infrastructure protect karna |
+| Auditing and monitoring | Suspicious activity detect karna |
+
+**Interview Answer:** Kubernetes uses a layered security model. Authentication verifies identity, RBAC authorizes actions, and admission controls enforce policies before resources are stored. NetworkPolicies can restrict Pod-to-Pod traffic, while Pod security settings, restricted Secret access, secure images, and control-plane and Node hardening protect workloads and infrastructure. I follow least privilege, avoid hardcoded credentials, and regularly audit permissions and workloads. No single control is sufficient; these layers must work together.
+
+---
