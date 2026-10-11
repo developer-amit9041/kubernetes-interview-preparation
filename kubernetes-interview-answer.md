@@ -14698,3 +14698,104 @@ kubectl describe pod <pod-name>
 **Interview Answer:** Use `kubectl get pods` to list Pods in the current namespace. Use `kubectl get pods -A` to list Pods across all namespaces.
 
 **Remember:** `get pods` lists Pods; `-A` lists them across all namespaces.
+
+---
+
+# 113. How Do You List Nodes?
+
+## 1. English Definition
+
+Use the `kubectl get nodes` command to list the worker and control-plane Nodes registered in a Kubernetes cluster.
+
+## 2. Hindi Definition
+
+Kubernetes cluster ke Nodes ki list dekhne ke liye `kubectl get nodes` command use karte hain. Isse cluster ke registered Nodes aur unka status pata chalta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application Kubernetes par deployed hai. Pods worker Nodes par run karte hain, isliye aapko check karna ho ki cluster mein kaunse Nodes available hain aur unka status kya hai, to `kubectl get nodes` use karte hain.
+
+- `Ready` ka matlab Node Kubernetes workloads run karne ke liye ready hai.
+- `NotReady` ka matlab Node mein koi health ya connectivity issue ho sakta hai.
+- `kubectl get nodes -o wide` extra details, jaise internal IP aur OS image, show karta hai.
+
+## 4. Practical Example / Code
+
+Run:
+
+```bash
+kubectl get nodes
+```
+
+Example output:
+
+```text
+NAME            STATUS   ROLES           AGE   VERSION
+worker-node-1   Ready    <none>          20d   v1.30.0
+worker-node-2   Ready    <none>          20d   v1.30.0
+control-plane   Ready    control-plane   20d   v1.30.0
+```
+
+**Explanation:**
+- `NAME`: Node ka naam.
+- `STATUS`: Node ki health/readiness state.
+- `ROLES`: Node par assigned role labels.
+- `AGE`: Node kitne time se cluster mein registered hai.
+- `VERSION`: Node par report kiya gaya Kubernetes version.
+
+Output illustrative hai; actual names, roles, aur versions aapke cluster ke according honge. Managed Kubernetes services mein control-plane Nodes aksar user ko is list mein visible nahi hote.
+
+## 5. Practical Commands
+
+```bash
+# List Nodes
+kubectl get nodes
+
+# Show extra details such as IP and OS image
+kubectl get nodes -o wide
+
+# Inspect one Node and its events
+kubectl describe node <node-name>
+
+# Display Node labels
+kubectl get nodes --show-labels
+
+# List Pods scheduled on a particular Node
+kubectl get pods -A -o wide --field-selector spec.nodeName=<node-name>
+```
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+        Developer / Terminal
+                 |
+                 v
+        kubectl get nodes
+                 |
+                 v
+       Kubernetes API Server
+                 |
+          Registered Nodes
+          /      |       \\
+         v       v        v
+      Node 1   Node 2  Control Plane*
+         |       |
+         v       v
+      App Pods  App Pods
+
+*Control-plane visibility depends on the cluster setup.
+```
+
+## 7. Summary Table
+
+| Command | Purpose |
+|---|---|
+| `kubectl get nodes` | Lists registered Nodes |
+| `kubectl get nodes -o wide` | Shows additional Node details |
+| `kubectl describe node <name>` | Shows Node conditions, capacity, and events |
+| `kubectl get nodes --show-labels` | Displays Node labels |
+| `kubectl get pods -A -o wide --field-selector spec.nodeName=<name>` | Lists Pods assigned to a specific Node |
+
+**Interview Answer:** Use `kubectl get nodes` to list Nodes registered in the Kubernetes cluster and check their readiness status. Use `kubectl get nodes -o wide` for additional details.
+
+**Remember:** `kubectl get nodes` tells you which Nodes are registered and whether they are Ready.
