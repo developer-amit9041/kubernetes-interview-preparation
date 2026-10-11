@@ -24524,5 +24524,369 @@ Phir browser mein `http://localhost:8080` open karo.
 
 “I would first containerize the React frontend and Node.js/Express backend, then push versioned images to a container registry. Next, I would create a Kubernetes namespace, configure the MongoDB connection securely, and deploy the frontend and backend using Deployments and Services. I would expose the application through an Ingress controller with DNS and TLS, then verify the rollout, logs, and health probes. For production, I would also configure resource limits, monitoring, backups, and CI/CD. I would generally consider managed MongoDB unless there is a specific requirement to self-host it.”
 
----
 
+## 186. How Would You Deploy a React Frontend on Kubernetes?
+
+### 1. English Definition
+
+Deploying a React frontend on Kubernetes means building the React application into optimized static files, packaging those files into a container image (commonly served by NGINX), pushing the image to a container registry, and running it with Kubernetes resources such as a Deployment and Service. An Ingress or LoadBalancer can expose the frontend to users.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+React frontend ko Kubernetes par deploy karne ke liye pehle React app ka production build banate hain. Phir us build ko NGINX jaise web server ke through serve karne ke liye Docker image banate hain. Image ko Docker Hub par push karte hain, aur Kubernetes mein Deployment aur Service create karte hain. Public access ke liye Ingress ya LoadBalancer use kar sakte hain.
+
+**Yaad rakho:** Docker image application ko package karti hai, Deployment Pods manage karta hai, Service Pods tak stable access deti hai, aur Ingress HTTP/HTTPS traffic ko route karta hai.
+
+### 3. Hinglish Explanation — Step by Step
+
+Maan lo aapki React application local machine par ready hai aur ab aap use Kubernetes cluster par deploy karna chahte ho.
+
+### Step 1: Architecture samjho
+
+```text
+User's Browser
+      |
+      v
+Ingress / Load Balancer (HTTP/HTTPS)
+      |
+      v
+Frontend Service (ClusterIP)
+      |
+      v
+React Frontend Pods
+      |
+      v
+NGINX serves optimized React static files
+```
+
+Deployment ka complete flow:
+
+1. React application aur Dockerfile ready karna.
+2. Production build ko Docker image mein package karna.
+3. Image ko Docker Hub ya kisi container registry par push karna.
+4. Kubernetes Namespace, Deployment aur Service create karna.
+5. Ingress ya LoadBalancer se frontend expose karna.
+6. Deployment status check karke browser mein test karna.
+
+Aapke paas Kubernetes cluster hona chahiye, jaise local practice ke liye Minikube ya production ke liye Amazon EKS. Neeche ke commands assume karte hain ki Docker, `kubectl`, aur cluster access configured hain.
+
+### Step 2: React project structure samjho
+
+Example:
+
+```text
+react-app/
+├── public/
+├── src/
+├── package.json
+├── package-lock.json
+└── Dockerfile
+```
+
+- `src/` mein React components aur application code hota hai.
+- `package.json` dependencies aur build scripts define karta hai.
+- `Dockerfile` frontend image build karne ke instructions rakhta hai.
+
+### Step 3: React frontend ka Dockerfile banao
+
+Project root mein `Dockerfile` create karo:
+
+```dockerfile
+# Stage 1: Build the React application
+FROM node:22-alpine AS build
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+# Stage 2: Serve the static files with NGINX
+FROM nginx:alpine
+
+# Create React App uses /app/build.
+COPY --from=build /app/build /usr/share/nginx/html
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+**Agar Vite use kar rahe ho:** Vite ka default output folder `dist` hota hai, isliye copy command ko is tarah change karo:
+
+```dockerfile
+COPY --from=build /app/dist /usr/share/nginx/html
+```
+
+**Dockerfile ka meaning:**
+
+- `FROM node:22-alpine AS build`: React build ke liye Node.js environment use hota hai.
+- `WORKDIR /app`: Container mein working directory set hoti hai.
+- `COPY package*.json ./` aur `RUN npm ci`: Dependencies install hoti hain.
+- `COPY . .`: Source code container mein copy hota hai.
+- `RUN npm run build`: Optimized production files generate hoti hain.
+- `FROM nginx:alpine`: Final image mein lightweight NGINX web server hota hai.
+- `COPY --from=build ...`: Sirf production build files final image mein copy hoti hain.
+- `EXPOSE 80`: NGINX ka intended HTTP port document hota hai.
+
+Yeh multi-stage build hai: final image mein Node.js build environment aur source dependencies rakhne ki zaroorat nahi hoti.
+
+**React Router note:** Agar application client-side routes use karti hai, jaise `/dashboard`, toh NGINX mein SPA fallback configure karna pad sakta hai. Warna browser par direct route refresh karne se 404 aa sakta hai.
+
+### Step 4: Docker image build karo aur locally test karo
+
+Project root se command run karo. `YOUR_DOCKERHUB_USERNAME` ko apne Docker Hub username se replace karna:
+
+```bash
+docker build -t YOUR_DOCKERHUB_USERNAME/react-frontend:1.0 .
+```
+
+Image locally verify karo:
+
+```bash
+docker images
+```
+
+Container start karo:
+
+```bash
+docker run --rm -p 8080:80 YOUR_DOCKERHUB_USERNAME/react-frontend:1.0
+```
+
+Browser mein `http://localhost:8080` open karo. Agar React page sahi load hota hai, toh container image ko registry par push karne ke liye ready ho.
+
+Container stop karne ke liye foreground terminal mein `Ctrl+C` press karo.
+
+### Step 5: Image ko Docker Hub par push karo
+
+Docker Hub mein login karo:
+
+```bash
+docker login
+```
+
+Image push karo:
+
+```bash
+docker push YOUR_DOCKERHUB_USERNAME/react-frontend:1.0
+```
+
+Ab image registry mein available hai. Kubernetes worker nodes isi image ko pull karke React frontend container run kar sakte hain. Production workflow mein mutable `latest` tag ke bajaye versioned tags ya immutable image digests use karna better hota hai.
+
+### Step 6: Kubernetes namespace create karo
+
+Application ko logically separate rakhne ke liye namespace create karo:
+
+```bash
+kubectl create namespace react-app
+```
+
+Agar namespace pehle se exist karta hai, toh dobara create karne par error aa sakta hai; existing namespace ko reuse karo.
+
+### Step 7: React frontend ka Deployment aur Service banao
+
+`k8s/frontend.yaml` file create karo:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: react-frontend
+  namespace: react-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: react-frontend
+  template:
+    metadata:
+      labels:
+        app: react-frontend
+    spec:
+      containers:
+        - name: react-frontend
+          image: YOUR_DOCKERHUB_USERNAME/react-frontend:1.0
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: react-frontend
+  namespace: react-app
+spec:
+  selector:
+    app: react-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+  type: ClusterIP
+```
+
+Image field mein apna Docker Hub username daalna.
+
+**Deployment ka role:**
+
+- `replicas: 2` ka matlab Kubernetes desired state mein do frontend Pods maintain karega.
+- Agar Pod fail ho jaye, Deployment ke through managed ReplicaSet replacement Pod create kar sakta hai.
+- `containerPort: 80` NGINX ke HTTP port ko declare karta hai.
+- `resources.requests` scheduling ke liye resource request set karta hai.
+- `resources.limits` container ke CPU aur memory usage par limits lagata hai.
+
+**Service ka role:**
+
+- Service ka naam `react-frontend` hai.
+- Service label selector `app: react-frontend` ke matching Pods ko target karta hai.
+- `port: 80` Service ka port hai aur `targetPort: 80` container port hai.
+- `ClusterIP` Service ko cluster ke andar accessible rakhta hai. Public access ke liye next step mein Ingress use karenge.
+
+### Step 8: Ingress se frontend ko expose karo
+
+Agar cluster mein compatible NGINX Ingress Controller installed hai, toh `k8s/ingress.yaml` create karo:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: react-frontend-ingress
+  namespace: react-app
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: react.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: react-frontend
+                port:
+                  number: 80
+```
+
+Yeh example assume karta hai ki aapke cluster mein `nginx` naam ka IngressClass aur compatible controller configured hai.
+
+- User `react.example.com` open karega.
+- DNS ko aapke Ingress controller ke external address par point karna hoga.
+- Ingress `/` path ka traffic `react-frontend` Service ko forward karega.
+- Production mein TLS certificate aur HTTPS configure karo.
+
+Agar Ingress controller use nahi kar rahe, toh cloud provider ke support ke hisaab se Service ka type `LoadBalancer` use kiya ja sakta hai. Local Minikube setup mein `minikube tunnel` ya `minikube service` ki zaroorat ho sakti hai, depending on the exposure method.
+
+### Step 9: Kubernetes par resources deploy karo
+
+Manifest files apply karo:
+
+```bash
+kubectl apply -f k8s/frontend.yaml
+kubectl apply -f k8s/ingress.yaml
+```
+
+Agar files kisi aur path par hain, toh commands mein wahi path use karo.
+
+### Step 10: Deployment verify aur test karo
+
+Pods, Deployment aur Service check karo:
+
+```bash
+kubectl get deployments,pods,services -n react-app
+```
+
+Rollout complete hone ka wait karo:
+
+```bash
+kubectl rollout status deployment/react-frontend -n react-app
+```
+
+Ingress check karo:
+
+```bash
+kubectl get ingress -n react-app
+kubectl describe ingress react-frontend-ingress -n react-app
+```
+
+Agar Pod ready nahi ho raha, toh details aur events dekho:
+
+```bash
+kubectl describe pods -n react-app
+kubectl logs deployment/react-frontend -n react-app
+kubectl get events -n react-app --sort-by=.metadata.creationTimestamp
+```
+
+Local testing ke liye Service ko port-forward kar sakte ho:
+
+```bash
+kubectl port-forward service/react-frontend 8080:80 -n react-app
+```
+
+Browser mein `http://localhost:8080` open karo. Isse aap Ingress aur public DNS configure kiye bina frontend ko test kar sakte ho.
+
+### Step 11: Naya frontend version deploy karo
+
+Jab React code update ho, naya image tag build aur push karo, for example `1.1`:
+
+```bash
+docker build -t YOUR_DOCKERHUB_USERNAME/react-frontend:1.1 .
+docker push YOUR_DOCKERHUB_USERNAME/react-frontend:1.1
+```
+
+Deployment manifest mein image tag update karke apply karo, ya command se image update karo:
+
+```bash
+kubectl set image deployment/react-frontend \
+  react-frontend=YOUR_DOCKERHUB_USERNAME/react-frontend:1.1 \
+  -n react-app
+
+kubectl rollout status deployment/react-frontend -n react-app
+```
+
+Agar rollout mein problem ho, toh previous revision par rollback kar sakte ho:
+
+```bash
+kubectl rollout undo deployment/react-frontend -n react-app
+```
+
+**Important React configuration note:** React frontend ka code browser mein run hota hai. Isliye API URL ko Kubernetes ke internal Service DNS jaise `http://backend:5000` par set mat karo; browser us internal hostname ko resolve nahi kar sakta. Public HTTPS API URL ya same-origin `/api` path use karo. Standard static React build mein environment variables aksar build time par bundle mein embed hote hain, isliye URL badalne par image rebuild karni pad sakti hai, jab tak runtime configuration pattern implement na kiya ho.
+
+### 4. Practical Commands — Quick Revision
+
+| Command | Purpose |
+|---|---|
+| `docker build -t USER/react-frontend:1.0 .` | Frontend image build karta hai |
+| `docker run --rm -p 8080:80 USER/react-frontend:1.0` | Local container test karta hai |
+| `docker push USER/react-frontend:1.0` | Image registry par push karta hai |
+| `kubectl apply -f k8s/frontend.yaml` | Deployment aur Service create/update karta hai |
+| `kubectl get pods -n react-app` | Pods ka status dikhata hai |
+| `kubectl rollout status deployment/react-frontend -n react-app` | Rollout progress check karta hai |
+| `kubectl logs deployment/react-frontend -n react-app` | Container logs check karta hai |
+| `kubectl port-forward service/react-frontend 8080:80 -n react-app` | Local browser testing karta hai |
+
+### 5. Summary Table
+
+| Component | Responsibility |
+|---|---|
+| React build | Optimized HTML, CSS, JavaScript assets generate karta hai |
+| Dockerfile / image | Frontend assets ko container image mein package karta hai |
+| NGINX | Static frontend files serve karta hai |
+| Container registry | Versioned images store karti hai |
+| Deployment | Frontend Pods ko manage aur update karta hai |
+| Service | Pods ko stable cluster-internal network endpoint deti hai |
+| Ingress | Host/path-based HTTP/HTTPS routing provide karta hai |
+| DNS and TLS | Domain resolution aur encrypted HTTPS access provide karte hain |
+
+**Interview-Ready Answer:**
+
+“I would first create a production build of the React application and package the static files into a Docker image, commonly served by NGINX. I would push the versioned image to a container registry, then create a Kubernetes Deployment and ClusterIP Service for the frontend. To make it publicly accessible, I would configure an Ingress controller with DNS and TLS, or use a LoadBalancer Service where appropriate. Finally, I would verify the rollout, test the application, configure resource requests and limits, and use versioned images with rollback support for updates.”
+
+---
