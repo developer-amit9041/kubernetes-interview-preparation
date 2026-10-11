@@ -5617,3 +5617,130 @@ Common checks:
 | Fix | Correct the image reference, registry access, or credentials |
 
 **Remember:** `ImagePullBackOff` means the image could not be downloaded. Check the exact image reference and Pod events first.
+---
+
+# 46. How Do You Restart a Pod Manually?
+
+## 1. English Definition
+
+**Kubernetes does not provide a direct `kubectl restart pod` command.** To restart a Pod manually, you can delete it and allow its controller to recreate it, or use `kubectl rollout restart` on a Deployment.
+
+The recommended method for a Deployment-managed application is:
+
+```bash
+kubectl rollout restart deployment <deployment-name>
+```
+
+## 2. Hindi Definition
+
+Kubernetes mein Pod ko manually restart karne ke liye workload ke according command use karte hain.
+
+- **Deployment ka Pod:** `kubectl rollout restart deployment <deployment-name>` use kar sakte hain.
+- **Directly created Pod:** Pod ko delete kar sakte hain, lekin Kubernetes use automatically recreate nahi karega jab tak koi controller usko manage nahi kar raha ho.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application Kubernetes par deployed hai: React frontend, Node.js backend aur MongoDB database.
+
+Agar backend Deployment ka naam `mern-backend` hai aur tum uske Pods ko restart karna chahte ho, toh command run karo:
+
+```bash
+kubectl rollout restart deployment mern-backend
+```
+
+Kubernetes Deployment ke Pods ko gradually replace karega, Deployment ki rollout strategy aur available replicas ke according.
+
+**Important:** Deployment restart karne se MongoDB data delete nahi hota, jab tak tum alag se database storage ya Pods ko destructive tareeke se modify nahi karte.
+
+## 4. Practical Example / Code
+
+Example Deployment:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+```
+
+## 5. Architecture Diagram
+
+```text
+        Run rollout restart
+                 |
+                 v
+       Deployment controller
+                 |
+                 v
+       Replace managed Pods
+          /             \
+         v               v
+   New Pod starts   Old Pod terminates
+         |
+         v
+   Application becomes ready
+```
+
+Actual replacement order depends on the Deployment rollout strategy, readiness, and available capacity.
+
+## 6. Practical Commands / Configuration
+
+**Option 1: Restart a Deployment (recommended for managed application Pods)**
+
+```bash
+kubectl rollout restart deployment mern-backend
+kubectl rollout status deployment mern-backend
+kubectl get pods
+```
+
+**Option 2: Delete one Pod managed by a Deployment**
+
+```bash
+kubectl get pods
+kubectl delete pod <pod-name>
+```
+
+The Deployment controller normally creates a replacement Pod to maintain the desired replica count. The replacement may have a different Pod name.
+
+**Option 3: Delete a standalone Pod**
+
+```bash
+kubectl delete pod <pod-name>
+```
+
+If no controller manages that Pod, it will not automatically be recreated.
+
+**Option 4: Restart a StatefulSet**
+
+```bash
+kubectl rollout restart statefulset <statefulset-name>
+kubectl rollout status statefulset <statefulset-name>
+```
+
+Use the correct namespace when needed, for example `kubectl -n production rollout restart deployment mern-backend`. Restarting Pods can interrupt traffic if readiness, replicas, or rollout settings are not configured appropriately.
+
+## 7. Summary Table
+
+| Method | Command | What happens |
+|---|---|---|
+| Restart a Deployment | `kubectl rollout restart deployment <name>` | Restarts managed Pods through a rollout |
+| Delete a managed Pod | `kubectl delete pod <pod-name>` | Controller generally creates a replacement |
+| Delete a standalone Pod | `kubectl delete pod <pod-name>` | Pod is deleted and may not return automatically |
+| Restart a StatefulSet | `kubectl rollout restart statefulset <name>` | Restarts its Pods according to StatefulSet behavior |
+
+**Remember:** For a Pod managed by a Deployment, prefer `kubectl rollout restart deployment <deployment-name>`. There is no direct `kubectl restart pod` command.
