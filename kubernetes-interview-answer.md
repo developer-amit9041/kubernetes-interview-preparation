@@ -8697,3 +8697,139 @@ An external IP may remain pending if the cluster has no supported load-balancer 
 | `ExternalName` | Alias an external DNS name | DNS CNAME resolution |
 
 **Remember:** `ClusterIP` is for internal access, `NodePort` exposes a port on nodes, `LoadBalancer` requests an external load balancer, and `ExternalName` maps a Service name to an external DNS name.
+---
+
+# 70. What Is ClusterIP?
+
+## 1. English Definition
+
+**ClusterIP is the default Kubernetes Service type that exposes an application on an internal IP address accessible from within the Kubernetes cluster.** It allows applications running inside the cluster to communicate with each other without exposing the Service directly to external clients.
+
+## 2. Hindi Definition
+
+ClusterIP Kubernetes Service ka default type hai. Ye application ko ek internal IP address aur DNS name provide karta hai, jiske through cluster ke andar chalne wale Pods ek doosre se communicate kar sakte hain.
+
+Simple words mein, **ClusterIP internal communication ke liye hota hai; by default, ye application ko directly internet par expose nahi karta.**
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application Kubernetes par deploy hai:
+
+- React frontend — frontend requests bhejta hai.
+- Node.js backend — port `5000` par API run karta hai.
+- MongoDB — database provide karta hai.
+
+React frontend ko Node.js backend se communicate karna hai. Tum backend ke liye `ClusterIP` Service bana sakte ho. Service ek stable internal endpoint provide karti hai aur matching, ready backend Pods tak traffic route kar sakti hai.
+
+Frontend Pod same namespace mein backend Service ko `http://mern-backend:5000` se access kar sakta hai. Isse frontend ko har backend Pod ki individual IP address track karne ki zaroorat nahi hoti.
+
+ClusterIP by default cluster ke andar reachable hoti hai. External users directly is internal Service IP ko internet se access nahi kar sakte; external access ke liye suitable Ingress/Gateway ya `NodePort`/`LoadBalancer` setup ki zaroorat ho sakti hai.
+
+## 4. Practical Example / Code
+
+Create `backend-service.yaml`:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mern-backend
+spec:
+  type: ClusterIP
+  selector:
+    app: mern-backend
+  ports:
+    - protocol: TCP
+      port: 5000
+      targetPort: 5000
+```
+
+Configuration:
+
+- `type: ClusterIP` — exposes the Service internally by default.
+- `selector` — selects Pods labelled `app: mern-backend`.
+- `port: 5000` — port exposed by the Service.
+- `targetPort: 5000` — destination port on the backend Pods.
+
+Example request from a frontend Pod in the same namespace:
+
+```javascript
+const response = await fetch(
+  "http://mern-backend:5000/api/products"
+);
+```
+
+The backend application must listen on port `5000`, and the selected Pods must be ready for normal traffic routing.
+
+## 5. Architecture Diagram
+
+```text
+         React Frontend Pod
+                  |
+                  | http://mern-backend:5000
+                  v
+       +-----------------------+
+       | ClusterIP Service     |
+       | Internal stable IP/DNS|
+       +-----------+-----------+
+                   |
+           routes to ready Pods
+              /    |    \
+             v     v     v
+          +-----+ +-----+ +-----+
+          |Pod 1| |Pod 2| |Pod 3|
+          | API | | API | | API |
+          +-----+ +-----+ +-----+
+
+       External clients cannot normally
+       reach the ClusterIP directly.
+```
+
+## 6. Practical Commands / Configuration
+
+**Create the Service:**
+
+```bash
+kubectl apply -f backend-service.yaml
+```
+
+**List Services and internal IPs:**
+
+```bash
+kubectl get services
+```
+
+**Inspect the Service:**
+
+```bash
+kubectl describe service mern-backend
+```
+
+**Check matching backend Pods:**
+
+```bash
+kubectl get pods -l app=mern-backend
+```
+
+**Check the Service's endpoints:**
+
+```bash
+kubectl get endpoints mern-backend
+```
+
+**Note:** `ClusterIP` is the default Service type, so omitting `spec.type` also creates a ClusterIP Service. For external access, choose a suitable Ingress/Gateway or Service exposure type according to the cluster architecture.
+
+## 7. Summary Table
+
+| Item | Meaning |
+|---|---|
+| `ClusterIP` | Default Service type |
+| Main purpose | Internal communication within the cluster |
+| Endpoint | Internal Service IP and DNS name |
+| `selector` | Matches Pods by labels |
+| `port` | Port exposed by the Service |
+| `targetPort` | Port receiving traffic on selected Pods |
+| Direct internet access | Not exposed externally by default |
+| Common MERN use | Frontend Pod communicating with backend Service |
+
+**Remember:** ClusterIP is the default Kubernetes Service type for internal communication. It provides a stable internal endpoint so applications can reach matching backend Pods without tracking individual Pod IPs.
