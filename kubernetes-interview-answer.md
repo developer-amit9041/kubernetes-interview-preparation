@@ -11527,3 +11527,166 @@ Security points:
 | AWS Secrets Manager | External service jo credentials manage kar sakti hai |
 
 **Remember:** Kubernetes Secrets are not fully secure by default. Base64 is encoding, not encryption. Improve Secret security with encryption at rest, least-privilege RBAC, and restricted access to authorized users and workloads.
+
+---
+
+# 89. Does a Pod Restart Automatically When a ConfigMap Is Updated?
+
+## 1. English Definition
+
+No. A Pod does not automatically restart when a ConfigMap is updated. ConfigMap changes may be reflected in mounted volume files after a delay, but environment variables do not update inside an already-running container. A restart or rollout is needed when the application must load updated environment variables.
+
+## 2. Hindi Definition
+
+Nahi, ConfigMap update hone par Kubernetes Pod ko automatically restart nahi karta. Agar ConfigMap volume ke through mount hai, toh uski files kuch samay baad update ho sakti hain. Lekin environment variables ke through diya gaya configuration running container mein automatically update nahi hota. Nayi values load karne ke liye aksar Pod ko restart ya Deployment ka rollout karna padta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application mein Node.js backend ke liye ConfigMap mein ek setting hai:
+
+- `LOG_LEVEL=info`
+- Aap ise change karke `LOG_LEVEL=debug` kar dete ho.
+
+Agar backend Pod ConfigMap ko environment variable ke roop mein use kar raha hai, toh running Node.js process ko purani value hi milegi. ConfigMap update hone se Pod automatically restart nahi hoga.
+
+Aapko Deployment restart karna padega:
+
+```bash
+kubectl rollout restart deployment mern-backend
+```
+
+Agar ConfigMap file ke roop mein volume mount hai, toh Kubernetes mounted file ko eventually update kar sakta hai. Lekin application ko updated file dobara read karni hogi. **`subPath` ke saath mount ki gayi ConfigMap file automatic updates receive nahi karti.**
+
+## 4. Practical Example / Code
+
+### Step 1: Create a ConfigMap
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+data:
+  LOG_LEVEL: "info"
+```
+
+Apply it:
+
+```bash
+kubectl apply -f backend-config.yaml
+```
+
+### Step 2: Use the ConfigMap in a Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          env:
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: backend-config
+                  key: LOG_LEVEL
+```
+
+Node.js mein value read kar sakte ho:
+
+```javascript
+const logLevel = process.env.LOG_LEVEL || "info";
+console.log("Configured log level:", logLevel);
+```
+
+### Step 3: Update the ConfigMap and restart the Deployment
+
+ConfigMap mein `LOG_LEVEL` ko `debug` karne ke baad:
+
+```bash
+kubectl apply -f backend-config.yaml
+kubectl rollout restart deployment mern-backend
+kubectl rollout status deployment mern-backend
+```
+
+Restart ke baad naye Pods updated ConfigMap value ko environment variable ke roop mein receive karenge.
+
+## 5. Architecture Diagram
+
+```text
+       ConfigMap updated
+       LOG_LEVEL=debug
+              |
+              v
+   Does the Pod restart automatically?
+              |
+        No ---+---
+              |
+              v
+    Existing environment variable
+        may still be "info"
+              |
+              v
+   kubectl rollout restart deployment
+              |
+              v
+       New backend Pods
+              |
+              v
+   LOG_LEVEL=debug is loaded
+```
+
+## 6. Practical Commands / Configuration
+
+Check the ConfigMap:
+
+```bash
+kubectl get configmap backend-config
+kubectl describe configmap backend-config
+```
+
+Update the ConfigMap:
+
+```bash
+kubectl edit configmap backend-config
+```
+
+Restart the Deployment to reload environment variables:
+
+```bash
+kubectl rollout restart deployment mern-backend
+kubectl rollout status deployment mern-backend
+```
+
+Check the rollout and Pods:
+
+```bash
+kubectl get deployments
+kubectl get pods
+```
+
+**Production tip:** Teams often automate rollouts when ConfigMap content changes, for example by adding a ConfigMap checksum to the Pod template or using a suitable reloader controller. A ConfigMap update by itself does not trigger a Deployment rollout.
+
+## 7. Summary Table
+
+| ConfigMap usage | What happens after an update? |
+|---|---|
+| Environment variable | Running container keeps the old value until it is recreated |
+| Normal volume mount | Mounted files are eventually updated; the application may need to reread them |
+| Volume mounted using `subPath` | Automatic updates are not received |
+| Deployment rollout restart | New Pods load the current ConfigMap values |
+| Automated reloader / checksum | Can trigger a rollout when the ConfigMap changes, if configured |
+
+**Remember:** Updating a ConfigMap does not automatically restart a Pod. Environment-variable changes require Pod recreation, while normal mounted ConfigMap files update eventually and must be reread by the application.
