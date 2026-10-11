@@ -19744,3 +19744,97 @@ If Pod remains `Pending`, check that the label matches exactly, the target Node 
 **Interview Answer:** To run a Pod on a specific Node, I usually label the Node and configure `nodeSelector` in the Pod specification. Kubernetes schedules the Pod onto a suitable Node with that label. For advanced placement rules, I use node affinity. `nodeName` can directly assign a Pod to a Node, but it bypasses normal scheduler selection and is not the usual choice for production workloads.
 
 ---
+
+## 155. What Role Does Resource Availability Play in Kubernetes Scheduling?
+
+### 1. English Definition
+
+Resource availability is a key factor in Kubernetes scheduling. The scheduler checks whether a Node has enough available allocatable CPU and memory to satisfy a Pod's resource requests, along with other scheduling constraints. If no suitable Node has sufficient resources, the Pod remains `Pending` until it can be scheduled or its requirements change.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+Kubernetes scheduler Pod ko Node par place karne se pehle check karta hai ki us Node par Pod ki required CPU aur memory available hai ya nahi.
+
+Yahan sabse important baat: scheduler aam taur par Pod ke **resource requests** ko consider karta hai, na ki sirf Node ka current actual CPU ya memory usage. Agar kisi suitable Node ke paas Pod ki requests fulfill karne ke liye resources nahi hain, toh Pod `Pending` reh sakta hai.
+
+### 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapke MERN application mein Node.js API Pod ko yeh resources chahiye:
+
+- CPU request: `500m` (half a CPU core)
+- Memory request: `512Mi`
+
+Agar kisi Node par scheduler ke hisaab se sirf `300m` CPU ya `256Mi` memory allocatable capacity bachi hai, toh woh Node is Pod ke liye suitable nahi hai. Scheduler kisi doosre suitable Node ko try karega. Agar koi bhi Node requirements satisfy nahi karta, toh Pod `Pending` rahega.
+
+**Important distinction:** `requests` scheduling ke liye reservation/placement calculation mein use hote hain. `limits` container ke resource usage ko cap karte hain; limits generally scheduler ka primary placement calculation nahi hain. Agar request set nahi ki gayi ho, Kubernetes configuration/defaulting ke hisaab se limit request ke roop mein bhi apply ho sakti hai.
+
+### 4. Practical YAML Example
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: node-api
+spec:
+  containers:
+    - name: node-api
+      image: node:22-alpine
+      command: ["node", "-e", "setInterval(() => {}, 1000)"]
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "512Mi"
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+```
+
+Is example mein:
+- `requests.cpu: 500m` ka matlab half CPU core request karna hai.
+- `requests.memory: 512Mi` ka matlab 512 mebibytes memory request karna hai.
+- `limits.cpu: 1` container ke CPU usage ko ek CPU tak limit karta hai.
+- `limits.memory: 1Gi` memory usage ki upper limit define karta hai; memory limit exceed hone par container OOM-killed ho sakta hai.
+
+Scheduler Node ki available allocatable resources aur already scheduled Pods ke requests ko consider karke placement decide karta hai.
+
+### 5. How to Check Resource Availability
+
+```bash
+# See Node capacity and allocatable resources
+kubectl describe node worker-1
+
+# Inspect Pod requests, status, and scheduling events
+kubectl describe pod node-api
+
+# Check Pods and the Nodes they're assigned to
+kubectl get pods -o wide
+
+# If Metrics Server is installed, inspect current usage
+kubectl top nodes
+kubectl top pods
+```
+
+`kubectl top` current usage dikhata hai, lekin scheduling decision ke liye sirf is output par rely nahi karna chahiye; scheduler primarily resource requests aur Node allocatable capacity ko evaluate karta hai.
+
+### 6. What Happens If Resources Are Insufficient?
+
+1. Scheduler candidate Nodes ko evaluate karta hai.
+2. Agar Node par requested CPU/memory available nahi hai, toh woh Node filter out ho sakta hai.
+3. Agar koi Node eligible nahi bachta, Pod `Pending` rehta hai.
+4. `kubectl describe pod node-api` ke Events section mein `Insufficient cpu` ya `Insufficient memory` jaise messages mil sakte hain.
+5. Resolution mein workload ko suitable capacity par schedule karna, Node capacity add karna, ya resource requests ko workload ke actual needs ke mutabik review karna shamil ho sakta hai. Requests ko bina measurement ke kam karna avoid karein.
+
+### 7. Quick Revision Table
+
+| Resource concept | Scheduling mein role |
+|---|---|
+| CPU request | Scheduler ke available CPU calculation mein count hoti hai |
+| Memory request | Scheduler ke available memory calculation mein count hoti hai |
+| CPU limit | Container ke CPU usage ko cap karti hai |
+| Memory limit | Container memory cap; exceed hone par OOM kill ho sakta hai |
+| Insufficient resources | Suitable Node na mile toh Pod `Pending` reh sakta hai |
+| `kubectl top` | Current usage dikhata hai; requests/allocatable calculation ka replacement nahi hai |
+
+**Interview Answer:** Resource availability affects Kubernetes scheduling because the scheduler checks whether a Node has enough allocatable CPU and memory to satisfy a Pod's resource requests. It also evaluates other constraints, such as taints, affinity, and selectors. If no eligible Node has sufficient resources, the Pod remains Pending, often with an event such as `Insufficient cpu` or `Insufficient memory`. Resource requests influence placement, while limits primarily constrain container usage.
+
+---
