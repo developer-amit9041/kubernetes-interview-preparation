@@ -6,6 +6,10 @@ Topic-wise Kubernetes interview preparation for developers, with practical focus
 
 - **[Kubernetes Interview Questions](./kubernetes-interview-questions.md)** — 225 interview questions in English, grouped into 18 topics, including MERN deployments, Docker, AWS/EKS, troubleshooting, and Amit's Must-Know Priority checklist.
 
+## Detailed Answers
+
+- **[1. What Is Kubernetes?](./answers/01-what-is-kubernetes.md)** — English definition, Hindi definition, Hinglish explanation, practical YAML, architecture diagram, commands, summary table, and interview-ready answer.
+
 ## Topics Covered
 
 1. Kubernetes Fundamentals
