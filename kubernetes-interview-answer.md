@@ -18465,3 +18465,111 @@ Under node memory pressure, **BestEffort** Pods are generally considered first f
 **Interview Answer:** Kubernetes QoS classes are Guaranteed, Burstable, and BestEffort. Kubernetes assigns the class automatically based on container CPU and memory requests and limits. Guaranteed requires every container to specify both CPU and memory requests and limits, with each request equal to its limit. BestEffort means no container has CPU or memory requests or limits; other eligible configurations are generally Burstable. QoS helps Kubernetes make eviction decisions under node resource pressure, along with factors such as Pod priority and resource usage relative to requests.
 
 ---
+
+## 144. What Is the Difference Between Guaranteed, Burstable, and BestEffort?
+
+### 1. English Definition
+
+**Guaranteed, Burstable, and BestEffort** are the three Kubernetes Quality of Service (QoS) classes. They differ in how CPU and memory requests and limits are configured, and this classification influences Pod eviction decisions during node resource pressure.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+In teeno QoS classes ka main difference CPU aur memory ki requests aur limits ki configuration hai:
+
+- **Guaranteed:** Har container ke liye CPU aur memory dono ki request aur limit set hoti hai, aur har resource ki request uski limit ke equal hoti hai.
+- **Burstable:** Pod Guaranteed ki conditions fulfill nahi karta, lekin kam-se-kam ek container mein CPU ya memory ki request ya limit set hoti hai.
+- **BestEffort:** Pod ke kisi bhi container mein CPU ya memory request/limit set nahi hoti.
+
+### 3. Easy Hinglish Explanation — MERN Stack Example
+
+Socho aapki MERN application Kubernetes par deploy hai:
+
+- **Guaranteed:** Payment service ko predictable resources dene ke liye CPU request/limit `500m` aur memory request/limit `256Mi` rakhi hai. Har container ko CPU aur memory dono ke liye equal requests and limits chahiye.
+- **Burstable:** Node.js API ka CPU request `250m` hai aur limit `500m`. App ko normal conditions mein kam CPU chahiye, lekin zarurat par configured limit tak use kar sakti hai.
+- **BestEffort:** Development/test Pod mein CPU aur memory resources specify nahi kiye. Isliye Kubernetes ke paas us Pod ke liye explicit resource request/limit nahi hai.
+
+QoS class manually set nahi hoti; Kubernetes resources ki configuration se automatically assign karta hai.
+
+### 4. YAML Comparison
+
+**Guaranteed:**
+
+```yaml
+resources:
+  requests:
+    cpu: "500m"
+    memory: "256Mi"
+  limits:
+    cpu: "500m"
+    memory: "256Mi"
+```
+
+**Burstable:**
+
+```yaml
+resources:
+  requests:
+    cpu: "250m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "256Mi"
+```
+
+**BestEffort:** Container ke spec mein `resources` section nahi hota, aur kisi bhi container ke liye CPU/memory requests ya limits set nahi hoti.
+
+> Guaranteed QoS ke liye Pod ke **har container** mein CPU aur memory requests aur limits honi chahiye, aur har resource ke liye request = limit hona chahiye. Sirf ek container ka aisa configuration hona enough nahi hai.
+
+### 5. Practical Commands
+
+Pod ka QoS class check karein:
+
+```bash
+kubectl get pods
+kubectl get pod <pod-name> -o jsonpath='{.status.qosClass}'
+kubectl describe pod <pod-name>
+```
+
+Output mein `Guaranteed`, `Burstable`, ya `BestEffort` milega. Actual Pod ka class uske sabhi containers aur any applicable defaulted resource values par depend karta hai.
+
+### 6. Resource Pressure and Eviction
+
+```text
+     CPU / Memory requests and limits
+                    |
+                    v
+         Kubernetes assigns QoS
+                    |
+       +------------+------------+
+       |            |            |
+       v            v            v
+  Guaranteed    Burstable    BestEffort
+       |            |            |
+       +------------+------------+
+                    |
+                    v
+          Node memory pressure
+                    |
+                    v
+       Eviction decision considers
+       QoS, usage vs. requests,
+             and Pod priority
+```
+
+Memory pressure mein BestEffort Pods generally pehle eviction ke candidates hote hain. Burstable Pods ki eviction resource usage relative to requests aur Pod priority par depend karti hai. Guaranteed Pods generally sabse zyada protected hote hain, lekin unhe absolutely eviction-proof nahi maana ja sakta.
+
+### 7. Summary Table
+
+| Feature | Guaranteed | Burstable | BestEffort |
+|---|---|---|---|
+| CPU and memory configuration | Every container has both requests and limits; each request equals its limit | Does not qualify as Guaranteed, but at least one container has a CPU or memory request/limit | No container has CPU or memory requests/limits |
+| Resource reservation for scheduling | Based on configured requests | Based on configured requests | No explicit requests |
+| Usage above request | CPU limit still applies; memory constrained by its limit | May use resources above request, subject to limits and available capacity | Can use available resources, without configured requests/limits |
+| Under node memory pressure | Generally most protected among QoS classes | Depends on usage relative to requests and Pod priority | Generally considered first |
+| Typical use | Workloads needing predictable resource configuration | Common application workloads | Workloads without resource guarantees configured |
+
+### Interview Answer
+
+“The main difference between Kubernetes QoS classes is the CPU and memory requests/limits configuration. Guaranteed requires every container to have CPU and memory requests and limits, with each request equal to its corresponding limit. Burstable applies when the Pod does not qualify as Guaranteed but at least one container has a CPU or memory request/limit. BestEffort applies when no container has CPU or memory requests or limits. During node memory pressure, BestEffort Pods are generally considered for eviction first, while actual eviction also depends on resource usage relative to requests and Pod priority.”
+
+---
