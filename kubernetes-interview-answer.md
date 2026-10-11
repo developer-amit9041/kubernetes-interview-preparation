@@ -16094,6 +16094,126 @@ kubectl describe pod <pod-name>
 
 ---
 
+# 126. What Is a Kubernetes Liveness Probe?
+
+## 1. English Definition
+
+A liveness probe is a Kubernetes health check that determines whether a container is still running properly. If the liveness probe repeatedly fails, Kubernetes restarts that container.
+
+## 2. Hindi Definition
+
+Liveness probe Kubernetes ka health check hai jo pata lagata hai ki container theek se kaam kar raha hai ya nahi. Agar probe baar-baar fail hota hai, toh Kubernetes container ko restart kar sakta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapka Node.js backend container deadlock mein chala gaya hai: container process abhi chal raha hai, lekin application properly kaam nahi kar rahi. Liveness probe ek health endpoint, jaise `/health`, check kar sakta hai.
+
+Agar probe configured failure threshold ke hisaab se repeatedly fail hota hai, Kubernetes container ko restart karega. Liveness probe ka purpose unhealthy container ko restart karna hai; yeh directly traffic ko ready hone ke basis par control karne ke liye nahi hota—uske liye readiness probe use hota hai.
+
+## 4. Practical Example / Code
+
+### Node.js Express health endpoint
+
+```javascript
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+```
+
+### Kubernetes Deployment with a liveness probe
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:latest
+          ports:
+            - containerPort: 5000
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+```
+
+**Configuration meaning:**
+- `httpGet`: HTTP request se health endpoint check karta hai.
+- `initialDelaySeconds: 10`: container start hone ke 10 seconds baad checks start hote hain.
+- `periodSeconds: 10`: har 10 seconds mein probe run hota hai.
+- `timeoutSeconds: 2`: response ke liye maximum 2 seconds wait karta hai.
+- `failureThreshold: 3`: 3 consecutive failures ke baad liveness check fail maana jaata hai aur container restart ho sakta hai.
+
+Ensure the `/health` endpoint reflects whether the process can make progress; don't make liveness depend on every external dependency, or a temporary database outage could trigger unnecessary restarts.
+
+## 5. Practical Commands
+
+```bash
+# Apply the Deployment
+kubectl apply -f deployment.yaml
+
+# Check Pod status and restarts
+kubectl get pods
+
+# Inspect probe configuration and related Events
+kubectl describe pod <pod-name>
+
+# Check container logs
+kubectl logs <pod-name>
+
+# Inspect the Deployment's live YAML
+kubectl get deployment backend -o yaml
+```
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+       Kubelet on Worker Node
+                 |
+                 v
+        Run liveness probe
+                 |
+          +------+------+
+          |             |
+        Success        Failure threshold reached
+          |             |
+          v             v
+   Container keeps   Container restarted
+      running
+```
+
+## 7. Summary Table
+
+| Setting / Concept | Purpose |
+|---|---|
+| `livenessProbe` | Checks whether a container is still healthy enough to continue |
+| `httpGet` | Checks an HTTP endpoint |
+| `periodSeconds` | Time between checks |
+| `failureThreshold` | Consecutive failures before the probe is considered failed |
+| Liveness failure | Kubernetes restarts the affected container |
+| Readiness probe | Controls whether a Pod should receive Service traffic |
+
+**Interview Answer:** A liveness probe checks whether a container is functioning properly. If it fails repeatedly according to the configured thresholds, Kubernetes restarts the container. It helps recover from stuck or unhealthy application processes.
+
+**Remember:** Liveness answers “Should this container be restarted?”; readiness answers “Should this Pod receive traffic?”
+
+---
+
 # 127. What Is a Kubernetes Readiness Probe?
 
 ## 1. English Definition
@@ -16230,121 +16350,3 @@ Use `kubectl describe pod <pod-name>` to inspect probe-related events. The exact
 **Interview Answer:** A readiness probe checks whether a container is ready to handle requests. If it fails, Kubernetes marks the Pod as not ready and removes it from the Service's ready endpoints; unlike a liveness probe, readiness failure does not restart the container.
 
 **Remember:** Readiness answers “Should this Pod receive traffic?”; liveness answers “Should this container be restarted?”
-
-# 126. What Is a Kubernetes Liveness Probe?
-
-## 1. English Definition
-
-A liveness probe is a Kubernetes health check that determines whether a container is still running properly. If the liveness probe repeatedly fails, Kubernetes restarts that container.
-
-## 2. Hindi Definition
-
-Liveness probe Kubernetes ka health check hai jo pata lagata hai ki container theek se kaam kar raha hai ya nahi. Agar probe baar-baar fail hota hai, toh Kubernetes container ko restart kar sakta hai.
-
-## 3. Hinglish Explanation — MERN Stack Example
-
-Maan lo aapka Node.js backend container deadlock mein chala gaya hai: container process abhi chal raha hai, lekin application properly kaam nahi kar rahi. Liveness probe ek health endpoint, jaise `/health`, check kar sakta hai.
-
-Agar probe configured failure threshold ke hisaab se repeatedly fail hota hai, Kubernetes container ko restart karega. Liveness probe ka purpose unhealthy container ko restart karna hai; yeh directly traffic ko ready hone ke basis par control karne ke liye nahi hota—uske liye readiness probe use hota hai.
-
-## 4. Practical Example / Code
-
-### Node.js Express health endpoint
-
-```javascript
-app.get("/health", (req, res) => {
-  res.status(200).json({ status: "ok" });
-});
-```
-
-### Kubernetes Deployment with a liveness probe
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: backend
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: backend
-  template:
-    metadata:
-      labels:
-        app: backend
-    spec:
-      containers:
-        - name: backend
-          image: your-dockerhub-username/mern-backend:latest
-          ports:
-            - containerPort: 5000
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 5000
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            timeoutSeconds: 2
-            failureThreshold: 3
-```
-
-**Configuration meaning:**
-- `httpGet`: HTTP request se health endpoint check karta hai.
-- `initialDelaySeconds: 10`: container start hone ke 10 seconds baad checks start hote hain.
-- `periodSeconds: 10`: har 10 seconds mein probe run hota hai.
-- `timeoutSeconds: 2`: response ke liye maximum 2 seconds wait karta hai.
-- `failureThreshold: 3`: 3 consecutive failures ke baad liveness check fail maana jaata hai aur container restart ho sakta hai.
-
-Ensure the `/health` endpoint reflects whether the process can make progress; don't make liveness depend on every external dependency, or a temporary database outage could trigger unnecessary restarts.
-
-## 5. Practical Commands
-
-```bash
-# Apply the Deployment
-kubectl apply -f deployment.yaml
-
-# Check Pod status and restarts
-kubectl get pods
-
-# Inspect probe configuration and related Events
-kubectl describe pod <pod-name>
-
-# Check container logs
-kubectl logs <pod-name>
-
-# Inspect the Deployment's live YAML
-kubectl get deployment backend -o yaml
-```
-
-## 6. Kubernetes Architecture Diagram
-
-```text
-       Kubelet on Worker Node
-                 |
-                 v
-        Run liveness probe
-                 |
-          +------+------+
-          |             |
-        Success        Failure threshold reached
-          |             |
-          v             v
-   Container keeps   Container restarted
-      running
-```
-
-## 7. Summary Table
-
-| Setting / Concept | Purpose |
-|---|---|
-| `livenessProbe` | Checks whether a container is still healthy enough to continue |
-| `httpGet` | Checks an HTTP endpoint |
-| `periodSeconds` | Time between checks |
-| `failureThreshold` | Consecutive failures before the probe is considered failed |
-| Liveness failure | Kubernetes restarts the affected container |
-| Readiness probe | Controls whether a Pod should receive Service traffic |
-
-**Interview Answer:** A liveness probe checks whether a container is functioning properly. If it fails repeatedly according to the configured thresholds, Kubernetes restarts the container. It helps recover from stuck or unhealthy application processes.
-
-**Remember:** Liveness answers “Should this container be restarted?”; readiness answers “Should this Pod receive traffic?”
