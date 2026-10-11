@@ -12116,3 +12116,109 @@ kubectl get storageclass
 | Backup | Storage ya accidental deletion ke against recovery mein help karta hai |
 
 **Remember:** To persist Pod data, create or obtain a PVC and mount it into the container. Persistent storage survives Pod recreation, but backups and correct storage lifecycle settings are still necessary.
+
+---
+
+# 93. What Is `emptyDir`?
+
+## 1. English Definition
+
+`emptyDir` is a Kubernetes volume type that provides temporary storage shared by containers in the same Pod. The volume is created when the Pod is assigned to a node and its data is deleted when the Pod is removed from that node.
+
+## 2. Hindi Definition
+
+Bhai, `emptyDir` Kubernetes ka temporary storage volume hai. Iske through Pod ke containers files share kar sakte hain. Container restart hone par data generally bana rehta hai, lekin jab Pod remove ho jata hai, toh `emptyDir` ka data delete ho jata hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application mein Node.js backend ko temporary files store karni hain, jaise image processing ke dauran temporary image ya report generate karna.
+
+Aap Pod mein `emptyDir` volume define karke use container ke andar `/app/tmp` par mount kar sakte ho.
+
+- Container restart ho, lekin Pod wahi rahe: `emptyDir` ka data rehta hai.
+- Pod delete ho jaye ya replace hokar naya Pod ban jaye: purane Pod ka `emptyDir` data delete ho jata hai.
+- Same Pod ke multiple containers is volume ko mount karke files share kar sakte hain.
+
+Isliye `emptyDir` temporary files aur cache ke liye useful hai, lekin important user uploads ya MongoDB database files ko persist karne ke liye suitable nahi hai.
+
+## 4. Practical Example / Code
+
+Create `backend-pod.yaml`:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: backend-emptydir-example
+spec:
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:1.0
+      volumeMounts:
+        - name: temporary-storage
+          mountPath: /app/tmp
+  volumes:
+    - name: temporary-storage
+      emptyDir: {}
+```
+
+Is configuration mein:
+
+- `volumes` ke andar `emptyDir: {}` temporary volume create karta hai.
+- `volumeMounts` volume ko container mein mount karta hai.
+- Backend temporary files ko `/app/tmp` directory mein read/write kar sakta hai.
+
+## 5. Architecture Diagram
+
+```text
+          Kubernetes Pod
+                |
+                v
+          emptyDir Volume
+                |
+        +-------+-------+
+        |               |
+        v               v
+   Backend Container  Sidecar Container
+        |               |
+        +-------+-------+
+                |
+        Shared temporary files
+
+   Container restart: data remains
+   Pod removed:       data is deleted
+```
+
+## 6. Practical Commands / Configuration
+
+Pod create karo:
+
+```bash
+kubectl apply -f backend-pod.yaml
+```
+
+Pod status check karo:
+
+```bash
+kubectl get pods
+kubectl describe pod backend-emptydir-example
+```
+
+Container ke andar mounted directory check karo, bina sensitive file contents print kiye:
+
+```bash
+kubectl exec backend-emptydir-example -- ls -la /app/tmp
+```
+
+## 7. Summary Table
+
+| Concept | Explanation |
+|---|---|
+| `emptyDir` | Pod ke liye temporary storage |
+| Container restart | Same Pod rehne par data generally rehta hai |
+| Pod deletion/removal | `emptyDir` data delete ho jata hai |
+| Shared volume | Same Pod ke multiple containers use kar sakte hain |
+| Common use cases | Temporary files, cache, intermediate processing data |
+| Persistent data | PV/PVC ya suitable external storage use karo |
+
+**Remember:** `emptyDir` is temporary Pod-scoped storage. It is useful for cache and temporary files, but it should not be used when data must survive Pod removal.
