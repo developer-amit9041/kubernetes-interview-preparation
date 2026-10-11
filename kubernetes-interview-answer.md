@@ -19059,3 +19059,107 @@ Scheduler evaluates Node labels
 “Node affinity is a Kubernetes scheduling feature that uses Node labels to control or influence Pod placement. Required node affinity is a hard constraint: a matching Node must be found for the Pod to schedule. Preferred node affinity is a soft preference: matching Nodes receive a scoring advantage, but the scheduler can choose another feasible Node. Node affinity is more flexible than `nodeSelector` because it supports match expressions and preference rules.”
 
 ---
+
+## 149. What Is Pod Affinity?
+
+### 1. English Definition
+
+**Pod affinity** is a Kubernetes scheduling feature that lets you place a Pod on a Node based on whether other Pods with matching labels are already running in a specified topology, such as the same Node or the same zone. It supports both required rules and preferred rules.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+Pod affinity ka use tab hota hai jab hum chahte hain ki ek Pod ko aise Node ya topology mein schedule kiya jaye jahan specific labels wale doosre Pods already run kar rahe hon. Yahan decision Node ke apne labels ke bajaye **doosre Pods ke labels aur unki location** par based hota hai.
+
+Iske do types hain:
+- `requiredDuringSchedulingIgnoredDuringExecution`: matching condition schedule karte waqt satisfy honi zaroori hai.
+- `preferredDuringSchedulingIgnoredDuringExecution`: matching topology ko preference milti hai, lekin scheduler doosri feasible placement bhi choose kar sakta hai.
+
+### 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application mein Node.js backend ke Pods aur Redis cache ke Pods hain. Aap chahte hain ki backend Pod usi Node par schedule ho jahan `app=redis` label wala Redis Pod chal raha ho, taaki dono paas hon aur communication latency kam ho sakti hai.
+
+Pod affinity scheduler ko kehti hai: "Aise topology domain mein Pod schedule karo jahan matching Redis Pod maujood ho." Agar required affinity use ki aur matching Pod/topology nahi mili, toh naya Pod `Pending` reh sakta hai.
+
+**Important:** Pod affinity matching Pod labels ko `labelSelector` se identify karti hai, aur `topologyKey` batata hai ki placement kis topology ke hisaab se compare karni hai. `kubernetes.io/hostname` same Node ko represent karne ke liye commonly use hota hai.
+
+### 4. Practical YAML Example — Same Node as Redis Pod
+
+Pehle ensure karein ki Redis Pod par `app: redis` label ho. Phir backend Pod ka example:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: node-api-pod
+  labels:
+    app: node-api
+spec:
+  affinity:
+    podAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app: redis
+          topologyKey: kubernetes.io/hostname
+  containers:
+    - name: node-api
+      image: node:20-alpine
+```
+
+Is rule ka matlab hai ki backend Pod ko aise Node par schedule karna hai jahan `app=redis` label wala Pod ho. `topologyKey: kubernetes.io/hostname` same Node ko topology domain banata hai. Agar cluster mein matching Redis Pod nahi hai ya koi eligible Node satisfy nahi karta, Pod schedule nahi ho sakta.
+
+### 5. Practical Commands
+
+```bash
+# Check Pods and their labels
+kubectl get pods --show-labels -o wide
+
+# Check whether Redis Pod uses the expected label
+kubectl get pods -l app=redis -o wide
+
+# Apply the backend Pod manifest
+kubectl apply -f node-api-pod.yaml
+
+# Check placement
+kubectl get pod node-api-pod -o wide
+
+# Inspect why the Pod may be Pending
+kubectl describe pod node-api-pod
+```
+
+### 6. Pod Affinity Scheduling Flow
+
+```text
+Backend Pod requests Pod affinity
+                 |
+                 v
+ Find Pods matching labelSelector
+                 |
+                 v
+ Check their topology (e.g. Node hostname)
+                 |
+                 v
+ Is there an eligible topology domain?
+          /                    \\
+        Yes                     No
+         |                       |
+         v                       v
+Schedule on a matching       Required rule fails;
+topology if other rules      Pod may remain Pending
+also allow it
+```
+
+### 7. Summary Table
+
+| Item | Meaning |
+|---|---|
+| Pod affinity | Places a Pod near Pods matching a label selector, within a topology domain |
+| `labelSelector` | Selects the existing Pods whose labels must match |
+| `topologyKey` | Node label key defining the topology domain, such as hostname or zone |
+| Required affinity | Matching topology is mandatory at scheduling time |
+| Preferred affinity | Matching topology gets a preference, not a guarantee |
+| Common use | Co-locate communicating services or components that benefit from proximity |
+
+**Interview Answer:** Pod affinity is a Kubernetes scheduling feature that places a Pod in a topology domain—such as the same Node or zone—as existing Pods matching specified labels. It uses `labelSelector` to identify those Pods and `topologyKey` to define the topology. Required affinity enforces the rule at scheduling time, while preferred affinity treats it as a scoring preference.
+
+---
