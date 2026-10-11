@@ -10635,3 +10635,173 @@ Avoid printing or committing real Secret values. Use RBAC to restrict who can re
 | MERN example | MongoDB credentials for a Node.js backend |
 
 **Remember:** A Kubernetes Secret separates sensitive values from application code and images, but it must be protected with appropriate access controls and encryption.
+---
+
+# 84. What Is the Difference Between a ConfigMap and a Secret?
+
+## 1. English Definition
+
+A **ConfigMap** is a Kubernetes API object used to store non-confidential configuration data, such as application settings, URLs, and feature flags. A **Secret** is a Kubernetes API object intended for sensitive data, such as passwords, API tokens, and private keys.
+
+## 2. Hindi Definition
+
+- **ConfigMap:** Application ki normal, non-sensitive configuration store karta hai, jaise application mode, URL aur feature flags.
+- **Secret:** Sensitive information store karne ke liye use hota hai, jaise database password, API token aur private key.
+
+Secret ka purpose sensitive data ko application code aur container image se alag rakhna hai. Lekin Secret ko sahi access controls aur encryption ke saath configure karna bhi zaroori hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application mein Node.js backend MongoDB se connect hota hai.
+
+- ConfigMap mein `NODE_ENV=production`, `PORT=5000` ya `DB_HOST=mongodb-service` rakh sakte ho.
+- Secret mein `DB_USERNAME` aur `DB_PASSWORD` rakh sakte ho.
+
+Isse normal settings aur credentials alag manage hote hain. ConfigMap confidential data ke liye nahi hai. Secret ka data by default Base64-encoded hota hai; **Base64 encryption nahi hai**. Production mein encryption at rest, least-privilege RBAC aur secure secret delivery use karo.
+
+## 4. Practical Example / Code
+
+### ConfigMap — `backend-config.yaml`
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+data:
+  NODE_ENV: "production"
+  PORT: "5000"
+  DB_HOST: "mongodb-service"
+```
+
+### Secret — create credentials without committing them in a YAML file
+
+```bash
+kubectl create secret generic mongodb-credentials \
+  --from-literal=username='app-user' \
+  --from-literal=password='replace-with-a-real-password'
+```
+
+### Reference both in a Node.js Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-registry/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - configMapRef:
+                name: backend-config
+          env:
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-credentials
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-credentials
+                  key: password
+```
+
+Node.js application values ko `process.env.NODE_ENV`, `process.env.DB_USERNAME` aur `process.env.DB_PASSWORD` se read kar sakti hai. Example image ko apni actual image se replace karo. Real passwords ko Git repository ya container image mein commit mat karo.
+
+## 5. Architecture Diagram
+
+```text
+             Kubernetes
+                 |
+        +--------+--------+
+        |                 |
+        v                 v
+   ConfigMap            Secret
+   NODE_ENV             DB_USERNAME
+   PORT                 DB_PASSWORD
+   DB_HOST                  |
+        |                   |
+        +---------+---------+
+                  |
+                  | environment variables
+                  v
+          Node.js Backend Pod
+                  |
+                  | authenticated connection
+                  v
+             MongoDB Service
+                  |
+                  v
+             MongoDB Pod(s)
+```
+
+ConfigMap aur Secret dono ko Pod mein environment variables ya mounted files ke through provide kiya ja sakta hai. Secret sensitive data ke liye intended hai, lekin usse read karne ki permission rakhne wala user ya workload values access kar sakta hai.
+
+## 6. Practical Commands / Configuration
+
+Apply the ConfigMap:
+
+```bash
+kubectl apply -f backend-config.yaml
+```
+
+List ConfigMaps and Secrets:
+
+```bash
+kubectl get configmaps
+kubectl get secrets
+```
+
+Inspect ConfigMap configuration:
+
+```bash
+kubectl describe configmap backend-config
+```
+
+Inspect Secret metadata without printing its values:
+
+```bash
+kubectl describe secret mongodb-credentials
+```
+
+Apply the Deployment and check its rollout:
+
+```bash
+kubectl apply -f backend-deployment.yaml
+kubectl rollout status deployment/backend
+```
+
+Security checklist:
+
+- Never store passwords or tokens in a ConfigMap.
+- Base64-encoded Secret values are not encrypted just because they are Base64.
+- Enable encryption at rest for Kubernetes Secrets where supported.
+- Use least-privilege RBAC and restrict access to Secrets.
+- Consider an external secret manager for production workloads.
+
+## 7. Summary Table
+
+| Feature | ConfigMap | Secret |
+|---|---|---|
+| Main purpose | Non-sensitive configuration | Sensitive information |
+| Example data | `NODE_ENV`, `PORT`, service URL | Passwords, tokens, private keys |
+| Pod integration | Environment variables or mounted files | Environment variables or mounted files |
+| Default data handling | Stored as configuration values | Data is Base64-encoded in the API representation by default; this is not encryption |
+| Security approach | Do not use for confidential values; control access | RBAC, encryption at rest, least privilege and secure handling |
+| MERN example | Backend port and MongoDB Service hostname | MongoDB username and password |
+
+**Remember:** ConfigMap = normal configuration; Secret = sensitive data. Secret is not automatically secure merely because it is a Kubernetes Secret.
