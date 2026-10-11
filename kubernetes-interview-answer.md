@@ -14799,3 +14799,135 @@ kubectl get pods -A -o wide --field-selector spec.nodeName=<node-name>
 **Interview Answer:** Use `kubectl get nodes` to list Nodes registered in the Kubernetes cluster and check their readiness status. Use `kubectl get nodes -o wide` for additional details.
 
 **Remember:** `kubectl get nodes` tells you which Nodes are registered and whether they are Ready.
+
+---
+
+# 114. How Do You Check Deployments?
+
+## 1. English Definition
+
+Use `kubectl get deployments` to check Deployments in the current namespace, including their desired, available, and up-to-date replica counts.
+
+## 2. Hindi Definition
+
+Deployments ka status check karne ke liye `kubectl get deployments` command use karte hain. Isse pata chalta hai ki kitne replicas desired hain, kitne updated hain aur kitne available hain.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapne Kubernetes mein Node.js/Express backend ka Deployment banaya hai aur `replicas: 3` set kiya hai. Aap check karna chahte ho ki teeno replicas properly available hain ya nahi.
+
+- `kubectl get deployments` — current namespace ke Deployments dikhata hai.
+- `READY` column mein `3/3` ka matlab teen desired replicas ready/available hain.
+- Agar `1/3` ya `0/3` dikh raha hai, to kuch replicas ready nahi hain; details aur events check karo.
+- `kubectl describe deployment backend` rollout, conditions aur related events samajhne mein help karta hai.
+
+## 4. Practical Example / Code
+
+Example Deployment:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:latest
+          ports:
+            - containerPort: 5000
+```
+
+Check its status:
+
+```bash
+kubectl get deployments
+```
+
+Example output:
+
+```text
+NAME      READY   UP-TO-DATE   AVAILABLE   AGE
+backend   3/3     3            3           5m
+```
+
+**Explanation:**
+- `READY`: ready replicas / desired replicas.
+- `UP-TO-DATE`: replicas updated to the latest Deployment configuration.
+- `AVAILABLE`: replicas available to serve workloads according to Deployment availability rules.
+- This is sample output; actual values depend on your cluster.
+
+## 5. Practical Commands
+
+```bash
+# List Deployments in the current namespace
+kubectl get deployments
+
+# List Deployments across all namespaces
+kubectl get deployments -A
+
+# Inspect a particular Deployment
+kubectl describe deployment backend
+
+# Watch Deployment status changes
+kubectl get deployments -w
+
+# Check Pods created for the backend
+kubectl get pods -l app=backend
+
+# Check rollout status
+kubectl rollout status deployment/backend
+
+# View rollout history
+kubectl rollout history deployment/backend
+```
+
+Use `-n <namespace>` if the Deployment is in a specific namespace.
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+        Developer / Terminal
+                 |
+                 v
+    kubectl get deployments
+                 |
+                 v
+       Kubernetes API Server
+                 |
+                 v
+          Deployment object
+                 |
+                 v
+          ReplicaSet manages
+            desired replicas
+                 |
+                 v
+             Backend Pods
+       (check READY / AVAILABLE)
+```
+
+## 7. Summary Table
+
+| Command / Field | Purpose |
+|---|---|
+| `kubectl get deployments` | Lists Deployments and replica status |
+| `kubectl get deployments -A` | Lists Deployments in all namespaces |
+| `READY` | Ready replicas compared with desired replicas |
+| `UP-TO-DATE` | Replicas using the latest Deployment configuration |
+| `AVAILABLE` | Replicas currently available |
+| `kubectl describe deployment <name>` | Shows details, conditions, and events |
+| `kubectl rollout status deployment/<name>` | Checks rollout progress |
+
+**Interview Answer:** Use `kubectl get deployments` to check Deployment status and desired, updated, and available replicas. Use `kubectl describe deployment <name>` and `kubectl rollout status deployment/<name>` for troubleshooting.
+
+**Remember:** `get deployments` gives the overview; `describe` and `rollout status` help investigate problems.
