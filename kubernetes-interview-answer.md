@@ -19395,3 +19395,117 @@ rules pass    PreferNoSchedule: avoid if possible
 **Interview Answer:** Taints are applied to Nodes to repel Pods that do not have matching tolerations. A Pod with a matching toleration is allowed to be considered for that Node, but it is not guaranteed to schedule there. The three common effects are `NoSchedule`, `PreferNoSchedule`, and `NoExecute`, which determine how the scheduler and kubelet handle Pods without matching tolerations.
 
 ---
+
+## 152. What Are Tolerations?
+
+### 1. English Definition
+
+**Tolerations** are settings in a Pod specification that allow the Pod to tolerate matching taints on Nodes. They remove the taint-based barrier, but do not guarantee that the Pod will be scheduled onto that Node; all other scheduling requirements must also be satisfied.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+Toleration Pod ki YAML file mein define hoti hai. Yeh Kubernetes ko batati hai ki Pod kisi matching taint wale Node par schedule hone ko tolerate kar sakta hai.
+
+Simple rule:
+- **Taint** Node par lagta hai aur Pods ko repel karta hai.
+- **Toleration** Pod mein hoti hai aur us matching taint ko tolerate karne deti hai.
+
+Toleration ka matlab Node par jaana compulsory nahi hai; sirf taint ki wajah se Pod block nahi hota. Node selector, affinity, resources aur doosri scheduling conditions bhi satisfy honi chahiye.
+
+### 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapne database ke liye ek worker Node reserve kiya hai aur us par yeh taint lagaya:
+
+```text
+workload=database:NoSchedule
+```
+
+Normal Node.js backend Pod ke paas matching toleration nahi hai, isliye woh us Node par schedule nahi ho sakta. Lekin agar database-related Pod mein matching toleration define hai, toh woh taint ko tolerate kar sakta hai aur baaki rules allow karein toh us Node par schedule ho sakta hai.
+
+### 4. Practical YAML Example
+
+Node par taint:
+
+```bash
+kubectl taint nodes worker-1 workload=database:NoSchedule
+```
+
+Pod with matching toleration:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: database-client
+spec:
+  tolerations:
+    - key: workload
+      operator: Equal
+      value: database
+      effect: NoSchedule
+  containers:
+    - name: client
+      image: busybox:1.36
+      command: ["sh", "-c", "sleep 3600"]
+```
+
+Yeh toleration `workload=database:NoSchedule` taint ko match karti hai:
+- `key: workload` taint ka key match karta hai.
+- `operator: Equal` key aur value ka exact match require karta hai.
+- `value: database` expected value hai.
+- `effect: NoSchedule` taint effect match karta hai.
+
+### 5. Toleration Operators
+
+| Operator | Meaning |
+|---|---|
+| `Equal` | Key, value, aur specified effect match hone chahiye |
+| `Exists` | Matching key aur effect ke liye value specify karna zaroori nahi; empty key with `Exists` can match all keys for that effect |
+
+Example using `Exists`:
+
+```yaml
+tolerations:
+  - key: workload
+    operator: Exists
+    effect: NoSchedule
+```
+
+Yeh `workload` key ke `NoSchedule` taints ko tolerate karta hai, chahe value kuch bhi ho. Agar `effect` omit kiya jaye, toh woh us key ke matching taints ke kisi bhi effect ko tolerate kar sakta hai. Broad tolerations carefully use karein, kyunki woh Pod ko zyada Nodes par eligible bana sakti hain.
+
+### 6. Taint Effects and Tolerations
+
+| Taint effect | Without matching toleration | With matching toleration |
+|---|---|---|
+| `NoSchedule` | New Pod schedule nahi hota | Taint scheduling barrier nahi banta |
+| `PreferNoSchedule` | Scheduler placement avoid karne ki koshish karta hai | Taint ke basis par avoidance nahi hoti |
+| `NoExecute` | New Pod schedule nahi hota; existing Pod evict ho sakta hai | Pod remain kar sakta hai; `tolerationSeconds` eviction delay kar sakta hai |
+
+### 7. Practical Commands
+
+```bash
+# Inspect Node taints
+kubectl describe node worker-1
+
+# Apply Pod manifest
+kubectl apply -f database-client.yaml
+
+# Check where it was scheduled
+kubectl get pod database-client -o wide
+
+# Inspect scheduling events
+kubectl describe pod database-client
+```
+
+### 8. Taint vs. Toleration
+
+| Feature | Taint | Toleration |
+|---|---|---|
+| Defined on | Node | Pod |
+| Purpose | Repels Pods that do not tolerate it | Allows a Pod to tolerate a matching taint |
+| Guarantees placement? | No | No |
+| Used together? | Yes | Yes |
+
+**Interview Answer:** Tolerations are configured in a Pod specification to allow the Pod to tolerate matching Node taints. They do not guarantee placement on that Node; they only remove the taint-based restriction. Other scheduling constraints, such as resources, affinity, and node selectors, still apply. Tolerations are commonly used with taints to reserve Nodes for particular workloads.
+
+---
