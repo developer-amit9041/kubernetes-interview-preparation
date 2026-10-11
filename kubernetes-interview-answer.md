@@ -2453,3 +2453,130 @@ Image update karne se pehle ensure karo ki nayi image published ho aur cluster u
 | Recommended for ongoing application workloads | Usually not | Yes |
 
 **Remember:** Testing ya one-off tasks ke liye standalone Pod useful ho sakta hai, lekin long-running application workloads ke liye Deployment aam taur par better choice hai.
+
+
+---
+
+# Part 2 — Kubernetes Architecture
+
+# 21. What Are the Components of the Kubernetes Control Plane?
+
+## 1. English Definition
+
+The **Kubernetes Control Plane** is the set of components responsible for managing a Kubernetes cluster. It makes global decisions about the cluster, detects changes in the desired state, and coordinates workloads running on worker nodes.
+
+The main Control Plane components are:
+
+1. **kube-apiserver**
+2. **etcd**
+3. **kube-scheduler**
+4. **kube-controller-manager**
+5. **cloud-controller-manager** (when required by the cloud environment)
+
+## 2. Hindi Definition
+
+Kubernetes Control Plane cluster ka brain hota hai. Ye cluster ki state ko manage karta hai, decide karta hai ki Pods kahan run honge, aur ensure karne mein help karta hai ki cluster desired configuration ke according kaam kare.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapne apni MERN application Kubernetes par deploy ki hai. Aap chahte ho ki Node.js backend ke 3 Pods run karein.
+
+Jab aap `kubectl apply` command chalate ho, toh Control Plane ke components milkar kaam karte hain:
+
+- **API Server:** Aapki request receive aur validate karta hai.
+- **etcd:** Cluster ki configuration aur state data store karta hai.
+- **Scheduler:** Naye Pod ke liye suitable Worker Node choose karta hai.
+- **Controller Manager:** Desired state aur actual state ko match karne ke liye controllers chalata hai.
+- **Cloud Controller Manager:** Supported cloud environments mein cloud resources, jaise load balancers, ko Kubernetes ke saath coordinate karta hai.
+
+Har component ka apna role hai, lekin ye milkar cluster ko manage karte hain.
+
+## 4. Architecture Diagram
+
+```text
+              kubectl / Administrator
+                       |
+                       v
+              +------------------+
+              | kube-apiserver   |
+              +------------------+
+                 |      |      |
+                 v      v      v
+              etcd  Scheduler  Controllers
+                       |
+                       v
+                 Worker Nodes
+              (Kubelet, Runtime, Pods)
+
+       cloud-controller-manager
+       integrates with supported cloud APIs
+```
+
+## 5. Practical Example / Code — MERN Backend
+
+Maan lo aap `backend-deployment.yaml` apply karte ho, jisme 3 replicas configured hain.
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+```
+
+Command:
+
+```bash
+kubectl apply -f backend-deployment.yaml
+```
+
+Is request ko API Server process karta hai. Deployment controller desired state observe karta hai, ReplicaSet manage hota hai, aur Scheduler naye Pods ko suitable Worker Nodes par assign karta hai. Kubelet assigned node par containers start karne ke liye container runtime ke saath kaam karta hai.
+
+## 6. Practical Commands / Configuration
+
+### Cluster ke nodes dekho
+
+```bash
+kubectl get nodes
+```
+
+### System Namespace ke Pods dekho
+
+```bash
+kubectl get pods -n kube-system
+```
+
+### Control Plane components ki details dekho
+
+```bash
+kubectl cluster-info
+kubectl describe nodes
+```
+
+Managed Kubernetes services mein Control Plane components user ko directly visible ya accessible na bhi hon. Isliye `kube-system` mein har component ka Pod dikhna guaranteed nahi hai.
+
+## 7. Summary Table
+
+| Component | Main responsibility |
+|---|---|
+| `kube-apiserver` | Kubernetes API requests receive aur validate karta hai; cluster ka main API entry point |
+| `etcd` | Cluster ki persistent state/configuration data store karta hai |
+| `kube-scheduler` | Unschedulable Pods ke liye suitable Node select karta hai |
+| `kube-controller-manager` | Controllers chalata hai jo actual state ko desired state ke kareeb laate hain |
+| `cloud-controller-manager` | Supported cloud provider ke resources ke saath integration karta hai; optional/environment-dependent |
+
+**Remember:** API Server request handle karta hai, etcd state store karta hai, Scheduler Pod placement choose karta hai, aur controllers desired state maintain karne ki koshish karte hain.
