@@ -9668,3 +9668,138 @@ EndpointSlices are the modern API for tracking Service backends. If no Pods matc
 | No matching Pods | Service has no matching backend endpoints |
 
 **Remember:** A Kubernetes Service uses label selectors to find matching Pods and sends traffic to eligible endpoints; it does not identify Pods by their names.
+---
+
+# 77. What Is a Service Selector?
+
+## 1. English Definition
+
+A **Service selector** is a field in a Kubernetes Service configuration that specifies which Pods the Service should target by matching their labels. Kubernetes uses the matching Pods as backend endpoints for routing traffic.
+
+## 2. Hindi Definition
+
+Kubernetes mein **Service Selector ek rule hota hai jo decide karta hai ki Service kin Pods ko select karegi.**
+
+Ye rule Pod ke labels ko match karta hai. Agar Pod ka label Service ke selector se match karta hai, toh woh Pod Service ka backend ban sakta hai, provided woh traffic receive karne ke liye eligible ho.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhare MERN project mein 3 Node.js backend Pods hain:
+
+| Pod | Label |
+|---|---|
+| `backend-pod-1` | `app: mern-backend` |
+| `backend-pod-2` | `app: mern-backend` |
+| `payment-pod-1` | `app: payment-service` |
+
+Ab tumhari backend Service mein ye selector hai:
+
+```yaml
+selector:
+  app: mern-backend
+```
+
+Service `backend-pod-1` aur `backend-pod-2` ko select karegi, kyunki unke labels match karte hain. `payment-pod-1` select nahi hoga, kyunki uska label alag hai.
+
+**Simple formula:** Pod labels + matching Service selector = selected backend Pods.
+
+## 4. Practical Example / Code
+
+### Pod labels
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: backend-pod
+  labels:
+    app: mern-backend
+spec:
+  containers:
+    - name: backend
+      image: nginx:stable
+```
+
+### Service selector
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+spec:
+  type: ClusterIP
+  selector:
+    app: mern-backend
+  ports:
+    - port: 80
+      targetPort: 80
+```
+
+Here, the Service selector matches Pods whose `app` label is `mern-backend`. The example uses NGINX only to demonstrate label selection; a real MERN backend Service should target the port used by the Node.js application.
+
+## 5. Architecture Diagram
+
+```text
+backend-pod-1                 label: app=mern-backend
+       \
+        \
+         +----> Service selector: app=mern-backend
+        /                       |
+backend-pod-2                   v
+                         Selected endpoints
+
+payment-pod-1  label: app=payment-service
+       |
+       +----> Not selected (label does not match)
+```
+
+Kubernetes continuously updates the endpoints for a selector-based Service as matching Pods change. A Pod must also be eligible to receive traffic; a matching label alone does not guarantee the application is healthy.
+
+## 6. Practical Commands / Configuration
+
+Create or update the resources:
+
+```bash
+kubectl apply -f backend-pod.yaml
+kubectl apply -f backend-service.yaml
+```
+
+View labels on Pods:
+
+```bash
+kubectl get pods --show-labels
+```
+
+List Pods matching the selector:
+
+```bash
+kubectl get pods -l app=mern-backend
+```
+
+Inspect the Service selector:
+
+```bash
+kubectl describe service backend-service
+```
+
+Check Service backend endpoints:
+
+```bash
+kubectl get endpoints backend-service
+kubectl get endpointslices
+```
+
+If no endpoints appear, verify that the selector and Pod labels match and that the Pods are ready and eligible for traffic.
+
+## 7. Summary Table
+
+| Term | Meaning |
+|---|---|
+| Pod label | Key-value metadata attached to a Pod |
+| Service selector | Rule that matches Pod labels |
+| Matching Pod | A Pod whose labels satisfy the selector |
+| Non-matching Pod | A Pod excluded by that selector |
+| Purpose | Dynamically identify Service backends without hard-coding Pod IPs |
+
+**Remember:** A Service selector matches Pod labels to determine which Pods can act as backends for that Service.
