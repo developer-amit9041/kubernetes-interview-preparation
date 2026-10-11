@@ -1163,3 +1163,103 @@ kubectl top nodes
 | Container | Application process ko isolated environment mein run karta hai |
 
 **Remember:** Cluster poora environment hai, Node us environment ki machine hai, aur Pod application workload ko run karne ki Kubernetes unit hai.
+
+
+---
+
+# 10. What Is a Master Node / Control Plane?
+
+## 1. English Definition
+
+The **Control Plane** is the part of Kubernetes responsible for managing the cluster, maintaining its desired state, and coordinating workload scheduling. It includes components such as the API Server, Scheduler, Controller Manager, and etcd.
+
+The term **Master Node** is commonly used for a machine running Control Plane components, while **Control Plane** is the preferred modern term.
+
+## 2. Hindi Definition
+
+Control Plane Kubernetes cluster ka management part hota hai. Ye cluster ki desired state maintain karne, Pods ko suitable nodes par schedule karne aur cluster ke resources ko coordinate karne mein help karta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application mein Node.js backend ke 3 Pods run hone chahiye. Aap Deployment file mein desired replicas define karte ho:
+
+```yaml
+spec:
+  replicas: 3
+```
+
+Kubernetes ko 3 backend Pod replicas ki desired state maintain karni hoti hai.
+
+**Control Plane ka role:**
+
+- **API Server:** Kubernetes commands aur API requests receive karta hai.
+- **etcd:** Cluster ki state aur configuration data store karta hai.
+- **Scheduler:** Naye Pods ke liye suitable Worker Node select karta hai.
+- **Controller Manager:** Controllers run karta hai jo desired state maintain karne ki koshish karte hain.
+
+Agar ek backend Pod fail ho jaata hai, toh Deployment aur ReplicaSet controllers replacement Pod create karne mein help karte hain. Scheduler zaroorat padne par naye Pod ke liye suitable node select karta hai.
+
+## 4. Control Plane Diagram
+
+```text
+             Kubernetes Control Plane
+      +-----------------------------------+
+      | API Server                        |
+      | etcd                              |
+      | Scheduler                         |
+      | Controller Manager                |
+      +----------------+------------------+
+                       |
+              coordinates workloads
+                       |
+          +------------+------------+
+          |                         |
+          v                         v
+   +--------------+          +--------------+
+   | Worker Node 1|          | Worker Node 2|
+   | Backend Pods |          | Frontend Pods|
+   +--------------+          +--------------+
+```
+
+Ye conceptual diagram hai. Production clusters mein Control Plane components ek ya multiple machines par run ho sakte hain, setup ke according.
+
+## 5. Master Node vs Control Plane
+
+| Term | Meaning |
+|---|---|
+| Master Node | Traditional/common term for a node hosting cluster-management components |
+| Control Plane | Kubernetes ke cluster-management components aur unki role ka modern term |
+| Worker Node | Application workloads, jaise Pods, run karne wali machine |
+
+## 6. Practical Commands
+
+Cluster information dekhne ke liye:
+
+```bash
+kubectl cluster-info
+```
+
+Nodes aur unke roles check karne ke liye:
+
+```bash
+kubectl get nodes
+```
+
+Control Plane-related Pods dekhne ke liye, agar cluster mein ye components visible hon:
+
+```bash
+kubectl get pods -n kube-system
+```
+
+Managed Kubernetes services mein Control Plane provider manage kar sakta hai, isliye uske underlying machines aapko directly visible na hon.
+
+## 7. Summary Table
+
+| Component | Main responsibility |
+|---|---|
+| API Server | Kubernetes API requests handle karta hai |
+| etcd | Cluster state store karta hai |
+| Scheduler | Unsheduled Pods ke liye nodes select karta hai |
+| Controller Manager | Desired state reconcile karne ke liye controllers run karta hai |
+
+**Remember:** Control Plane cluster ka management brain hai; Worker Nodes application Pods run karte hain. “Master Node” older/common terminology hai, jabki modern Kubernetes terminology mein “Control Plane” preferred hai.
