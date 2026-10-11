@@ -19621,3 +19621,126 @@ kubectl taint nodes worker-db-1 workload=mongodb:NoSchedule-
 **Interview Answer:** A common real-world use case is dedicating Kubernetes Nodes to specific workloads, such as GPU-based machine-learning jobs or database Pods. We apply a taint to the dedicated Node and add a matching toleration to the intended Pod. Since toleration alone does not guarantee placement, we often combine it with node affinity or a node selector. This helps control workload placement and reduces accidental scheduling of unrelated Pods on specialized Nodes.
 
 ---
+
+## 154. How Do You Run a Pod on a Specific Node?
+
+### 1. English Definition
+
+You can schedule a Kubernetes Pod onto a specific Node using `nodeSelector` with a Node label, or using node affinity for more expressive placement rules. For a quick, direct test, `kubectl` also supports assigning a Pod to a Node with `nodeName`, but this bypasses normal scheduler selection and is generally not the preferred approach for application workloads.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+Kisi Pod ko specific Node par run karne ke liye hum aam taur par Node par label lagate hain aur Pod ki YAML mein `nodeSelector` define karte hain.
+
+- Node par label batata hai ki Node kis type ka hai.
+- `nodeSelector` Pod ke liye matching label wala Node require karta hai.
+- Agar multiple Nodes same label match karte hain, toh Pod unmein se kisi suitable Node par schedule ho sakta hai; exact ek Node chahiye toh unique label use karo.
+
+### 3. Method 1 — Using `nodeSelector` (Simple and Recommended)
+
+**Step 1: Nodes check karo**
+
+```bash
+kubectl get nodes --show-labels
+```
+
+**Step 2: Target Node ko unique label do**
+
+```bash
+kubectl label node worker-1 dedicated=myapp
+```
+
+**Step 3: Pod YAML banao**
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-pod
+spec:
+  nodeSelector:
+    dedicated: myapp
+  containers:
+    - name: myapp
+      image: nginx:stable
+      ports:
+        - containerPort: 80
+```
+
+Save this as `myapp-pod.yaml`, then run:
+
+```bash
+kubectl apply -f myapp-pod.yaml
+kubectl get pod myapp-pod -o wide
+```
+
+`nodeSelector` ensure karta hai ki Pod sirf aise Nodes par schedule ho jahan `dedicated=myapp` label ho. Agar label kisi Node par nahi hai, ya matching Node available nahi hai, Pod `Pending` reh sakta hai.
+
+### 4. Method 2 — Using Node Affinity
+
+Node affinity more flexible rules provide karti hai. Example:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-affinity-pod
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: dedicated
+                operator: In
+                values:
+                  - myapp
+  containers:
+    - name: myapp
+      image: nginx:stable
+```
+
+Yeh required rule hai: Pod schedule hone ke liye `dedicated=myapp` label match hona chahiye. `preferredDuringSchedulingIgnoredDuringExecution` use karne par yeh preference hoti hai, strict requirement nahi.
+
+### 5. Method 3 — Using `nodeName` (Special Cases)
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: directly-assigned-pod
+spec:
+  nodeName: worker-1
+  containers:
+    - name: myapp
+      image: nginx:stable
+```
+
+`nodeName` Pod ko directly named Node assign karta hai, scheduler ke normal selection process ko bypass karke. Isliye yeh aam application scheduling ke liye generally recommended nahi hai; named Node unavailable ho ya resources insufficient hon, toh Pod expected tarah run na kar sake.
+
+### 6. How to Verify and Troubleshoot
+
+```bash
+# Confirm Node labels
+kubectl get nodes --show-labels
+
+# Check the Pod's assigned Node
+kubectl get pod myapp-pod -o wide
+
+# See scheduling events and reasons for Pending
+kubectl describe pod myapp-pod
+```
+
+If Pod remains `Pending`, check that the label matches exactly, the target Node is Ready, enough CPU/memory is available, and taints, tolerations, affinity, and other constraints permit scheduling.
+
+### 7. Quick Comparison
+
+| Method | Best for | Important note |
+|---|---|---|
+| `nodeSelector` | Simple label-based placement | All specified labels must match |
+| Node affinity | Advanced required or preferred placement | More expressive rules |
+| `nodeName` | Special direct assignment cases | Bypasses normal scheduler selection |
+
+**Interview Answer:** To run a Pod on a specific Node, I usually label the Node and configure `nodeSelector` in the Pod specification. Kubernetes schedules the Pod onto a suitable Node with that label. For advanced placement rules, I use node affinity. `nodeName` can directly assign a Pod to a Node, but it bypasses normal scheduler selection and is not the usual choice for production workloads.
+
+---
