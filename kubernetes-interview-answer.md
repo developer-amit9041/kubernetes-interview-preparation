@@ -13666,3 +13666,116 @@ The namespace above is only an example; controllers can be installed in other na
 | MERN example | Routes frontend and API requests to their Services |
 
 **Remember:** Ingress defines the routing rules; the Ingress Controller implements them and routes requests to Kubernetes Services.
+
+---
+
+# 105. What Is the NGINX Ingress Controller?
+
+## 1. English Definition
+
+The **NGINX Ingress Controller** is a Kubernetes controller that watches Ingress resources and configures NGINX to route incoming HTTP/HTTPS traffic to the appropriate Kubernetes Services.
+
+## 2. Hindi Definition
+
+NGINX Ingress Controller Kubernetes ka ek component hai jo Ingress rules ko monitor karta hai aur NGINX ko configure karta hai, taaki incoming HTTP/HTTPS requests sahi Kubernetes Service tak pahunch sakein.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application mein React frontend aur Node.js/Express backend hai:
+
+- `/` par aane wali request ko `frontend-service` tak bhejna hai.
+- `/api` par aane wali request ko `backend-service` tak bhejna hai.
+
+Aap **Ingress resource** mein routing rules define karte ho. NGINX Ingress Controller un rules ko read karke NGINX ki routing configuration banata hai aur traffic ko correct Service tak forward karta hai.
+
+**Yaad rakho:** Ingress rules batata hai *traffic kahan jana chahiye*; NGINX Ingress Controller un rules ko implement karta hai.
+
+## 4. Practical Example / Code
+
+Example Ingress resource for a MERN application:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mern-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-service
+                port:
+                  number: 5000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-service
+                port:
+                  number: 80
+```
+
+**Important:** Is YAML ko kaam karne ke liye cluster mein compatible NGINX Ingress Controller install hona chahiye. `backend-service` aur `frontend-service` pehle se exist karne chahiye, aur unke ports apni application ke according set hone chahiye. Example hostname `app.example.com` ko apne actual domain se replace karein.
+
+## 5. Architecture Diagram
+
+```text
+          User / Browser
+                 |
+                 v
+       External LoadBalancer
+                 |
+                 v
+      NGINX Ingress Controller
+                 |
+          Reads Ingress rules
+                 |
+          +------+------+
+          |             |
+       /api path       / path
+          |             |
+          v             v
+   backend-service  frontend-service
+          |             |
+          v             v
+   Express/Node.js   React app
+```
+
+## 6. Practical Commands / Configuration
+
+Check Ingress resources and classes:
+
+```bash
+kubectl get ingress
+kubectl describe ingress mern-ingress
+kubectl get ingressclass
+```
+
+Check whether the controller is running (the namespace depends on how it was installed):
+
+```bash
+kubectl get pods -A | grep -i ingress
+kubectl get services -A | grep -i ingress
+```
+
+If the controller is missing, install a compatible NGINX Ingress Controller using its official installation instructions for your Kubernetes environment. The installation method can differ between local clusters and managed platforms such as AWS EKS.
+
+## 7. Summary Table
+
+| Component | Responsibility |
+|---|---|
+| Ingress resource | Defines host and path-based routing rules |
+| NGINX Ingress Controller | Watches Ingress resources and configures NGINX |
+| NGINX | Proxies incoming HTTP/HTTPS traffic to backend Services |
+| Kubernetes Service | Provides stable access to application Pods |
+| DNS | Resolves the hostname, such as `app.example.com`, to the configured entry point |
+
+**Interview Answer:** The NGINX Ingress Controller watches Kubernetes Ingress resources and configures NGINX to route external HTTP/HTTPS traffic to the correct Services based on host and path rules.
+
+**Remember:** Ingress is the routing rule; NGINX Ingress Controller is the component that applies the rule.
