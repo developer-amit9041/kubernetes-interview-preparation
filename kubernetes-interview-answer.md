@@ -6997,3 +6997,129 @@ This HPA example targets average CPU utilization of 70% of the Pods' CPU request
 | Verify | `kubectl get deployment mern-backend` | Check desired and available replica counts |
 
 **Remember:** Use `kubectl scale deployment <name> --replicas=<number>` for manual scaling. Use HPA for metric-based automatic scaling, and ensure the cluster has enough resources.
+---
+
+# 57. What Is a Rolling Update?
+
+## 1. English Definition
+
+**A rolling update is a Kubernetes Deployment strategy that gradually replaces old application Pods with new Pods running an updated version, instead of replacing all Pods at once.**
+
+It helps maintain application availability during updates, provided enough healthy replicas and cluster resources are available.
+
+## 2. Hindi Definition
+
+Rolling update ka matlab hai application ke purane Pods ko ek-ek karke ya batches mein naye version ke Pods se replace karna.
+
+Kubernetes saare purane Pods ko ek saath band karne ke bajaye, configured strategy ke according old aur new Pods ko manage karta hai. Isse application update karte waqt downtime ka risk kam hota hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhara Node.js backend version `1.0` par chal raha hai aur Deployment mein 3 replicas hain. Ab tumne backend ka naya version `2.0` bana diya.
+
+Rolling update mein:
+
+1. Kubernetes new image `2.0` ke liye naya ReplicaSet create karta hai.
+2. Naye Pods create hote hain.
+3. Naye Pods ready hone par old Pods ko gradually terminate kiya ja sakta hai.
+4. Rollout complete hone par saare desired replicas new version par aa jaate hain.
+
+Is process mein old aur new version ke Pods kuch samay tak saath chal sakte hain.
+
+**Important:** Rolling update zero downtime ki guarantee nahi deta. Readiness probes, rollout settings, sufficient resources aur application compatibility bhi important hain.
+
+## 4. Practical Example / Code
+
+Example Deployment configuration:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+```
+
+`maxSurge: 1` allows up to one extra Pod above the desired replica count during the rollout. `maxUnavailable: 1` allows up to one desired Pod to be unavailable during the rollout, subject to Deployment behavior and readiness.
+
+## 5. Architecture Diagram
+
+```text
+Before update: 3 old Pods
+      v1       v1       v1
+       |        |        |
+       +--------+--------+
+                |
+                v
+       Deployment image update
+                |
+                v
+       New ReplicaSet creates v2 Pods
+                |
+                v
+     v1 Pods gradually replaced by v2
+                |
+                v
+After update: 3 new Pods
+      v2       v2       v2
+```
+
+## 6. Practical Commands / Configuration
+
+**Update the backend image to version 2.0:**
+
+```bash
+kubectl set image deployment/mern-backend backend=your-dockerhub-username/mern-backend:2.0
+```
+
+**Watch rollout progress:**
+
+```bash
+kubectl rollout status deployment/mern-backend
+kubectl get pods -w
+```
+
+**Inspect rollout history:**
+
+```bash
+kubectl rollout history deployment/mern-backend
+```
+
+**Roll back if the new version has a problem and a suitable previous revision exists:**
+
+```bash
+kubectl rollout undo deployment/mern-backend
+```
+
+## 7. Summary Table
+
+| Item | Explanation |
+|---|---|
+| Purpose | Gradually replaces old Pods with updated Pods |
+| Managed by | Kubernetes Deployment |
+| ReplicaSets | Old and new ReplicaSets can coexist during rollout |
+| `maxSurge` | Maximum extra Pods allowed above desired replicas during rollout |
+| `maxUnavailable` | Maximum desired replicas that may be unavailable during rollout |
+| Monitor progress | `kubectl rollout status deployment/<name>` |
+| Rollback | `kubectl rollout undo deployment/<name>` |
+
+**Remember:** A rolling update gradually moves a Deployment to the new version. It can reduce downtime risk, but availability depends on readiness, capacity, rollout settings, and application behavior.
