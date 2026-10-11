@@ -10334,3 +10334,150 @@ Treat ConfigMap values as non-confidential. Use Kubernetes Secrets or an appropr
 | Passwords and tokens | Do not store in ConfigMaps; use Secrets or a secret manager |
 
 **Remember:** A ConfigMap separates non-sensitive application configuration from the container image, making the same image reusable across environments.
+---
+
+# 82. Why Do We Need a ConfigMap?
+
+## 1. English Definition
+
+A **ConfigMap is used to separate non-sensitive application configuration from application code and container images.** It makes applications easier to configure across development, testing, and production environments without rebuilding the container image for every configuration change.
+
+## 2. Hindi Definition
+
+ConfigMap ki zaroorat isliye hoti hai taaki hum application ki configuration ko code aur Docker image se alag rakh saken.
+
+Ismein hum non-sensitive values store kar sakte hain, jaise:
+
+- Application environment — `development` ya `production`
+- Frontend URL
+- Feature flags
+- Configuration files aur application settings
+
+**Note:** Passwords, database credentials aur API tokens ke liye ConfigMap nahi, balki Kubernetes Secrets ya external secret manager use karna chahiye.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application mein Node.js backend hai aur tum use development aur production dono environments mein deploy karte ho.
+
+Development mein frontend URL `http://localhost:5173` hai, jabki production mein `https://myapp.example.com` hai.
+
+### ConfigMap ke bina
+
+Agar URL code mein hard-code kar diya, toh environment change hone par code ya configuration ko image mein dobara package karna pad sakta hai.
+
+### ConfigMap ke saath
+
+Dono environments ke liye alag ConfigMap bana sakte ho aur same backend image use kar sakte ho.
+
+```text
+          Same Docker Image
+                 |
+        +--------+--------+
+        |                 |
+        v                 v
+   Development        Production
+   ConfigMap          ConfigMap
+        |                 |
+        v                 v
+   Backend Pod       Backend Pod
+   localhost URL     Production URL
+```
+
+Isse configuration manage karna aasaan hota hai aur environment-specific values ko application code mein hard-code karne ki zaroorat kam ho jaati hai.
+
+## 4. Practical Example / Code
+
+Create a development ConfigMap in `backend-config-dev.yaml`:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+data:
+  NODE_ENV: "development"
+  FRONTEND_URL: "http://localhost:5173"
+```
+
+For production, use the appropriate value in the production environment, for example:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+data:
+  NODE_ENV: "production"
+  FRONTEND_URL: "https://myapp.example.com"
+```
+
+Reference the ConfigMap from a Deployment:
+
+```yaml
+envFrom:
+  - configMapRef:
+      name: backend-config
+```
+
+The Pod receives the ConfigMap values as environment variables. Typically, use separate namespaces or distinct ConfigMap names for different environments so that the intended configuration is applied. Environment variables in an already-running container do not automatically update when a ConfigMap changes; a rollout/restart may be needed.
+
+## 5. Architecture Diagram
+
+```text
+             Same Backend Image
+                    |
+          +---------+---------+
+          |                   |
+          v                   v
+   Development             Production
+   ConfigMap               ConfigMap
+   NODE_ENV=development    NODE_ENV=production
+   FRONTEND_URL=local      FRONTEND_URL=public
+          |                   |
+          v                   v
+     Backend Pod          Backend Pod
+```
+
+ConfigMaps help separate configuration from application packaging. They are not a security boundary for confidential data; access to ConfigMaps should still be controlled with Kubernetes RBAC.
+
+## 6. Practical Commands / Configuration
+
+Apply a ConfigMap:
+
+```bash
+kubectl apply -f backend-config-dev.yaml
+```
+
+List ConfigMaps:
+
+```bash
+kubectl get configmaps
+```
+
+Inspect its values:
+
+```bash
+kubectl describe configmap backend-config
+kubectl get configmap backend-config -o yaml
+```
+
+After referencing the ConfigMap in the Deployment, apply and verify the rollout:
+
+```bash
+kubectl apply -f backend-deployment.yaml
+kubectl rollout status deployment/backend
+```
+
+Use Secrets or an external secret manager for credentials and tokens, and restrict who can read configuration objects through RBAC.
+
+## 7. Summary Table
+
+| Why use a ConfigMap? | Benefit |
+|---|---|
+| Separate configuration from code | Keeps environment-specific values out of application source |
+| Reuse the same image | Avoids rebuilding an image just to change non-secret settings |
+| Support multiple environments | Development, testing and production can use different settings |
+| Centralize configuration | Makes settings easier to inspect and manage |
+| Store credentials? | No; use Secrets or an external secret manager |
+
+**Remember:** We need ConfigMaps to manage non-sensitive configuration independently from application code and container images, making deployments more portable and easier to maintain.
