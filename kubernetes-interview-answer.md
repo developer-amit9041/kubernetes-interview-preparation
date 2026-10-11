@@ -7462,3 +7462,144 @@ kubectl get pods -w
 | `kubectl get pods -w` | Watch Pod changes live |
 
 **Remember:** `kubectl rollout` is a command group for managing and inspecting Deployment rollouts. Use `status` to monitor, `history` to inspect revisions, `undo` to roll back, and `restart` to restart Pods through a rollout.
+---
+
+# 61. What Is the Difference Between `RollingUpdate` and `Recreate` Strategies?
+
+## 1. English Definition
+
+**RollingUpdate:** A Deployment strategy that gradually replaces old Pods with new Pods during an application update. Old and new Pods can run simultaneously during the rollout.
+
+**Recreate:** A Deployment strategy that terminates the existing Pods before creating new Pods for the updated version. This can cause downtime while the new Pods start.
+
+## 2. Hindi Definition
+
+- **RollingUpdate:** Purane Pods ko gradually naye Pods se replace kiya jaata hai. Update ke dauran kuch time ke liye old aur new version ke Pods saath chal sakte hain.
+- **Recreate:** Pehle purane Pods terminate hote hain, phir naye version ke Pods create hote hain. Is wajah se application kuch samay ke liye unavailable ho sakti hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application ka Node.js backend Kubernetes mein 3 replicas ke saath chal raha hai. Ab tum backend version `1.0` se `2.0` par update karna chahte ho.
+
+### RollingUpdate
+
+Kubernetes configured rollout settings ke according old Pods ko gradually replace karta hai. Old aur new version ke Pods rollout ke dauran overlap kar sakte hain. Isse downtime ka risk kam hota hai, lekin zero downtime guaranteed nahi hai.
+
+### Recreate
+
+Kubernetes pehle existing Deployment Pods terminate karta hai aur phir new version ke Pods create karta hai. New Pods ready hone tak application unavailable ho sakti hai. Is strategy se old aur new versions ke overlap se bacha ja sakta hai.
+
+## 4. Practical Example / Code
+
+### RollingUpdate strategy
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:2.0
+          ports:
+            - containerPort: 5000
+```
+
+`maxSurge: 1` allows up to one extra Pod above the desired count during the rollout. `maxUnavailable: 1` allows up to one desired Pod to be unavailable during the rollout.
+
+### Recreate strategy
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 3
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:2.0
+          ports:
+            - containerPort: 5000
+```
+
+With `Recreate`, the Deployment terminates the old Pods before creating Pods for the updated Pod template. Application downtime may occur while the new Pods are scheduled and become ready.
+
+## 5. Architecture Diagram
+
+```text
+RollingUpdate:
+  Old Pods v1.0  --->  Old and new Pods overlap  --->  New Pods v2.0
+  Gradual replacement; downtime risk is reduced
+
+Recreate:
+  Old Pods v1.0  --->  Old Pods terminated  --->  New Pods v2.0
+                             |
+                      Possible downtime
+```
+
+## 6. Practical Commands / Configuration
+
+**Check the Deployment strategy:**
+
+```bash
+kubectl describe deployment mern-backend
+```
+
+**Watch Pods during an update:**
+
+```bash
+kubectl get pods -w
+```
+
+**Check rollout progress:**
+
+```bash
+kubectl rollout status deployment/mern-backend
+```
+
+**Apply a manifest after choosing a strategy:**
+
+```bash
+kubectl apply -f backend-deployment.yaml
+```
+
+Changing the Deployment strategy in YAML and applying it configures how a subsequent Pod-template update is handled. Both strategies still depend on scheduling, image availability, resource capacity and application readiness.
+
+## 7. Summary Table
+
+| Feature | RollingUpdate | Recreate |
+|---|---|---|
+| Replacement | Gradually replaces old Pods | Terminates old Deployment Pods before creating new ones |
+| Old and new versions overlap | Possible during rollout | Avoided by the strategy for the old and new Deployment Pods |
+| Downtime | Risk is reduced; not guaranteed zero | Downtime is expected while replacement Pods start |
+| Extra Pods | `maxSurge` can allow temporary extra Pods | No RollingUpdate surge behavior |
+| Configuration | `type: RollingUpdate` | `type: Recreate` |
+| Typical use | Updates where availability matters | Updates that require old and new versions not to overlap |
+
+**Remember:** `RollingUpdate` gradually replaces Pods and generally reduces downtime risk. `Recreate` terminates the old Deployment Pods before creating the new ones, which can cause downtime but avoids overlap between those versions.
