@@ -22353,10 +22353,10 @@ Backend ko credentials environment variable ya mounted Secret file ke through mi
 Production mein real credentials ko source code ya Git mein store mat karo. Example ke liye interactive command use kar sakte ho:
 
 ```bash
+# Example: create from a protected env file (keep it out of Git)
 kubectl create secret generic mongo-credentials \
   --namespace=production \
-  --from-literal=MONGO_USERNAME='app-user' \
-  --from-literal=MONGO_PASSWORD
+  --from-env-file=./mongo-credentials.env
 ```
 
 Command password prompt nahi karti; isliye is exact command ko run karne se pehle actual password dene ka secure tareeqa choose karo. Better, password ko approved secret manager se inject karo ya aise shell/tool ka use karo jo secret ko command history aur process arguments mein expose na kare. Placeholder values ko actual credentials samajhkar use mat karo.
