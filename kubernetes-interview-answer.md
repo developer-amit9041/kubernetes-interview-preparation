@@ -2857,3 +2857,153 @@ Is command ko chalane ke liye correctly configured `etcdctl` aur etcd endpoint a
 | Operations | Backup, restore, access control aur health monitoring important hain |
 
 **Remember:** `etcd` Kubernetes ka persistent state store hai. API Server requests process karta hai, etcd state store karta hai, aur controllers desired state maintain karte hain.
+
+
+---
+
+# 24. What Does `kube-scheduler` Do?
+
+## 1. English Definition
+
+**`kube-scheduler` is a Kubernetes control plane component that selects a suitable Worker Node for newly created Pods that have not yet been assigned to a node.**
+
+It evaluates factors such as available resources, scheduling constraints, node selectors, affinity rules, and taints and tolerations.
+
+## 2. Hindi Definition
+
+`kube-scheduler` Kubernetes ka control plane component hai jo decide karta hai ki kisi naye Pod ko cluster ke kis Worker Node par chalana chahiye.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application mein 3 backend Pods run karne hain aur cluster mein 2 Worker Nodes hain.
+
+Scheduler broadly ye steps follow karta hai:
+
+1. **Pending Pod identify karta hai:** Aisa Pod jise abhi tak Worker Node assign nahi hua.
+2. **Nodes filter karta hai:** Kaun se Nodes Pod ki requirements satisfy karte hain, jaise CPU, memory aur scheduling rules.
+3. **Suitable Node select karta hai:** Eligible Nodes ko score karke appropriate Node choose karta hai.
+4. **Binding hoti hai:** Selected Node Pod ke saath associate hota hai. Uske baad us Node ka `kubelet` Pod ko run karne ki process handle karta hai.
+
+**Important:** Scheduler container ko directly start nahi karta. Node select karna uska kaam hai; container execution Worker Node par container runtime ke through hota hai.
+
+## 4. Practical Example / Code — MERN Backend
+
+Example Deployment mein backend ke 3 replicas define kiye gaye hain:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+```
+
+Apply karo:
+
+```bash
+kubectl apply -f backend-deployment.yaml
+kubectl get pods -o wide
+```
+
+`kubectl get pods -o wide` output mein `NODE` column dikhata hai ki har Pod kis Worker Node par assigned hai.
+
+Agar cluster mein koi eligible Node available nahi hai, toh Pod `Pending` reh sakta hai. Aise case mein details dekhne ke liye:
+
+```bash
+kubectl describe pod <pod-name>
+kubectl get events --sort-by=.metadata.creationTimestamp
+```
+
+Pod ke Events mein scheduling failure ka reason mil sakta hai, jaise insufficient CPU/memory ya unsatisfied scheduling constraints.
+
+## 5. Architecture Diagram
+
+```text
+       Deployment Controller
+                |
+                v
+       Pod created (unassigned)
+                |
+                v
+        +----------------+
+        | kube-scheduler |
+        +----------------+
+                |
+        | filters and scores eligible nodes
+                v
+          Selected Node
+                |
+                v
+             kubelet
+                |
+                v
+       Container Runtime
+                |
+                v
+        MERN Backend Pod
+```
+
+## 6. Practical Commands / Configuration
+
+### Pods kis Node par run ho rahe hain?
+
+```bash
+kubectl get pods -o wide
+kubectl get nodes
+```
+
+### Pod scheduling details
+
+```bash
+kubectl describe pod <pod-name>
+```
+
+### Node selector ka example
+
+Agar kisi Node par label `workload=backend` hai, toh Pod ko us label wale Node par schedule karne ke liye:
+
+```yaml
+spec:
+  nodeSelector:
+    workload: backend
+```
+
+Node ko label dene ke liye:
+
+```bash
+kubectl label node <node-name> workload=backend
+```
+
+Dhyan rahe: `nodeSelector` scheduling constraint hai. Agar koi eligible Node is label ko match nahi karta, toh Pod Pending reh sakta hai.
+
+## 7. Summary Table
+
+| Component / Concept | Role |
+|---|---|
+| `kube-scheduler` | Pod ke liye suitable Node select karta hai |
+| Resource requests | CPU/memory ki scheduling requirements batati hain |
+| Node selector / affinity | Pod placement ko constrain karte hain |
+| Taints and tolerations | Decide karne mein help karte hain ki Pod kisi tainted Node par schedule ho sakta hai ya nahi |
+| `kubelet` | Assigned Node par Pod ko run karne ki process handle karta hai |
+| Container runtime | Containers ko actually run karta hai |
+| Pending Pod | Scheduling abhi complete nahi hui ya Pod kisi aur wajah se start nahi ho pa raha |
+
+**Remember:** `kube-scheduler` decides *where* a Pod should run; `kubelet` on the selected Node manages getting that Pod running.
