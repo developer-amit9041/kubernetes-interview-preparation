@@ -12861,3 +12861,143 @@ kubectl get events --sort-by=.metadata.creationTimestamp
 | Requirement | A working provisioner, valid StorageClass, and available backend capacity |
 
 **Remember:** Dynamic provisioning automatically provisions storage for a PVC through a configured StorageClass and provisioner.
+
+---
+
+# 99. How Do You Manage Storage for a Stateful Application?
+
+## 1. English Definition
+
+**Storage for a stateful application in Kubernetes is managed using PersistentVolumes (PVs), PersistentVolumeClaims (PVCs), and StorageClasses to retain application data beyond the lifecycle of individual Pods.**
+
+## 2. Hindi Definition
+
+Bhai, stateful application ka data Pod delete ya recreate hone ke baad bhi preserve karna hota hai. Iske liye hum PV, PVC aur StorageClass use karte hain. Production mein backups, data recovery aur proper storage configuration bhi important hain.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aap Kubernetes par MERN application deploy kar rahe ho aur MongoDB mein users, orders aur products ka data store hota hai.
+
+Agar MongoDB ka data sirf container ke temporary filesystem mein rakha hai, toh Pod recreate hone par data lose ho sakta hai.
+
+Isliye storage ko is tarah manage karte hain:
+
+1. **StorageClass:** Define karti hai ki storage kaise provision hoga.
+2. **PVC:** MongoDB ke liye required storage request karta hai, jaise `10Gi`.
+3. **PV:** Actual storage resource represent karta hai.
+4. **Volume mount:** Storage ko MongoDB ke `/data/db` directory par mount karta hai.
+5. **Backups:** Data loss ya accidental deletion se recovery ke liye backups maintain karte hain.
+
+MongoDB jaise stateful workloads ke liye Kubernetes `StatefulSet` bhi useful hota hai, kyunki woh stable Pod identities aur per-replica storage claims manage kar sakta hai.
+
+## 4. Practical Example / Code
+
+Example `StatefulSet` for a learning environment. It requests a separate 10Gi PVC for the MongoDB Pod:
+
+```yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb
+spec:
+  serviceName: mongodb
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      containers:
+        - name: mongodb
+          image: mongo:7
+          ports:
+            - containerPort: 27017
+          volumeMounts:
+            - name: mongodb-data
+              mountPath: /data/db
+  volumeClaimTemplates:
+    - metadata:
+        name: mongodb-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+```
+
+**Important:** This example requires a default StorageClass or another suitable dynamic provisioner. For production, configure authentication, network access controls, resource requests/limits, monitoring, backups, and a tested restore procedure. The storage reclaim policy and PVC lifecycle should be understood before deleting resources.
+
+## 5. Architecture Diagram
+
+```text
+            MongoDB StatefulSet
+                    |
+                    v
+               MongoDB Pod
+                    |
+             mounts /data/db
+                    |
+                    v
+                   PVC
+                    |
+          StorageClass / Provisioner
+                    |
+                    v
+                   PV
+                    |
+                    v
+             Persistent Storage
+
+      Backup + Restore process (separate)
+```
+
+## 6. Practical Commands / Configuration
+
+Apply the StatefulSet:
+
+```bash
+kubectl apply -f mongodb-statefulset.yaml
+```
+
+Check the StatefulSet and Pod:
+
+```bash
+kubectl get statefulset
+kubectl get pods
+```
+
+Check claims and volumes:
+
+```bash
+kubectl get pvc
+kubectl get pv
+kubectl get storageclass
+```
+
+Inspect a claim if it is not binding:
+
+```bash
+kubectl describe pvc mongodb-data-mongodb-0
+kubectl get events --sort-by=.metadata.creationTimestamp
+```
+
+Before a production upgrade or migration, take a database-consistent backup and test restoring it. A persistent volume is not, by itself, a backup.
+
+## 7. Summary Table
+
+| Practice | Why it matters |
+|---|---|
+| PV/PVC | Separates storage from the Pod lifecycle |
+| StorageClass | Defines storage provisioning behavior |
+| StatefulSet | Provides stable Pod identity and per-replica claims |
+| Volume mount | Makes persistent storage available to the container |
+| Backup and restore | Enables recovery from deletion, corruption, or failure |
+| Access control | Protects sensitive database data |
+| Monitoring | Helps detect storage capacity and I/O problems |
+| Reclaim policy | Controls storage handling after a claim is released |
+
+**Remember:** Use PVC-backed persistent storage for stateful data, StatefulSets when stable identity/per-replica claims are needed, and regular tested backups for recovery.
