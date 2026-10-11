@@ -13779,3 +13779,180 @@ If the controller is missing, install a compatible NGINX Ingress Controller usin
 **Interview Answer:** The NGINX Ingress Controller watches Kubernetes Ingress resources and configures NGINX to route external HTTP/HTTPS traffic to the correct Services based on host and path rules.
 
 **Remember:** Ingress is the routing rule; NGINX Ingress Controller is the component that applies the rule.
+
+---
+
+# 106. How Do You Connect a Domain to an Application Running in Kubernetes?
+
+## 1. English Definition
+
+To connect a domain to an application running in Kubernetes, point the domain's DNS record to the external entry point (usually a LoadBalancer) and configure an Ingress resource to route requests for that domain to the correct Kubernetes Service.
+
+## 2. Hindi Definition
+
+Kubernetes mein chal rahi application ke saath domain connect karne ke liye domain ki DNS settings ko cluster ke external entry point, jaise LoadBalancer, se point karte hain. Phir Ingress mein domain aur path ke routing rules define karte hain, taaki request sahi Service tak ja sake.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application ka domain `app.example.com` hai:
+
+1. Kubernetes mein React frontend aur Node.js/Express backend ke Services run ho rahe hain.
+2. NGINX Ingress Controller install aur running hona chahiye.
+3. Ingress resource mein `app.example.com` ke liye routing rules define karo.
+4. Controller ke external LoadBalancer ka IP ya hostname find karo.
+5. Apne DNS provider mein domain ka `A` record LoadBalancer ke IP par, ya supported setup mein `CNAME` record uske hostname par point karo.
+6. HTTPS chahiye to TLS certificate configure karo, for example Kubernetes TLS Secret ke through.
+
+DNS request ko cluster tak pahunchata hai; Ingress request ko correct Service tak route karta hai.
+
+## 4. Practical Example / Code
+
+### Step 1: Create an Ingress resource
+
+Example assumes that `frontend-service` and `backend-service` already exist and that the NGINX Ingress Controller is installed.
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mern-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-service
+                port:
+                  number: 5000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-service
+                port:
+                  number: 80
+```
+
+Apply the file:
+
+```bash
+kubectl apply -f ingress.yaml
+kubectl get ingress
+```
+
+### Step 2: Find the controller's external address
+
+The namespace and Service name can vary by installation:
+
+```bash
+kubectl get services -A
+```
+
+Find the NGINX Ingress Controller Service and note its `EXTERNAL-IP` or external hostname. If using a cloud-managed LoadBalancer, wait until its address is assigned.
+
+### Step 3: Configure DNS
+
+In your domain provider's DNS management panel, create the appropriate record:
+
+| Record | Name / Host | Value |
+|---|---|---|
+| A | `app` | LoadBalancer's public IPv4 address |
+| CNAME | `app` | LoadBalancer hostname, if supported by your DNS setup |
+
+Use the record type that matches the address provided by your infrastructure. Do not enter a placeholder IP; use the actual external address. DNS propagation may take time.
+
+### Step 4: Configure HTTPS (optional but recommended)
+
+After a valid certificate is available in a TLS Secret in the same namespace as the Ingress, configure the Ingress TLS section:
+
+```yaml
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - app.example.com
+      secretName: app-example-com-tls
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-service
+                port:
+                  number: 80
+```
+
+This is the relevant `spec` excerpt for TLS; merge it with your complete Ingress configuration. The referenced Secret must contain a valid certificate and private key. A certificate automation tool such as cert-manager can help manage certificate issuance and renewal.
+
+## 5. Architecture Diagram
+
+```text
+User visits https://app.example.com
+                 |
+                 v
+          DNS provider
+                 |
+       Resolves domain to the
+       LoadBalancer's address
+                 |
+                 v
+     NGINX Ingress Controller
+                 |
+          Ingress host/path rules
+                 |
+          +------+------+
+          |             |
+        /api             /
+          |             |
+          v             v
+  backend-service  frontend-service
+          |             |
+          v             v
+   Node/Express      React app
+```
+
+## 6. Practical Commands / Configuration
+
+```bash
+# Check Ingress and its assigned address
+kubectl get ingress
+kubectl describe ingress mern-ingress
+
+# Inspect Services and external addresses
+kubectl get services -A
+
+# Check application Services and Pods in the current namespace
+kubectl get services
+kubectl get pods
+```
+
+Troubleshooting checklist:
+
+- Confirm the domain's DNS record points to the correct LoadBalancer address.
+- Confirm the NGINX Ingress Controller is installed and healthy.
+- Confirm `ingressClassName`, hostname, Service names, and Service ports are correct.
+- Confirm the Services have healthy endpoints and the application Pods are running.
+- For HTTPS, confirm the TLS Secret exists in the Ingress namespace and contains a valid certificate.
+
+## 7. Summary Table
+
+| Step | What to do |
+|---|---|
+| 1 | Deploy the application and expose it through Kubernetes Services |
+| 2 | Install and verify the Ingress Controller |
+| 3 | Create an Ingress resource with the domain and routing paths |
+| 4 | Point DNS to the controller's external LoadBalancer address |
+| 5 | Configure a TLS certificate for HTTPS |
+| 6 | Verify DNS, Ingress, Services, and Pods if requests fail |
+
+**Interview Answer:** Connect the domain's DNS record to the Kubernetes Ingress Controller's external LoadBalancer address, then configure an Ingress resource to route that hostname and its paths to the appropriate Services. Configure TLS to enable HTTPS.
+
+**Remember:** DNS points the domain to the entry point; Ingress routes the request to the correct Service.
