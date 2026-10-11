@@ -27555,4 +27555,268 @@ Common issues:
 ### Interview-ready answer
 “I expose multiple Node.js Pods through a Kubernetes Service. The Service uses a label selector to identify the backend Pods and provides a stable IP and DNS name. Kubernetes networking routes connections to eligible ready endpoints. I verify the selected endpoints with EndpointSlices and make sure the readiness probe, Service selector, and target port are correct. I also know that Service routing does not guarantee perfectly even distribution of every individual HTTP request, especially when connections are reused.”
 
+## 200. How would you design the architecture for React, Node.js, and MongoDB on Kubernetes?
+
+### English Definition
+A MERN application on Kubernetes can be designed using separate Deployments and Services for the React frontend and Node.js backend, with MongoDB deployed as a persistent database or managed database service. Ingress handles external HTTP/HTTPS traffic, while Kubernetes provides service discovery, health checks, scaling, and workload management.
+
+### Hindi Definition
+React, Node.js aur MongoDB ko alag components mein deploy karenge. React frontend UI serve karega, Node.js/Express APIs aur business logic handle karega, aur MongoDB data store karega. Kubernetes containers ko manage aur scale karega; Ingress aur Services traffic ko correct component tak route karenge.
+
+### Step 1: Understand the architecture
+
+```text
+                         Browser
+                            |
+                          HTTPS
+                            |
+                     Ingress Controller
+                       /           \
+                    "/"             "/api"
+                     |                |
+              Frontend Service   Backend Service
+                     |                |
+             React/Nginx Pods   Node.js Pods (2+)
+                                      |
+                               private connection
+                                      |
+                              MongoDB database
+                         (managed or persistent DB)
+```
+
+The browser uses a public HTTPS origin and API path, such as `https://example.com/api`. Internal workloads can use Kubernetes Service DNS names. A browser generally cannot resolve or directly access internal ClusterIP Service names.
+
+### Step 2: Build the React frontend image
+
+For a Vite-based React app, an example multi-stage Dockerfile is:
+
+```dockerfile
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+EXPOSE 80
+```
+
+This assumes Vite outputs files to `dist`; another React build tool may use a different output directory. Production builds should be served by a production web server such as Nginx rather than the React development server.
+
+### Step 3: Deploy the frontend
+
+Example `frontend.yaml`:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: your-dockerhub-username/mern-frontend:v1
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+spec:
+  type: ClusterIP
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 80
+```
+
+The Deployment maintains the desired frontend replicas. The ClusterIP Service gives other cluster components a stable internal endpoint.
+
+### Step 4: Deploy the Node.js backend
+
+Example `backend.yaml`:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:v1
+          ports:
+            - containerPort: 5000
+          env:
+            - name: PORT
+              value: "5000"
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+spec:
+  type: ClusterIP
+  selector:
+    app: backend
+  ports:
+    - port: 5000
+      targetPort: 5000
+```
+
+The Node.js app must listen on port 5000 and implement both health endpoints. Readiness determines whether the Pod should receive normal Service traffic; liveness can trigger a container restart after repeated failures. Tune probe values to the actual application's startup and response behavior.
+
+### Step 5: Configure Ingress routing
+
+An Ingress controller must be installed and configured for an Ingress resource to work. Example routing rules:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mern-ingress
+spec:
+  rules:
+    - host: example.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-service
+                port:
+                  number: 5000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-service
+                port:
+                  number: 80
+```
+
+This is a basic routing example. Configure TLS in the Ingress and ensure the Ingress controller, DNS, and any required path-rewrite behavior match the environment. Some backend applications expect `/api` to remain in the path; others need a rewrite, depending on how routes are implemented.
+
+### Step 6: Connect the backend to MongoDB securely
+
+For production, a managed MongoDB service is often operationally simpler. The backend should connect over an approved private network path where possible, use TLS, and load credentials from a Kubernetes Secret or a secrets manager integration. Do not place passwords directly in an image or commit them into source control.
+
+Example backend environment configuration:
+
+```yaml
+env:
+  - name: MONGODB_URI
+    valueFrom:
+      secretKeyRef:
+        name: mongodb-secret
+        key: uri
+```
+
+The Secret must exist in the same namespace as the Pod. Kubernetes Secret data is base64-encoded in manifests/API representations; base64 is not encryption. Configure least-privilege RBAC and encryption at rest, or use a suitable external secrets solution.
+
+If MongoDB runs inside Kubernetes, use a StatefulSet with persistent storage and design backups, replication, upgrades, recovery, and storage capacity explicitly. A Pod's ephemeral filesystem is not suitable for durable database files.
+
+### Step 7: Configure frontend API URLs correctly
+
+The browser should call a reachable URL, for example:
+
+```javascript
+fetch("/api/users");
+```
+
+Using a relative API path works when the same public origin's Ingress routes `/api` to the backend. Alternatively, configure a public API base URL as part of the frontend build/deployment process. Do not configure browser JavaScript to call an internal address such as `http://backend-service:5000`, because that DNS name is intended for cluster-internal workloads.
+
+### Step 8: Add production safeguards
+
+- Configure readiness and liveness probes for the backend and suitable health checks for the frontend.
+- Set CPU/memory requests and limits based on observed usage.
+- Use HorizontalPodAutoscaler when metrics and scaling policies are configured and available.
+- Keep backend instances stateless where possible; use MongoDB or another shared store for durable state and an appropriate shared/session mechanism if needed.
+- Use TLS, network restrictions, least-privilege service accounts/RBAC, and secure secret management.
+- Configure database backups, restore tests, monitoring, logs, and alerts.
+- Consider PodDisruptionBudgets and topology spread/anti-affinity for availability.
+- Use rolling deployments and immutable image tags rather than relying on a mutable `latest` tag.
+- Configure MongoDB connection pooling and limits: increasing backend replicas also increases the potential number of database connections.
+
+### Step 9: Deploy and verify
+
+After saving the manifests in the relevant files:
+
+```bash
+kubectl apply -f frontend.yaml
+kubectl apply -f backend.yaml
+kubectl apply -f ingress.yaml
+
+kubectl get deployments
+kubectl get pods
+kubectl get services
+kubectl get ingress
+kubectl get endpointslices
+kubectl rollout status deployment/frontend
+kubectl rollout status deployment/backend
+```
+
+Troubleshoot a workload:
+
+```bash
+kubectl describe pod <pod-name>
+kubectl logs <pod-name>
+kubectl get events --sort-by=.metadata.creationTimestamp
+kubectl describe ingress mern-ingress
+```
+
+If the API cannot reach MongoDB, verify the connection string, credentials, DNS/network access, TLS settings, database availability, and backend logs. If traffic does not route, verify Ingress controller status, host/DNS, Service selectors, ports, and ready endpoints.
+
+### Component responsibilities
+
+| Component | Responsibility |
+|---|---|
+| Ingress Controller | External HTTP/HTTPS routing and commonly TLS termination |
+| Frontend Deployment/Service | Runs and exposes React static assets |
+| Backend Deployment/Service | Runs Node.js API replicas and provides stable internal access |
+| MongoDB | Persistent application data, preferably via a managed database or properly operated persistent deployment |
+| ConfigMap | Non-sensitive configuration |
+| Secret / external secret manager | Credentials and other sensitive configuration |
+| Probes | Determine readiness and restart unhealthy containers when appropriate |
+| HPA | Adjust replica count based on configured metrics and policies |
+| Monitoring/logging | Detect failures and support diagnosis |
+
+### Interview-ready answer
+“I would deploy React and Node.js as separate Kubernetes Deployments, each exposed through a ClusterIP Service. An Ingress controller would route external HTTPS requests to the frontend and API paths to the backend. The Node.js Pods would connect to MongoDB over a secured network using credentials stored in a Secret or an external secrets manager. For production, I would configure readiness and liveness probes, resource requests, scaling policies, TLS, monitoring, and database backups. I would usually prefer a managed MongoDB service unless there is a specific reason to operate MongoDB inside Kubernetes, in which case I would design persistent storage and database replication and recovery carefully.”
+
 ---
