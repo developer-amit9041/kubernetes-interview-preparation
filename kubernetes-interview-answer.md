@@ -18927,3 +18927,135 @@ Bind Pod to a suitable Node
 **Interview Answer:** A node selector is a simple Kubernetes scheduling mechanism that uses Node labels to restrict where a Pod can run. You specify key-value pairs under `spec.nodeSelector`; the Pod can be scheduled only onto Nodes matching all those pairs and satisfying the other scheduling constraints. If no eligible Node matches, the Pod can remain Pending.
 
 ---
+
+## 148. What Is Node Affinity?
+
+### 1. English Definition
+
+**Node affinity** is a Kubernetes Pod scheduling feature that lets you express rules about which Nodes are preferred or required for a Pod, based on Node labels. It is more expressive than `nodeSelector` because it supports match expressions and both hard requirements and soft preferences.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+Node affinity Kubernetes mein Pod ko specific labels wale Nodes par schedule karne ke rules define karti hai. `nodeSelector` ke comparison mein yeh zyada flexible hai, kyunki ismein hum bata sakte hain ki koi condition **must match** honi chahiye ya sirf **preference** hai.
+
+Iske do main types hain:
+- `requiredDuringSchedulingIgnoredDuringExecution`: scheduling ke waqt rule match hona zaroori hai.
+- `preferredDuringSchedulingIgnoredDuringExecution`: scheduler matching Nodes ko preference deta hai, lekin zaroorat par doosra eligible Node bhi choose kar sakta hai.
+
+`IgnoredDuringExecution` ka matlab hai ki Pod schedule hone ke baad label badalne se sirf is rule ki wajah se Pod automatically evict nahi hota.
+
+### 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapke cluster mein kuch Nodes par `workload=backend` aur kuch par `workload=database` label hai. Aap Node.js backend ko backend-labeled Nodes par hi chalana chahte hain, ya bas un Nodes ko preference dena chahte hain.
+
+- **Required rule:** Agar koi matching aur otherwise eligible Node nahi hai, toh Pod `Pending` reh sakta hai.
+- **Preferred rule:** Scheduler matching Nodes ko higher preference deta hai, lekin agar woh available/eligible nahi hain toh doosra feasible Node select kar sakta hai.
+
+### 4. Practical YAML — Required Node Affinity
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: node-api-required-affinity
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: workload
+                operator: In
+                values:
+                  - backend
+  containers:
+    - name: node-api
+      image: node:20-alpine
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "128Mi"
+```
+
+Is rule mein `workload` label ki value `backend` honi chahiye. Agar koi eligible Node is condition ko satisfy nahi karta, Pod schedule nahi hoga.
+
+### 5. Practical YAML — Preferred Node Affinity
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: node-api-preferred-affinity
+spec:
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 80
+          preference:
+            matchExpressions:
+              - key: workload
+                operator: In
+                values:
+                  - backend
+  containers:
+    - name: node-api
+      image: node:20-alpine
+```
+
+Yahan scheduler `workload=backend` label wale Nodes ko preference deta hai. `weight` 1 se 100 ke beech hota hai aur scoring mein preference ki strength contribute karta hai; yeh guarantee nahi hai ki wahi Node select hoga.
+
+### 6. Useful Commands
+
+```bash
+# Inspect Node labels
+kubectl get nodes --show-labels
+
+# Add a label for the example
+kubectl label node worker-1 workload=backend
+
+# Create the Pod
+kubectl apply -f pod.yaml
+
+# Check Pod placement
+kubectl get pod node-api-required-affinity -o wide
+
+# Inspect scheduling events if Pending
+kubectl describe pod node-api-required-affinity
+```
+
+Use an actual Node name from `kubectl get nodes` in the label command. If the label already exists, update it only if that change is intended.
+
+### 7. Node Affinity vs. Node Selector
+
+| Feature | `nodeSelector` | Node affinity |
+|---|---|---|
+| Matching | Exact key-value pairs | Label match expressions such as `In`, `NotIn`, `Exists`, `DoesNotExist`, `Gt`, and `Lt` where supported |
+| Required placement | Yes | Yes, with `requiredDuringSchedulingIgnoredDuringExecution` |
+| Preference without hard requirement | No | Yes, with `preferredDuringSchedulingIgnoredDuringExecution` |
+| Flexibility | Simple | More expressive |
+
+### 8. Scheduling Flow
+
+```text
+Pod defines nodeAffinity rules
+              |
+              v
+Scheduler evaluates Node labels
+              |
+      +-------+--------+
+      |                |
+      v                v
+ Required rule      Preferred rule
+ must match         matching Nodes get
+      |              a scoring preference
+      v                |
+ No eligible match?   v
+ Pod may stay       Scheduler chooses a
+ Pending            feasible Node by score
+```
+
+### Interview Answer
+
+“Node affinity is a Kubernetes scheduling feature that uses Node labels to control or influence Pod placement. Required node affinity is a hard constraint: a matching Node must be found for the Pod to schedule. Preferred node affinity is a soft preference: matching Nodes receive a scoring advantage, but the scheduler can choose another feasible Node. Node affinity is more flexible than `nodeSelector` because it supports match expressions and preference rules.”
+
+---
