@@ -5518,3 +5518,102 @@ kubectl get events --sort-by=.metadata.creationTimestamp
 | Resolution | Fix the underlying cause and verify recovery |
 
 **Remember:** `CrashLoopBackOff` tells you Kubernetes is backing off between restart attempts. Use logs and Pod events to find out why the container keeps crashing.
+---
+
+# 45. What Is `ImagePullBackOff`?
+
+## 1. English Definition
+
+**`ImagePullBackOff` is a Kubernetes container status reason that indicates Kubernetes failed to pull a container image from a container registry and is waiting before retrying the image pull.**
+
+It commonly occurs when the image name or tag is incorrect, the image does not exist, registry credentials are invalid, or the registry cannot be reached.
+
+## 2. Hindi Definition
+
+`ImagePullBackOff` tab hota hai jab Kubernetes Docker Hub ya kisi doosre container registry se required Docker image download nahi kar pata. Kubernetes dobara image pull karne ki koshish karta hai, lekin repeated failures ke baad next attempt se pehle wait karta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumne apni Node.js backend application ki Docker image Docker Hub par push ki hai: `amit9041/mern-backend:1.0`.
+
+Ab Kubernetes Deployment mein galti se tumne image ka naam likh diya: `amit9041/mern-backend:10.0`. Agar `10.0` tag registry mein exist nahi karta, toh Kubernetes image pull nahi kar paayega.
+
+**Important:** `ImagePullBackOff` Pod phase nahi hai. Yeh container ki `Waiting` state ka reason hai. Container start hi nahi ho paata kyunki required image available nahi hui.
+
+## 4. Practical Example / Code — Incorrect Image Tag
+
+The following example intentionally uses a placeholder image tag. Replace it with an image and tag that actually exist in your registry.
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mern-image-pull-demo
+spec:
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:wrong-tag
+      ports:
+        - containerPort: 5000
+```
+
+If the specified tag does not exist or the registry cannot provide the image, the container may show `ErrImagePull` first and then `ImagePullBackOff` after repeated failed attempts.
+
+## 5. Architecture Diagram
+
+```text
+         Kubernetes schedules Pod
+                  |
+                  v
+          Kubelet requests image
+                  |
+                  v
+        Container registry lookup
+                  |
+          +-------+--------+
+          |                |
+        Success           Failure
+          |                |
+          v                v
+   Start container     ErrImagePull
+                           |
+                           v
+                    ImagePullBackOff
+                    (wait, then retry)
+```
+
+## 6. Practical Commands / Configuration
+
+Inspect the Pod and the precise pull error:
+
+```bash
+kubectl get pods
+kubectl describe pod mern-image-pull-demo
+kubectl get events --sort-by=.metadata.creationTimestamp
+```
+
+Check and fix the image name/tag in the manifest, then apply the corrected configuration:
+
+```bash
+kubectl apply -f backend-pod.yaml
+```
+
+Common checks:
+
+- Verify the registry hostname, image name, and tag.
+- Confirm the image exists and the registry is reachable.
+- For private registries, configure a valid `imagePullSecret` in the Pod's namespace and reference it using `imagePullSecrets`.
+- Check registry credentials, permissions, and rate limits.
+
+## 7. Summary Table
+
+| Item | Explanation |
+|---|---|
+| Meaning | Kubernetes cannot pull the required container image and backs off before retrying |
+| Kubernetes category | Container `Waiting` reason, not a Pod phase |
+| Common causes | Wrong image name/tag, missing image, private-registry authentication, network or rate-limit issue |
+| Related reason | `ErrImagePull` often appears before `ImagePullBackOff` |
+| First diagnostic command | `kubectl describe pod <pod-name>` |
+| Fix | Correct the image reference, registry access, or credentials |
+
+**Remember:** `ImagePullBackOff` means the image could not be downloaded. Check the exact image reference and Pod events first.
