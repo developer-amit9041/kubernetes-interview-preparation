@@ -15604,3 +15604,96 @@ kubectl rollout restart deployment backend
 **Interview Answer:** Use `kubectl rollout restart deployment <deployment-name>` to trigger a rolling restart of the Deployment. Use `kubectl rollout status deployment <deployment-name>` to verify that the rollout completes.
 
 **Remember:** A restart recreates Pods; it does not automatically update the container image to a newer version.
+
+---
+
+# 121. How Do You Roll Back a Deployment?
+
+## 1. English Definition
+
+Rolling back a Deployment means reverting it to a previous revision when a new release causes problems. Kubernetes supports this through `kubectl rollout undo`.
+
+## 2. Hindi Definition
+
+Deployment ko rollback karne ka matlab hai problem wali nayi release se wapas kisi previous revision par jaana. Kubernetes mein iske liye `kubectl rollout undo` command use hoti hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapne Node.js backend ka naya version deploy kiya aur usmein bug aa gaya. Agar Deployment ki previous revision available hai, toh aap rollback karke previous revision restore kar sakte hain.
+
+Rollback se pehle rollout history check karna useful hai. Dhyan rahe: rollback Kubernetes Deployment ke Pod template/revision ko revert karta hai; database migrations ya external changes automatically reverse nahi hote.
+
+## 4. Practical Example / Code
+
+### Roll back to the previous revision
+
+```bash
+kubectl rollout undo deployment backend
+```
+
+### Roll back to a specific revision
+
+```bash
+kubectl rollout history deployment backend
+kubectl rollout undo deployment backend --to-revision=2
+```
+
+Yahan `backend` Deployment ka naam hai, aur `--to-revision=2` revision 2 ko target karta hai. Actual revision number rollout history se verify karein.
+
+## 5. Practical Commands
+
+```bash
+# View rollout history
+kubectl rollout history deployment backend
+
+# Inspect a particular revision
+kubectl rollout history deployment backend --revision=2
+
+# Roll back to the previous revision
+kubectl rollout undo deployment backend
+
+# Roll back to a specific revision
+kubectl rollout undo deployment backend --to-revision=2
+
+# Verify rollback progress
+kubectl rollout status deployment backend
+
+# Check Deployment and Pods
+kubectl get deployment backend
+kubectl get pods
+```
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+       New backend release has a bug
+                    |
+                    v
+ kubectl rollout undo deployment backend
+                    |
+                    v
+          Kubernetes API Server
+                    |
+                    v
+               Deployment
+                    |
+                    v
+       Previous Pod-template revision
+                    |
+                    v
+          ReplicaSet / Pods updated
+```
+
+## 7. Summary Table
+
+| Command | Purpose |
+|---|---|
+| `kubectl rollout history deployment backend` | Available rollout revisions dekhta hai |
+| `kubectl rollout undo deployment backend` | Previous revision par rollback karta hai |
+| `kubectl rollout undo deployment backend --to-revision=2` | Specific revision par rollback karta hai |
+| `kubectl rollout status deployment backend` | Rollback progress verify karta hai |
+| `kubectl get pods` | Current Pod status dekhta hai |
+
+**Interview Answer:** Use `kubectl rollout undo deployment <deployment-name>` to roll back a Deployment to its previous revision. Use `--to-revision=<number>` to select a specific revision, and check progress with `kubectl rollout status`.
+
+**Remember:** Rollback reverts the Deployment revision; it does not automatically undo database migrations or other external changes.
