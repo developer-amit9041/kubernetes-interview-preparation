@@ -2174,3 +2174,129 @@ kubectl get pods -l app=mern-backend-rc
 | Recommended approach | Existing legacy workloads ko samjho/manage karo | New application workloads ke liye Deployment use karo |
 
 **Remember:** ReplicationController aur ReplicaSet ka basic purpose similar hai. ReplicationController legacy resource hai; modern applications ke liye aam taur par Deployment use karo, jo ReplicaSet manage karta hai.
+
+
+---
+
+# 19. What Is the Difference Between a Deployment and a ReplicaSet?
+
+## 1. English Definition
+
+**Deployment:** A Kubernetes resource that manages application releases by managing ReplicaSets. It supports rolling updates, rollbacks, and maintaining the desired application state.
+
+**ReplicaSet:** A Kubernetes resource that ensures a specified number of Pod replicas are running, creating replacement Pods when necessary to match the desired count.
+
+## 2. Hindi Definition
+
+- **Deployment:** Application ke versions aur updates ko manage karta hai. Ye ReplicaSets ke through Pods manage karta hai aur rolling updates aur rollbacks support karta hai.
+- **ReplicaSet:** Specified number mein Pods maintain karne ki koshish karta hai. Agar Pods ki sankhya kam ho jaye, toh replacement Pods create karta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapka Node.js + Express backend hai aur aapko uske 3 Pods run karne hain.
+
+**ReplicaSet ka kaam:**
+- 3 backend Pods maintain karna.
+- Koi Pod delete ya fail ho jaye, toh replacement Pod create karne ki koshish karna.
+
+**Deployment ka kaam:**
+- ReplicaSet ko manage karna.
+- Backend ka naya version deploy karna, jaise `1.0` se `2.0`.
+- Rolling update ke through application update karna.
+- Update mein problem ho toh previous revision par rollback karna.
+
+Simple flow:
+
+`Deployment → ReplicaSet → Pods → Containers`
+
+Isliye production mein aam taur par hum Deployment create karte hain, aur Deployment background mein ReplicaSet manage karta hai.
+
+## 4. Practical Example / Code — MERN Backend
+
+Is example mein hum Node.js backend ke liye Deployment banayenge. Deployment apna ReplicaSet create aur manage karega.
+
+File: `backend-deployment.yaml`
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+```
+
+Yahan `replicas: 3` ka matlab hai ki Deployment 3 backend Pods ki desired state maintain karega. Image ko apni actual published Docker image se replace karna.
+
+## 5. Architecture Diagram
+
+```text
+                 Deployment
+        (updates, rollbacks, desired state)
+                       |
+                       v
+                   ReplicaSet
+             (maintains Pod count)
+                       |
+          +------------+------------+
+          |            |            |
+          v            v            v
+        Pod 1         Pod 2         Pod 3
+```
+
+## 6. Practical Commands / Configuration
+
+### Deployment create karo
+
+```bash
+kubectl apply -f backend-deployment.yaml
+```
+
+### Deployment, ReplicaSet aur Pods dekho
+
+```bash
+kubectl get deployments
+kubectl get replicasets
+kubectl get pods -l app=mern-backend
+```
+
+### Image update karo
+
+```bash
+kubectl set image deployment/mern-backend backend=your-dockerhub-username/mern-backend:2.0
+kubectl rollout status deployment/mern-backend
+```
+
+### Previous revision par rollback karo
+
+```bash
+kubectl rollout undo deployment/mern-backend
+```
+
+Image update karne se pehle ensure karo ki nayi image published ho aur cluster usse pull kar sake.
+
+## 7. Summary Table
+
+| Feature | Deployment | ReplicaSet |
+|---|---|---|
+| Main responsibility | Application rollout aur ReplicaSets manage karna | Desired Pod replica count maintain karna |
+| Creates/manages | ReplicaSets ko create aur manage karta hai | Pod replicas manage karta hai |
+| Maintains desired Pod count | Yes, underlying ReplicaSet ke through | Yes |
+| Rolling updates | Supports | Directly provide nahi karta |
+| Rollbacks | Supports rollout undo | Deployment-style rollout history manage nahi karta |
+| Recommended usage | Application workloads ke liye preferred | Usually Deployment ke through indirectly managed |
+
+**Remember:** Deployment higher-level resource hai jo ReplicaSet manage karta hai. ReplicaSet ka main kaam desired number of Pods maintain karna hai. Production mein generally Deployment use karo.
