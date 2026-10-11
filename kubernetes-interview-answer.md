@@ -9114,3 +9114,111 @@ If `EXTERNAL-IP` remains `pending`, check whether the cluster has a supported lo
 | Common use | Exposing an API or application to external clients |
 
 **Remember:** A LoadBalancer Service is used to expose a Kubernetes application externally through a load balancer. In supported environments, clients access the published external IP or hostname, and the Service routes traffic to matching, ready Pods.
+---
+
+# 73. What Is ExternalName?
+
+## 1. English Definition
+
+**ExternalName is a Kubernetes Service type that maps a Service name to an external DNS name using a DNS CNAME record.** It allows applications inside a Kubernetes cluster to refer to an external service through a Kubernetes Service name without creating a proxy or selecting Pods.
+
+## 2. Hindi Definition
+
+`ExternalName` Kubernetes Service ka ek type hai jo Kubernetes ke andar ek Service name ko kisi external DNS hostname se map karta hai.
+
+Simple words mein, agar tumhari application ko kisi external database ya external API se connect karna hai, toh tum `ExternalName` use karke us external hostname ka alias bana sakte ho.
+
+**Important:** ExternalName traffic ko backend Pods tak route nahi karta. Ye DNS alias provide karta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application Kubernetes par deploy hai aur tumhara MongoDB database cluster ke bahar kisi managed database service par chal raha hai.
+
+External database ka hostname hai `mongodb.example.com`. Tum chahte ho ki cluster ke andar application is database ko ek Kubernetes Service name se refer kare, jaise `external-database`.
+
+`ExternalName` Service DNS ke through `external-database` ko `mongodb.example.com` se map kar sakti hai. Isse application Kubernetes ke Service name ko use kar sakti hai, jabki actual database external environment mein hi rehta hai.
+
+Dhyan rahe, hostname mapping connection ko khud establish nahi karti. Database ka network reachable hona, authentication, TLS aur application ki connection configuration sahi hona zaroori hai.
+
+## 4. Practical Example / Code
+
+Create a file named `external-database-service.yaml`:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-database
+spec:
+  type: ExternalName
+  externalName: mongodb.example.com
+```
+
+Configuration explained:
+
+- `type: ExternalName` — configures a DNS alias rather than a selector-based Service.
+- `externalName: mongodb.example.com` — the external DNS hostname to which the Service name aliases.
+- No `selector` is needed because this Service does not select Pods.
+
+Within the cluster, DNS lookup of the Service name returns a CNAME pointing to `mongodb.example.com`. The application still needs to connect using the appropriate database port and credentials; replace the example hostname with your real external hostname.
+
+## 5. Architecture Diagram
+
+```text
+        Node.js Backend Pod
+                 |
+                 | DNS lookup: external-database
+                 v
+      +-------------------------+
+      | ExternalName Service    |
+      | external-database       |
+      +------------+------------+
+                   |
+                   | DNS CNAME
+                   v
+          mongodb.example.com
+                   |
+                   v
+          External MongoDB
+          (outside the cluster)
+```
+
+ExternalName only provides DNS name mapping. It does not proxy traffic, create a load balancer, select Pods or guarantee that the external destination is reachable.
+
+## 6. Practical Commands / Configuration
+
+**Create the Service:**
+
+```bash
+kubectl apply -f external-database-service.yaml
+```
+
+**Inspect the Service:**
+
+```bash
+kubectl get service external-database
+kubectl describe service external-database
+```
+
+**Check DNS resolution from a Pod that has DNS tools installed:**
+
+```bash
+nslookup external-database
+```
+
+Depending on the namespace and DNS search configuration, you may need the fully qualified Service DNS name, such as `external-database.<namespace>.svc.cluster.local`.
+
+If the application cannot connect, check the external DNS name, network routes/firewall rules, database port, credentials and TLS settings. ExternalName only handles the DNS alias.
+
+## 7. Summary Table
+
+| Item | Meaning |
+|---|---|
+| `type: ExternalName` | Maps a Service name to an external DNS name |
+| `externalName` | Destination DNS hostname |
+| DNS behavior | Returns a CNAME alias |
+| Pod selector | Not used for this Service type |
+| Proxy/load balancing | Not provided by ExternalName itself |
+| MERN use case | Giving an external database or API a cluster Service alias |
+
+**Remember:** ExternalName creates a DNS alias from a Kubernetes Service name to an external hostname. It does not route or proxy traffic to Pods and does not guarantee connectivity to the external destination.
