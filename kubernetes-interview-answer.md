@@ -18699,3 +18699,123 @@ If the Pod remains `Pending`, run `kubectl describe pod <pod-name>` and inspect 
 **Interview Answer:** Kubernetes uses the kube-scheduler to place a Pod on a suitable Node. The scheduler watches for Pods without an assigned Node, filters Nodes based on resource requests and scheduling constraints, scores the feasible Nodes, and binds the Pod to the selected Node. The kubelet on that Node then works with the container runtime to pull images and start the containers. If no Node meets the requirements, the Pod stays Pending and its events can help identify the reason.
 
 ---
+
+## Part 12 — Scheduling
+
+## 146. What Does the Kubernetes Scheduler Do?
+
+### 1. English Definition
+
+The **Kubernetes Scheduler (`kube-scheduler`)** is the control-plane component that assigns an eligible Node to a Pod that has not yet been scheduled. It evaluates the Pod's resource requests and scheduling constraints, filters and scores candidate Nodes, and binds the Pod to a selected Node.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+Kubernetes Scheduler control plane ka component hai jo decide karta hai ki **kaunsa Pod kis Node par run hoga**. Jab Pod create hota hai aur usko abhi tak Node assign nahi hua, scheduler available Nodes ko check karta hai. Woh resource requests aur scheduling rules ke basis par suitable Node select karke Pod ko us Node se bind karta hai.
+
+Uske baad selected Node ka kubelet containers ko run karne ki process handle karta hai.
+
+### 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application ka Node.js backend Pod create hua hai aur cluster mein teen worker Nodes hain. Scheduler check karega:
+
+- Kya Node par Pod ki CPU aur memory **requests** ke liye enough allocatable capacity hai?
+- Kya Pod ka `nodeSelector` ya node affinity satisfy hota hai?
+- Kya Node ke taints ko Pod tolerate karta hai?
+- Kya doosri scheduling constraints fulfill hoti hain?
+
+Scheduler pehle ineligible Nodes ko filter karta hai, phir eligible Nodes ko score karta hai aur suitable Node choose karta hai. Scheduler khud application container start nahi karta; selected Node ka kubelet ye kaam karta hai.
+
+### 4. Practical YAML Example
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: node-api-pod
+spec:
+  containers:
+    - name: node-api
+      image: node:20-alpine
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "128Mi"
+```
+
+Is example mein scheduler CPU aur memory requests ko consider karega, saath hi Node labels, taints/tolerations, affinity aur doosri scheduling policies ko bhi evaluate kar sakta hai. YAML mein resources specify karne se scheduler ko placement ke liye explicit requirements milti hain.
+
+### 5. Scheduler Working — Step by Step
+
+1. User Pod manifest submit karta hai, jaise `kubectl apply -f pod.yaml`.
+2. API server Pod object ko accept karta hai aur cluster state store hoti hai.
+3. `kube-scheduler` un Pods ko observe karta hai jinke liye Node abhi assign nahi hua.
+4. **Filtering:** Requirements satisfy na karne wale Nodes ko exclude karta hai.
+5. **Scoring:** Feasible Nodes ko scheduling rules ke mutabik rank karta hai.
+6. **Binding:** Selected Node ko Pod ke saath associate karta hai.
+7. Selected Node ka kubelet container runtime ke saath milkar images pull aur containers start karne ki koshish karta hai.
+
+### 6. Architecture Diagram
+
+```text
+User submits Pod YAML
+          |
+          v
+      API Server
+          |
+          v
+   Pod stored in cluster state
+          |
+          v
+     kube-scheduler
+          |
+          v
+ Filter unsuitable Nodes
+          |
+          v
+ Score eligible Nodes
+          |
+          v
+ Bind Pod to selected Node
+          |
+          v
+ Selected Node's kubelet
+          |
+          v
+ Pull image and start containers
+          |
+          v
+       Pod may become Ready
+```
+
+### 7. Practical Commands
+
+```bash
+# Create the Pod
+kubectl apply -f pod.yaml
+
+# Check the assigned Node and Pod status
+kubectl get pod node-api-pod -o wide
+
+# Inspect scheduling events and errors
+kubectl describe pod node-api-pod
+
+# List cluster Nodes
+kubectl get nodes
+```
+
+Agar Pod `Pending` state mein rahe, toh `kubectl describe pod <pod-name>` ke Events section mein `Insufficient cpu`, `Insufficient memory`, selector/affinity mismatch, ya untolerated taints jaise reasons check karein.
+
+### 8. Summary Table
+
+| Component / step | Responsibility |
+|---|---|
+| API server | Pod creation request accept aur validate karta hai |
+| kube-scheduler | Pod ke liye suitable Node select aur bind karta hai |
+| Filtering | Requirements fail karne wale Nodes ko exclude karta hai |
+| Scoring | Eligible Nodes ko rank karta hai |
+| kubelet | Selected Node par containers run karne ki process handle karta hai |
+| Pod Events | Scheduling failure troubleshoot karne mein help karte hain |
+
+**Interview Answer:** The Kubernetes Scheduler (`kube-scheduler`) assigns an eligible Node to an unscheduled Pod. It filters Nodes based on resource requests and scheduling constraints, scores the feasible Nodes, and binds the Pod to the selected Node. The kubelet on that Node then works with the container runtime to start the Pod's containers. If no Node satisfies the requirements, the Pod can remain Pending, and its events help identify the reason.
+
+---
