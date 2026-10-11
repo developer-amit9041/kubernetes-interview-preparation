@@ -6863,3 +6863,137 @@ Note: if you later reapply a manifest that specifies `replicas: 3`, that manifes
 | Verify | `kubectl get deployment mern-backend` | Shows Deployment replica status |
 
 **Remember:** Set `spec.replicas` in the Deployment YAML or use `kubectl scale deployment <name> --replicas=<number>`. This defines the desired count; it does not guarantee every Pod becomes ready.
+---
+
+# 56. How Do You Scale a Deployment?
+
+## 1. English Definition
+
+**Scaling a Kubernetes Deployment means increasing or decreasing the desired number of Pod replicas to handle application workload and resource requirements.**
+
+You can scale a Deployment manually using `kubectl scale`, update the `spec.replicas` field in a YAML manifest, or configure a Horizontal Pod Autoscaler (HPA) to adjust replicas automatically based on metrics.
+
+## 2. Hindi Definition
+
+Kubernetes mein Deployment ko scale karne ka matlab hai application ke Pods ki sankhya badhana ya kam karna.
+
+- **Scale up:** Zyada Pods create karna, jaise 3 se 5.
+- **Scale down:** Pods kam karna, jaise 5 se 2.
+- **Auto scaling:** HPA ke through metrics aur configured rules ke according replicas automatically adjust karna.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application ka Node.js backend Deployment mein 3 Pods chala raha hai.
+
+Normal traffic mein 3 Pods enough hain. Lekin agar users ki requests badh jaati hain, toh tum backend ko 5 replicas tak scale kar sakte ho:
+
+```bash
+kubectl scale deployment mern-backend --replicas=5
+```
+
+Kubernetes controller 5 Pods ki desired state maintain karne ki koshish karega. Scale down karne par extra Pods terminate kiye jaayenge.
+
+**Important:** Scaling se application ki capacity badh sakti hai, lekin uske liye cluster mein sufficient CPU, memory aur available node capacity bhi honi chahiye.
+
+## 4. Practical Example / Code
+
+Example Deployment manifest:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+```
+
+Change `spec.replicas` to `5` and apply the manifest to request five replicas.
+
+## 5. Architecture Diagram
+
+```text
+       Deployment
+       replicas: 3
+            |
+            v
+        ReplicaSet
+            |
+       +----+----+
+       |    |    |
+       v    v    v
+      Pod1 Pod2 Pod3
+
+  Scale to replicas: 5
+            |
+            v
+    ReplicaSet creates 2 more Pods
+            |
+       +----+----+----+----+
+       |    |    |    |    |
+       v    v    v    v    v
+      Pod1 Pod2 Pod3 Pod4 Pod5
+```
+
+## 6. Practical Commands / Configuration
+
+**Method 1: Scale up using `kubectl scale`:**
+
+```bash
+kubectl scale deployment mern-backend --replicas=5
+kubectl get deployment mern-backend
+kubectl get pods
+```
+
+**Method 2: Scale down:**
+
+```bash
+kubectl scale deployment mern-backend --replicas=2
+```
+
+**Method 3: Scale by editing the YAML manifest:**
+
+```yaml
+spec:
+  replicas: 5
+```
+
+Apply it:
+
+```bash
+kubectl apply -f backend-deployment.yaml
+```
+
+**Method 4: Configure automatic scaling (HPA):**
+
+```bash
+kubectl autoscale deployment mern-backend --min=2 --max=10 --cpu-percent=70
+kubectl get hpa
+```
+
+This HPA example targets average CPU utilization of 70% of the Pods' CPU requests and allows replicas between 2 and 10. CPU-based HPA requires metrics to be available (commonly through Metrics Server) and appropriate CPU requests to be configured. HPA can change the replica count after creation.
+
+## 7. Summary Table
+
+| Method | Example | Purpose |
+|---|---|---|
+| Scale up | `kubectl scale deployment mern-backend --replicas=5` | Request five replicas |
+| Scale down | `kubectl scale deployment mern-backend --replicas=2` | Request two replicas |
+| YAML scaling | Set `spec.replicas: 5` and apply the manifest | Keep replica count in configuration |
+| Automatic scaling | `kubectl autoscale deployment ...` | Adjust replicas using configured metrics and limits |
+| Verify | `kubectl get deployment mern-backend` | Check desired and available replica counts |
+
+**Remember:** Use `kubectl scale deployment <name> --replicas=<number>` for manual scaling. Use HPA for metric-based automatic scaling, and ensure the cluster has enough resources.
