@@ -2580,3 +2580,127 @@ Managed Kubernetes services mein Control Plane components user ko directly visib
 | `cloud-controller-manager` | Supported cloud provider ke resources ke saath integration karta hai; optional/environment-dependent |
 
 **Remember:** API Server request handle karta hai, etcd state store karta hai, Scheduler Pod placement choose karta hai, aur controllers desired state maintain karne ki koshish karte hain.
+
+
+---
+
+# 22. What Does `kube-apiserver` Do?
+
+## 1. English Definition
+
+The **`kube-apiserver`** is the component of the Kubernetes Control Plane that exposes the Kubernetes API. It receives API requests, validates and processes them, and provides the primary interface through which users, automation, and other Kubernetes components interact with the cluster.
+
+## 2. Hindi Definition
+
+`kube-apiserver` Kubernetes ka main entry point hai. Ye users aur Kubernetes components ki API requests receive karta hai, unhe validate aur process karta hai, aur cluster resources ko manage karne ka interface provide karta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapko apna Node.js backend Kubernetes par deploy karna hai aur aap ye command chalate ho:
+
+`kubectl apply -f backend-deployment.yaml`
+
+Internally kya hota hai?
+
+1. `kubectl` request ko `kube-apiserver` ke paas bhejta hai.
+2. API Server authentication aur authorization checks karta hai, aur request ko validate karta hai.
+3. Valid request ke baad desired configuration cluster ke state store mein persist hoti hai, normally `etcd` ke through.
+4. Deployment controller API Server ke through desired state observe karta hai aur ReplicaSet manage karta hai.
+5. Scheduler naye Pods ke liye suitable Worker Nodes choose karta hai.
+6. Worker Node ka Kubelet Pod specification observe karke container runtime ke saath containers start karwata hai.
+
+**Important:** `kube-apiserver` khud Node.js container run nahi karta aur na hi khud Pod ko Worker Node par schedule karta hai. Ye Kubernetes API ke through components ke beech coordination ka central interface hai.
+
+## 4. Practical Example / Code — MERN Backend
+
+Maan lo aapki file `backend-deployment.yaml` mein ye configuration hai:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+```
+
+Jab aap command chalate ho:
+
+```bash
+kubectl apply -f backend-deployment.yaml
+```
+
+`kubectl` Kubernetes API ko request bhejta hai. API Server request ko process karta hai, aur valid configuration cluster mein record hoti hai. Deployment controller baaki reconciliation process handle karta hai.
+
+## 5. Architecture Diagram
+
+```text
+           kubectl / Kubernetes clients
+                      |
+                      v
+              +----------------+
+              | kube-apiserver |
+              | API entry point|
+              +----------------+
+                 |          |
+                 v          v
+               etcd    Controllers /
+                       Scheduler
+                           |
+                           v
+                     Worker Nodes
+                     Kubelet / Pods
+```
+
+Ye simplified diagram hai. Controllers, Scheduler aur Kubelets API Server ke saath API calls ke through interact karte hain; sab components ek hi linear chain mein directly connected nahi hote.
+
+## 6. Practical Commands / Configuration
+
+### Cluster API endpoint aur services ki information
+
+```bash
+kubectl cluster-info
+```
+
+### API Server se resources list karo
+
+```bash
+kubectl get nodes
+kubectl get deployments
+kubectl get pods -A
+```
+
+### API resources inspect karo
+
+```bash
+kubectl api-resources
+kubectl version
+```
+
+Ye commands API Server ko query karne ke practical examples hain. Managed Kubernetes mein API Server host aur uski internal logs directly accessible hon, ye guaranteed nahi hai.
+
+## 7. Summary Table
+
+| Responsibility | What `kube-apiserver` does |
+|---|---|
+| API access | Kubernetes API expose karta hai |
+| Authentication | Request karne wale user/client ki identity verify karne mein role |
+| Authorization | Check karta hai ki identity ko requested action ki permission hai ya nahi |
+| Validation | API objects aur requests ko validate karta hai |
+| State persistence | Cluster state ko etcd ke saath persist karne ka interface provide karta hai |
+| Component communication | Kubernetes components ko API ke through cluster state interact karne deta hai |
+
+**Remember:** `kube-apiserver` Kubernetes ka central API entry point hai. Ye requests process karta hai; scheduling Scheduler karta hai aur containers Worker Nodes par Kubelet aur container runtime ke through run hote hain.
