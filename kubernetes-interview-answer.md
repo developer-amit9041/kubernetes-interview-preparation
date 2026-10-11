@@ -12343,3 +12343,134 @@ A PV can remain in `Available`, become `Bound` to a PVC, or enter other lifecycl
 | Persistence | Depends on the storage backend, lifecycle settings, and reclaim policy |
 
 **Remember:** A PersistentVolume is the storage resource; a PersistentVolumeClaim is the request to use that storage. A Pod typically mounts the claim, not the PV directly.
+
+---
+
+# 95. What Is a PersistentVolumeClaim (PVC)?
+
+## 1. English Definition
+
+A **PersistentVolumeClaim (PVC)** is a request for storage made by a Kubernetes application. It specifies requirements such as storage capacity and access mode, and Kubernetes tries to bind it to a suitable PersistentVolume (PV) or provision storage dynamically through a StorageClass.
+
+## 2. Hindi Definition
+
+Bhai, **PVC ek storage ki request hoti hai**. Jaise aapki application ko 5Gi storage chahiye, toh aap PVC banate ho. Kubernetes us request ke liye suitable PV find karta hai ya StorageClass ke through naya storage provision kar sakta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aap MongoDB ko Kubernetes mein run kar rahe ho aur database ka data persistently store karna chahte ho.
+
+- **PV:** Actual storage resource.
+- **PVC:** Application ki storage request.
+- **Pod:** PVC ke through storage ko container mein mount karta hai.
+
+Flow yaad rakho:
+
+`MongoDB Pod → PVC → PV → Actual Storage`
+
+Aapko normally Pod configuration mein PVC ka naam dena hota hai. Kubernetes storage ko bind karne ka kaam karta hai, provided suitable storage available ho.
+
+## 4. Practical Example / Code
+
+Create `mongodb-pvc.yaml`:
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: manual
+```
+
+This PVC requests 5Gi of storage. The `storageClassName: manual` value must match an appropriate PV's StorageClass for static binding, or be configured consistently with your cluster's storage setup. If you use dynamic provisioning, specify an installed StorageClass that supports it, or omit `storageClassName` to use the cluster's default StorageClass.
+
+A Pod can consume this claim like this:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mongodb
+spec:
+  containers:
+    - name: mongodb
+      image: mongo:7
+      volumeMounts:
+        - name: mongodb-data
+          mountPath: /data/db
+  volumes:
+    - name: mongodb-data
+      persistentVolumeClaim:
+        claimName: mongodb-pvc
+```
+
+## 5. Architecture Diagram
+
+```text
+       MongoDB Pod
+            |
+            v
+   persistentVolumeClaim
+       claimName: mongodb-pvc
+            |
+            v
+  PersistentVolumeClaim (PVC)
+       Request: 5Gi
+            |
+            v
+   PersistentVolume (PV)
+            |
+            v
+     Actual Storage
+```
+
+## 6. Practical Commands / Configuration
+
+Create the PVC:
+
+```bash
+kubectl apply -f mongodb-pvc.yaml
+```
+
+Check PVC status:
+
+```bash
+kubectl get pvc
+kubectl describe pvc mongodb-pvc
+```
+
+Check PVs and StorageClasses:
+
+```bash
+kubectl get pv
+kubectl get storageclass
+```
+
+After creating the Pod:
+
+```bash
+kubectl apply -f mongodb-pod.yaml
+kubectl get pods
+```
+
+If the PVC remains in `Pending`, check whether a compatible PV exists or the selected StorageClass can provision storage. A PVC may not bind until a matching storage resource is available.
+
+## 7. Summary Table
+
+| Concept | Explanation |
+|---|---|
+| PVC | Request for storage |
+| PV | Storage resource that can satisfy the claim |
+| Capacity | Requested size, such as 5Gi |
+| Access mode | Declares how the volume is requested for mounting |
+| StorageClass | Can define dynamic storage provisioning |
+| Pod usage | Pod references the PVC and mounts it into a container |
+| Common MERN use | Persisting MongoDB data beyond a Pod's lifecycle |
+
+**Remember:** A PVC requests storage; a PV provides storage. A Pod normally uses the PVC to mount that storage.
