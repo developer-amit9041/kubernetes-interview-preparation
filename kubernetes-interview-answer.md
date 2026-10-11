@@ -5310,3 +5310,90 @@ kubectl logs mern-backend-phase-demo -c backend
 | `Unknown` | Kubernetes cannot determine the Pod's state | Node communication issue |
 
 **Remember:** These five values are Pod phases. `CrashLoopBackOff` and `ImagePullBackOff` are container waiting reasons, not Pod phases.
+---
+
+# 43. What Is a Pod Restart Policy?
+
+## 1. English Definition
+
+A **Pod restart policy** in Kubernetes determines whether containers inside a Pod should be restarted when they terminate. Kubernetes supports three restart policies: `Always`, `OnFailure`, and `Never`.
+
+The policy is specified using the `restartPolicy` field in a Pod specification.
+
+## 2. Hindi Definition
+
+Pod restart policy Kubernetes ko batati hai ki Pod ke andar koi container stop ya terminate hone par use dobara start karna chahiye ya nahi.
+
+Iski three policies hoti hain: `Always`, `OnFailure`, and `Never`.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tum Kubernetes mein Node.js backend ya koi database migration script run kar rahe ho. Agar container terminate ho jata hai, toh Kubernetes ka behaviour restart policy par depend karega.
+
+- **`Always`:** Container terminate hone par Kubernetes use restart karne ki koshish karta hai, chahe container successfully exit hua ho ya failure se. Example: Long-running Node.js backend application.
+- **`OnFailure`:** Container non-zero exit code ke saath terminate ho, toh Kubernetes restart karne ki koshish karta hai. Successful exit ke baad restart nahi karta. Example: Aisa task jo failure hone par retry hona chahiye.
+- **`Never`:** Container terminate hone ke baad Kubernetes us container ko restart nahi karta. Example: One-time diagnostic ya test run.
+
+**Important:** Restart policy container ko restart karne ke behaviour ko control karti hai; yeh khud application ke bug ko fix nahi karti. `restartPolicy` ki setting Pod level par hoti hai, individual container level par nahi.
+
+## 4. Practical Example / Code — MERN Backend Pod
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mern-backend-restart-demo
+spec:
+  restartPolicy: Always
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:1.0
+      ports:
+        - containerPort: 5000
+```
+
+For a long-running backend, `Always` is the default Pod restart policy. Replace the image with your own image that listens on port 5000.
+
+## 5. Architecture Diagram
+
+```text
+       Container terminates
+                |
+                v
+       Check Pod restartPolicy
+          /       |       \
+         v        v        v
+      Always   OnFailure  Never
+         |        |         |
+      Restart  Restart if  Do not
+      attempt  exit != 0   restart
+```
+
+Restarts may be delayed with exponential backoff after repeated failures. A restart policy does not guarantee that a broken application will become healthy.
+
+## 6. Practical Commands / Configuration
+
+Create the Pod:
+
+```bash
+kubectl apply -f backend-restart-demo.yaml
+```
+
+Inspect its restart policy and restart count:
+
+```bash
+kubectl get pod mern-backend-restart-demo
+kubectl describe pod mern-backend-restart-demo
+kubectl get pod mern-backend-restart-demo -o jsonpath='{.spec.restartPolicy}'
+kubectl get pod mern-backend-restart-demo -o jsonpath='{.status.containerStatuses[*].restartCount}'
+```
+
+## 7. Summary Table
+
+| Restart policy | Container exits successfully (code 0) | Container exits with failure (non-zero) |
+|---|---|---|
+| `Always` | Restart attempt | Restart attempt |
+| `OnFailure` | No restart | Restart attempt |
+| `Never` | No restart | No restart |
+
+**Remember:** `Always` is the default. Pods managed by Deployments/ReplicaSets use `Always`; Jobs commonly use `OnFailure` or `Never`. Kubernetes may back off between repeated restart attempts.
