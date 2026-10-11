@@ -16090,6 +16090,147 @@ kubectl describe pod <pod-name>
 
 ---
 
+
+
+---
+
+# 127. What Is a Kubernetes Readiness Probe?
+
+## 1. English Definition
+
+A **readiness probe** is a Kubernetes health check that determines whether a container is ready to receive traffic. If the probe fails, Kubernetes marks the Pod as not ready and excludes it from the Service's ready endpoints.
+
+## 2. Hindi Definition
+
+Readiness probe Kubernetes ka health check hai jo batata hai ki application traffic ya requests receive karne ke liye ready hai ya nahi. Agar probe fail hota hai, toh Pod ko ready nahi maana jaata aur Service us Pod ko normal traffic bhejna band kar deti hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN Stack application ka Node.js + Express backend Kubernetes par run ho raha hai.
+
+Jab backend container start hota hai, use initialization, configuration load karne ya MongoDB connection establish karne mein thoda time lag sakta hai. Is dauran container running ho sakta hai, lekin application abhi requests handle karne ke liye ready nahi hai.
+
+Readiness probe backend ke `/ready` endpoint ko check karega. Jab endpoint successful response deta hai, Pod ready mark ho sakta hai aur Service use traffic bhej sakti hai. Agar endpoint fail hone lage, toh Pod unready ho jaata hai aur Service ke ready endpoints se hata diya jaata hai. Container ko sirf readiness failure ki wajah se restart nahi kiya jaata.
+
+## 4. Practical Example / Code
+
+### Node.js Express readiness endpoint
+
+```javascript
+app.get("/ready", (req, res) => {
+  // In a real application, return 200 only when
+  // the backend is initialized and ready for requests.
+  res.status(200).json({ status: "ready" });
+});
+```
+
+This simple endpoint is illustrative. In production, readiness logic should reflect whether the application can actually serve requests. For example, if requests require MongoDB, you may include an appropriate database-availability check without making the probe excessively expensive.
+
+### Kubernetes Deployment with a readiness probe
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:latest
+          ports:
+            - containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+```
+
+**Configuration meaning:**
+
+- `httpGet`: HTTP request se readiness endpoint check karta hai.
+- `path: /ready`: Backend ke readiness endpoint ko request bhejta hai.
+- `port: 5000`: Container ke port 5000 par check karta hai.
+- `initialDelaySeconds: 5`: Container start hone ke 5 seconds baad probe checks start karta hai.
+- `periodSeconds: 5`: Har 5 seconds mein probe run hota hai.
+- `timeoutSeconds: 2`: Response ke liye maximum 2 seconds wait karta hai.
+- `failureThreshold: 3`: 3 consecutive failures ke baad probe failure maana jaata hai aur Pod unready ho sakta hai.
+
+**Important:** Readiness probe failure se container restart nahi hota. Probe successful hone par Pod dobara ready ho sakta hai.
+
+## 5. Practical Commands
+
+```bash
+# Apply the Deployment
+kubectl apply -f deployment.yaml
+
+# Check Pod readiness
+kubectl get pods
+
+# Inspect readiness probe configuration and Events
+kubectl describe pod <pod-name>
+
+# Check the Service and its endpoints
+kubectl get service
+kubectl get endpointslices
+
+# Check backend logs
+kubectl logs <pod-name>
+
+# Inspect the live Deployment YAML
+kubectl get deployment backend -o yaml
+```
+
+Use `kubectl describe pod <pod-name>` to inspect probe-related events. The exact endpoint resources and output depend on the Kubernetes version and cluster setup.
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+          Kubelet on Worker Node
+                    |
+                    v
+          Run readiness probe
+                    |
+              +-----+-----+
+              |           |
+           Success       Failure
+              |           |
+              v           v
+         Pod is Ready   Pod is Not Ready
+              |           |
+              v           v
+      Service can route  Removed from
+      traffic to Pod     ready endpoints
+```
+
+## 7. Summary Table
+
+| Setting / Concept | Purpose |
+|---|---|
+| `readinessProbe` | Checks whether the application is ready to serve requests |
+| `httpGet` | Checks an HTTP endpoint |
+| `periodSeconds` | Time between checks |
+| `failureThreshold` | Consecutive failures before the probe is considered failed |
+| Readiness failure | Pod is marked not ready; Service stops routing normal traffic to it |
+| Liveness probe | Checks whether a container should be restarted |
+| Startup probe | Allows a slow-starting application time to finish startup |
+
+**Interview Answer:** A readiness probe checks whether a container is ready to handle requests. If it fails, Kubernetes marks the Pod as not ready and removes it from the Service's ready endpoints; unlike a liveness probe, readiness failure does not restart the container.
+
+**Remember:** Readiness answers “Should this Pod receive traffic?”; liveness answers “Should this container be restarted?”
+
 # 126. What Is a Kubernetes Liveness Probe?
 
 ## 1. English Definition
