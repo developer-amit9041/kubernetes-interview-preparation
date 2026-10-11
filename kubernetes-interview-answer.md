@@ -26203,4 +26203,253 @@ This port-forward is for development/debugging; it is not the normal public prod
 ### Interview-ready answer
 “In Kubernetes, the frontend communicates with the backend through HTTP APIs. I expose the Node.js backend Pods through a ClusterIP Service, which provides a stable endpoint and load-balances traffic to ready Pods. For browser traffic, I normally configure an Ingress so requests to `/api` reach the backend Service and requests to `/` reach the React frontend Service. React can then call a same-origin URL such as `/api/products`. A browser cannot normally call an internal ClusterIP DNS name directly because it runs outside the cluster. I also verify Service selectors, ports, Pod readiness, Ingress rules, and CORS when the frontend and backend use different origins.”
 
+## 192. How would the backend connect to MongoDB?
+
+### English Definition
+A Node.js backend connects to MongoDB in Kubernetes using a MongoDB connection URI. The backend uses the database Service's DNS name and port to reach MongoDB, while credentials are supplied securely through Kubernetes Secrets. The backend should handle connection failures and recover appropriately when the database is temporarily unavailable.
+
+### Hindi Definition
+Kubernetes mein Node.js backend MongoDB se connect hone ke liye MongoDB Service ka DNS name, port aur connection URI use karta hai. Username aur password ko Kubernetes Secret mein store karke environment variables ke through backend container tak pahunchaya ja sakta hai. Isse backend database se data read aur write kar sakta hai.
+
+### Step 1: Understand the architecture
+Example setup:
+- Backend Deployment: `node-backend`
+- Backend Pods: 2
+- MongoDB StatefulSet Pod: `mongo-0`
+- MongoDB Service: `mongodb`
+- MongoDB port: `27017`
+- MongoDB namespace: `database`
+
+```text
+Node.js / Express Backend
+        |
+        | MONGO_URI
+        v
+mongodb.database.svc.cluster.local:27017
+        |
+        v
+MongoDB Service
+        |
+        v
+MongoDB Pod + Persistent Storage
+```
+
+Backend database Pod ka changing IP directly use nahi karta. Woh stable Service DNS name use karta hai. The full DNS name assumes Service `mongodb` exists in namespace `database`.
+
+### Step 2: Identify the MongoDB Service
+```bash
+kubectl get pods -n database
+kubectl get services -n database
+kubectl get statefulset -n database
+kubectl get pvc -n database
+```
+
+If the Service is named `mongodb` in namespace `database`, its cluster DNS name is:
+
+```text
+mongodb.database.svc.cluster.local
+```
+
+MongoDB's default port is `27017`. The Service and Pod must be healthy, and network policies must permit the connection.
+
+### Step 3: Store credentials in a Secret
+Example learning Secret for MongoDB initialization:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongo-auth
+  namespace: database
+type: Opaque
+stringData:
+  username: appuser
+  password: change-this-password
+```
+
+Apply it:
+
+```bash
+kubectl apply -f mongo-secret.yaml
+```
+
+**Security:** Use a strong real password, do not commit populated Secret manifests to GitHub, and configure appropriate Secret access controls and encryption at rest. Kubernetes Secrets are not automatically guaranteed to be encrypted at rest. A production app should normally use a least-privilege database user. Creating a Kubernetes Secret does not create a MongoDB user automatically.
+
+A Pod can reference a Secret only in its own namespace. If the database is in namespace `database` and backend is in namespace `mern-app`, create the backend's credential Secret in `mern-app` as well.
+
+### Step 4: Install Mongoose
+For a MERN application using Mongoose:
+
+```bash
+npm install mongoose
+```
+
+Alternatively, the native MongoDB driver can be used with `npm install mongodb`.
+
+### Step 5: Connect from Node.js
+Example `db.js`:
+
+```javascript
+const mongoose = require("mongoose");
+
+async function connectDB() {
+  const mongoURI = process.env.MONGO_URI;
+
+  if (!mongoURI) {
+    throw new Error("MONGO_URI is not configured");
+  }
+
+  await mongoose.connect(mongoURI, {
+    serverSelectionTimeoutMS: 5000
+  });
+
+  console.log("MongoDB connected successfully");
+}
+
+module.exports = connectDB;
+```
+
+Example server startup:
+
+```javascript
+const express = require("express");
+const connectDB = require("./db");
+
+const app = express();
+app.use(express.json());
+
+async function startServer() {
+  try {
+    await connectDB();
+
+    app.get("/api/health", (req, res) => {
+      res.json({ status: "ok" });
+    });
+
+    app.listen(5000, "0.0.0.0", () => {
+      console.log("Backend listening on port 5000");
+    });
+  } catch (error) {
+    console.error("Database connection failed:", error.message);
+    process.exit(1);
+  }
+}
+
+startServer();
+```
+
+**Explanation:**
+1. Backend reads `MONGO_URI` from its environment.
+2. Mongoose uses the URI to connect to MongoDB.
+3. The HTTP server starts after the initial database connection succeeds.
+4. If the connection fails, the process exits; Kubernetes may restart the container according to its restart policy.
+
+For production, add sensible retry/backoff, readiness checks, and graceful shutdown handling for temporary outages. A process restart alone is not a complete recovery strategy.
+
+### Step 6: Pass the URI and credentials to the backend Deployment
+Example Secret for the backend workload (in the same namespace as the backend):
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mern-app
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backend-mongo-auth
+  namespace: mern-app
+type: Opaque
+stringData:
+  username: appuser
+  password: change-this-password
+```
+
+This credential must correspond to a MongoDB user that already exists. The following Deployment fragment references the Secret and sets the URI:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-backend
+  namespace: mern-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: node-backend
+  template:
+    metadata:
+      labels:
+        app: node-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:v1
+          ports:
+            - containerPort: 5000
+          env:
+            - name: MONGO_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: backend-mongo-auth
+                  key: username
+            - name: MONGO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: backend-mongo-auth
+                  key: password
+            - name: MONGO_URI
+              value: "mongodb://$(MONGO_USERNAME):$(MONGO_PASSWORD)@mongodb.database.svc.cluster.local:27017/myapp?authSource=admin"
+```
+
+The example assumes the MongoDB user authenticates against the `admin` database. Set `authSource` to the actual authentication database. If credentials contain reserved URI characters such as `@`, `:`, `/`, `?`, or `#`, encode them correctly or construct the connection safely; raw insertion can break the URI.
+
+### Step 7: Deploy and verify
+Apply namespaces and resources in the correct order. Use the actual filenames in your project:
+
+```bash
+kubectl apply -f mongo-secret.yaml
+kubectl apply -f mongodb.yaml
+kubectl apply -f backend-mongo-secret.yaml
+kubectl apply -f backend-deployment.yaml
+kubectl apply -f backend-service.yaml
+```
+
+Check status and logs:
+
+```bash
+kubectl get pods -n database
+kubectl get services -n database
+kubectl get pods -n mern-app
+kubectl rollout status deployment/node-backend -n mern-app
+kubectl logs deployment/node-backend -n mern-app
+```
+
+When the example connection succeeds, logs may include `MongoDB connected successfully` and `Backend listening on port 5000`.
+
+### Step 8: Troubleshoot common failures
+1. **DNS or host not found:** check Service name and namespace, and use the correct cluster DNS name.
+2. **Connection refused or timeout:** verify MongoDB Pod readiness, Service target port, EndpointSlices, network policies, and MongoDB listener.
+3. **Authentication failed:** verify the username/password, MongoDB user creation, and `authSource`.
+4. **Secret not found:** ensure the Secret exists in the backend Pod's namespace and keys match the Deployment.
+5. **Backend starts before MongoDB is ready:** add startup retry/backoff and readiness handling; do not rely only on container start order.
+6. **Data disappears after Pod recreation:** verify MongoDB uses persistent storage through a PVC; Pod storage alone is not durable.
+7. **URI breaks with special characters:** encode credentials correctly and avoid logging secrets or full connection strings.
+
+### Summary table
+
+| Item | Purpose |
+|---|---|
+| MongoDB Service DNS | Stable endpoint for database access inside the cluster |
+| Port 27017 | Default MongoDB port |
+| `MONGO_URI` | Tells the driver where and how to connect |
+| Kubernetes Secret | Supplies credentials without hardcoding them in source code |
+| Mongoose / MongoDB driver | Establishes and manages the application connection |
+| PVC | Preserves database files beyond an individual Pod lifecycle |
+
+### Interview-ready answer
+“I connect the Node.js backend to MongoDB using Mongoose or the MongoDB driver and a connection URI stored in the backend's environment. In Kubernetes, I use the MongoDB Service DNS name and port 27017 rather than a Pod IP. I store credentials in a Kubernetes Secret in the backend's namespace, reference them in the Deployment, and configure the correct authentication database. I verify Service endpoints, Pod readiness, and backend logs, and implement retry handling, persistent storage, backups, and appropriate database security for production.”
+
 ---
