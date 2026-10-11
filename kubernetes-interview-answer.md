@@ -20174,3 +20174,95 @@ Agar HPA mein CPU metrics `<unknown>` dikh rahe hain, Metrics Server, Pod CPU re
 **Interview Answer:** HPA scales based on CPU by comparing the average CPU utilization of Pods with a configured target percentage of their CPU requests. If utilization is above the target, HPA calculates a higher desired replica count; if it is below the target, it may scale down within configured limits and stabilization policies. CPU requests and available metrics are essential for CPU utilization-based scaling. HPA adjusts Pod replicas, not Node count.
 
 ---
+
+## 159. What Is the Vertical Pod Autoscaler?
+
+### 1. English Definition
+
+The **Vertical Pod Autoscaler (VPA)** is a Kubernetes autoscaling component that recommends or adjusts CPU and memory resource requests for containers based on observed usage and its configuration. Depending on the update mode, applying recommendations may require restarting or recreating Pods.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+VPA ka full form **Vertical Pod Autoscaler** hai. Yeh Pod ki quantity badhane ke bajaye, container ko kitna CPU aur memory chahiye uske requests ko recommend ya adjust karta hai.
+
+- Agar application ko zyada CPU ya memory chahiye, VPA higher requests recommend ya apply kar sakta hai.
+- Agar workload kam resources use karta hai, toh VPA lower requests recommend kar sakta hai.
+- Configuration aur update mode ke hisaab se changes apply karne ke liye Pod restart/recreation ki zaroorat ho sakti hai.
+
+### 3. MERN Stack Example
+
+Maan lo aapki Node.js API Deployment mein har Pod ka CPU request `100m` aur memory request `128Mi` hai. Monitoring se pata chalta hai ki application consistently zyada memory use karti hai. VPA us container ke liye higher memory request, jaise `256Mi`, recommend kar sakta hai (actual recommendation observed usage aur policy par depend karegi).
+
+VPA ka focus har Pod ko suitable CPU/memory resources dena hai. HPA ka focus replicas ki quantity adjust karna hai.
+
+### 4. Example VPA Configuration
+
+VPA aam Kubernetes clusters mein aksar separately install kiya jaata hai; yeh har cluster mein built-in available nahi hota. Example:
+
+```yaml
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: node-api-vpa
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: node-api
+  updatePolicy:
+    updateMode: "Off"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: node-api
+        controlledResources: ["cpu", "memory"]
+```
+
+Is example mein `updateMode: "Off"` ka matlab VPA recommendations calculate/report kar sakta hai, lekin automatically Pod resources update nahi karta. VPA custom resource definition aur controller installed hona chahiye.
+
+Common update modes include:
+
+- `Off`: recommendations only; no automatic resource updates.
+- `Initial`: resource recommendations Pod create hone par apply hoti hain.
+- `Recreate`: VPA resource changes apply karne ke liye Pods evict/recreate kar sakta hai, subject to its policy and eviction constraints.
+- `InPlaceOrRecreate`: supported Kubernetes/VPA versions and resources mein pehle in-place update ki koshish karta hai; possible na ho toh recreate kar sakta hai.
+
+Exact mode availability and behavior VPA version aur cluster support par depend karte hain.
+
+### 5. How VPA Works
+
+1. VPA recommender historical/current resource usage aur configuration observe karta hai.
+2. Suitable CPU aur memory requests recommend karta hai.
+3. Configured update mode ke hisaab se recommendations sirf report ho sakti hain ya Pods ke resource requests update kiye ja sakte hain.
+4. Updates ke dauraan Pod restart/recreation ho sakti hai, isliye disruption budget aur workload availability consider karna chahiye.
+
+VPA ko install aur configure karna pad sakta hai. Iske saath HPA ko same CPU/memory utilization metric par chalane mein care chahiye, kyunki VPA requests badalne se HPA ka utilization percentage affect ho sakta hai.
+
+### 6. VPA vs. HPA
+
+| Feature | VPA | HPA |
+|---|---|---|
+| Full form | Vertical Pod Autoscaler | Horizontal Pod Autoscaler |
+| Main action | Per-container CPU/memory requests recommend or adjust karta hai | Pod replicas ki quantity adjust karta hai |
+| Scaling dimension | Vertical: resources per Pod | Horizontal: number of Pods |
+| Typical use | Right-size resource requests | Scale out/in with changing load |
+| Potential Pod restart | Depending on update mode, yes | Replica changes create/remove Pods; existing Pods usually need not restart just for replica count changes |
+
+### 7. Useful Checks
+
+```bash
+# Check VPA resources, if the VPA CRD is installed
+kubectl get vpa
+
+# Inspect recommendation and update status
+kubectl describe vpa node-api-vpa
+
+# Inspect current Pod resource requests and usage
+kubectl describe pod <pod-name>
+kubectl top pods
+```
+
+`kubectl top` requires a working resource metrics pipeline, and `kubectl get vpa` requires VPA to be installed.
+
+**Interview Answer:** The Vertical Pod Autoscaler recommends or adjusts the CPU and memory resource requests of containers based on observed workload usage. Unlike HPA, which changes the number of Pod replicas, VPA changes the resources allocated/requested per Pod. Depending on its update mode and cluster support, applying changes may require Pod recreation. VPA is useful for right-sizing workloads and should be configured carefully when combined with HPA.
+
+---
