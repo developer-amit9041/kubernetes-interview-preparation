@@ -10481,3 +10481,157 @@ Use Secrets or an external secret manager for credentials and tokens, and restri
 | Store credentials? | No; use Secrets or an external secret manager |
 
 **Remember:** We need ConfigMaps to manage non-sensitive configuration independently from application code and container images, making deployments more portable and easier to maintain.
+---
+
+# 83. What Is a Secret?
+
+## 1. English Definition
+
+A **Kubernetes Secret is an API object used to store and manage sensitive information**, such as passwords, authentication tokens, and private keys. Pods can consume Secrets as environment variables or mounted files without hard-coding those values into application code or container images.
+
+**Important:** By default, Secret data is Base64-encoded, not necessarily encrypted. Proper encryption at rest, access controls through RBAC, and secure handling are important for protecting sensitive data.
+
+## 2. Hindi Definition
+
+Kubernetes Secret ek object hai jiska use sensitive information store karne ke liye hota hai, jaise:
+
+- Database username aur password
+- API keys aur access tokens
+- Authentication credentials
+- TLS certificates aur private keys
+
+Simple words mein, **ConfigMap non-sensitive configuration ke liye hota hai, aur Secret sensitive information ke liye.**
+
+Isse passwords ko application code ya Docker image mein hard-code karne ki zaroorat nahi hoti.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application mein Node.js backend ko MongoDB se connect karna hai. MongoDB connection string mein username aur password hote hain.
+
+Agar tum connection string ko directly source code mein likh doge, toh code repository ya Docker image ke through credentials expose ho sakte hain.
+
+Iske bajaye Kubernetes Secret mein credentials store kar sakte ho aur Deployment ke through backend container ko provide kar sakte ho.
+
+```text
+       Kubernetes Secret
+       DB_USERNAME
+       DB_PASSWORD
+              |
+              | Environment variables
+              v
+       Node.js Backend Pod
+              |
+              v
+         MongoDB Database
+```
+
+Is approach mein credentials source code se alag rehte hain. Lekin Secret use karne se data automatically fully secure nahi ho jata; Kubernetes permissions aur encryption configuration bhi sahi honi chahiye.
+
+## 4. Practical Example / Code
+
+Create a Secret imperatively without putting a real password into a committed YAML file:
+
+```bash
+kubectl create secret generic mongodb-credentials \
+  --from-literal=username='app-user' \
+  --from-literal=password='replace-with-a-real-secret'
+```
+
+Use the Secret in a Deployment:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-registry/mern-backend:1.0
+          env:
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-credentials
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-credentials
+                  key: password
+```
+
+In Node.js, the application can read `process.env.DB_USERNAME` and `process.env.DB_PASSWORD`. Replace the example image with your own. Avoid committing actual credentials to source control or shell history; for production, consider an approved secret manager and a secure deployment workflow.
+
+## 5. Architecture Diagram
+
+```text
+      Kubernetes Secret
+      username / password
+               |
+               | secretKeyRef
+               v
+      +-------------------+
+      | Node.js Backend   |
+      | Pod               |
+      +---------+---------+
+                |
+                | authenticated connection
+                v
+          MongoDB Database
+```
+
+Secret values are available to authorized workloads as configured, but access must be restricted. Base64 is an encoding format, not encryption; enable encryption at rest where supported and grant least-privilege RBAC permissions.
+
+## 6. Practical Commands / Configuration
+
+Create the Secret:
+
+```bash
+kubectl create secret generic mongodb-credentials \
+  --from-literal=username='app-user' \
+  --from-literal=password='replace-with-a-real-secret'
+```
+
+List Secrets (this does not print their values):
+
+```bash
+kubectl get secrets
+```
+
+Inspect Secret metadata:
+
+```bash
+kubectl describe secret mongodb-credentials
+```
+
+Apply the Deployment and check its rollout:
+
+```bash
+kubectl apply -f backend-deployment.yaml
+kubectl rollout status deployment/backend
+```
+
+Avoid printing or committing real Secret values. Use RBAC to restrict who can read Secrets, configure encryption at rest, and use an external secret manager if required by your security model.
+
+## 7. Summary Table
+
+| Item | Meaning |
+|---|---|
+| Kubernetes object | Secret |
+| Stores | Sensitive data such as passwords, tokens and keys |
+| Pod integration | Environment variables or mounted files |
+| Base64 | Default data representation; not encryption |
+| Security controls | RBAC, encryption at rest, restricted access and secure handling |
+| MERN example | MongoDB credentials for a Node.js backend |
+
+**Remember:** A Kubernetes Secret separates sensitive values from application code and images, but it must be protected with appropriate access controls and encryption.
