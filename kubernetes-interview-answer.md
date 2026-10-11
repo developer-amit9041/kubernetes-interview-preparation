@@ -15496,3 +15496,111 @@ kubectl scale deployment backend --replicas=5
 **Interview Answer:** You can scale a Deployment using `kubectl scale deployment <deployment-name> --replicas=<count>`. Kubernetes adjusts the number of Pod replicas to match the desired count.
 
 **Remember:** `--replicas` sets the desired number of Pods; scaling manually is different from configuring automatic scaling with an HPA.
+
+---
+
+# 120. How Do You Restart a Deployment?
+
+## 1. English Definition
+
+Use `kubectl rollout restart deployment <deployment-name>` to trigger a rolling restart of a Deployment by recreating its Pods gradually, according to the Deployment's update strategy.
+
+## 2. Hindi Definition
+
+Deployment ko restart karne ke liye `kubectl rollout restart deployment <deployment-name>` command use karte hain. Kubernetes Deployment ke Pods ko rolling process mein recreate karta hai, taaki application ka downtime kam rakha ja sake.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapka MERN application ka Node.js backend Deployment chal raha hai, aur aapko Pods restart karne hain—jaise kisi configuration change ke baad. Aap `kubectl rollout restart deployment backend` run kar sakte hain.
+
+Kubernetes Pods ko rolling update strategy ke according replace karta hai. Actual downtime Deployment ki configuration, readiness probes, available replicas aur application health par depend karta hai; zero downtime guaranteed nahi hai.
+
+## 4. Practical Example / Code
+
+### Restart the backend Deployment
+
+```bash
+kubectl rollout restart deployment backend
+```
+
+### Example Deployment YAML
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:latest
+          ports:
+            - containerPort: 5000
+```
+
+Is example mein Deployment 3 replicas use karta hai aur `RollingUpdate` strategy specify karta hai. Restart command Pod template ko update karke rollout trigger karti hai.
+
+## 5. Practical Commands
+
+```bash
+# Restart the Deployment
+kubectl rollout restart deployment backend
+
+# Restart a Deployment in a specific namespace
+kubectl rollout restart deployment backend -n production
+
+# Check rollout status
+kubectl rollout status deployment backend
+
+# Check Pods after restart
+kubectl get pods
+
+# Inspect Deployment details
+kubectl describe deployment backend
+
+# View rollout history
+kubectl rollout history deployment backend
+```
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+kubectl rollout restart deployment backend
+                    |
+                    v
+          Kubernetes API Server
+                    |
+                    v
+               Deployment
+                    |
+                    v
+        ReplicaSet / Rolling Update
+                    |
+                    v
+       Old Pods replaced by new Pods
+```
+
+## 7. Summary Table
+
+| Command | Purpose |
+|---|---|
+| `kubectl rollout restart deployment backend` | Deployment ka rolling restart trigger karta hai |
+| `kubectl rollout restart deployment backend -n production` | Specific namespace mein restart |
+| `kubectl rollout status deployment backend` | Restart/rollout ki progress check karta hai |
+| `kubectl get pods` | Pod status check karta hai |
+| `kubectl describe deployment backend` | Deployment details aur events dekhta hai |
+
+**Interview Answer:** Use `kubectl rollout restart deployment <deployment-name>` to trigger a rolling restart of the Deployment. Use `kubectl rollout status deployment <deployment-name>` to verify that the rollout completes.
+
+**Remember:** A restart recreates Pods; it does not automatically update the container image to a newer version.
