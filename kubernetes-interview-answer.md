@@ -26615,4 +26615,223 @@ Coordinate credential rotation with MongoDB so the application and database cred
 ### Interview-ready answer
 “I store the MongoDB connection string in a Kubernetes Secret rather than hardcoding it in the Node.js source code or container image. In the backend Deployment, I reference the Secret using `secretKeyRef` and expose it as the `MONGO_URI` environment variable. The application reads it through `process.env.MONGO_URI` and uses Mongoose or the MongoDB driver to connect. I keep the Secret in the same namespace as the backend Pod, restrict access with RBAC, configure encryption at rest, and never commit populated credentials to GitHub or print them in logs.”
 
+## 194. How would you configure environment variables in Kubernetes?
+
+### English Definition
+Environment variables in Kubernetes configure application settings inside containers without hardcoding them into application code or container images. Kubernetes supports setting individual variables through `env`, loading multiple variables through `envFrom`, and managing non-sensitive and sensitive configuration through ConfigMaps and Secrets.
+
+### Hindi Definition
+Kubernetes mein environment variables ka use application ki configuration container ke andar provide karne ke liye hota hai. Isse development, testing aur production ke liye application code ya Docker image change karne ki zaroorat nahi padti.
+
+### Step 1: Identify the configuration
+For a MERN backend, examples are:
+- `PORT=5000` — non-sensitive
+- `NODE_ENV=production` — non-sensitive
+- `LOG_LEVEL=info` — non-sensitive
+- `MONGO_URI` — sensitive if it contains credentials
+- `JWT_SECRET` — sensitive
+
+### Step 2: Set variables directly using env
+For a small number of simple values, use `env` in the Deployment:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: node-backend
+  template:
+    metadata:
+      labels:
+        app: node-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:v1
+          ports:
+            - containerPort: 5000
+          env:
+            - name: PORT
+              value: "5000"
+            - name: NODE_ENV
+              value: "production"
+            - name: LOG_LEVEL
+              value: "info"
+```
+
+In Node.js:
+
+```javascript
+const express = require("express");
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+const NODE_ENV = process.env.NODE_ENV || "development";
+
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", environment: NODE_ENV });
+});
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log("Server running on port " + PORT);
+});
+```
+
+Kubernetes supplies the variables when the container starts. Node.js reads them through `process.env`.
+
+### Step 3: Use a ConfigMap for non-sensitive settings
+Example `backend-configmap.yaml`:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+data:
+  PORT: "5000"
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+```
+
+Apply it:
+
+```bash
+kubectl apply -f backend-configmap.yaml
+```
+
+Reference all its keys using `envFrom`:
+
+```yaml
+envFrom:
+  - configMapRef:
+      name: backend-config
+```
+
+The keys become environment variables such as `process.env.PORT`, `process.env.NODE_ENV`, and `process.env.LOG_LEVEL`. Keep passwords, tokens, and credential-bearing connection strings out of ConfigMaps.
+
+### Step 4: Use a Secret for sensitive values
+Example learning manifest `backend-secret.yaml`:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backend-secret
+type: Opaque
+stringData:
+  JWT_SECRET: "replace-with-a-strong-secret"
+  MONGO_URI: "mongodb://appuser:YOUR_PASSWORD@mongodb.database.svc.cluster.local:27017/myapp?authSource=admin"
+```
+
+Apply it:
+
+```bash
+kubectl apply -f backend-secret.yaml
+```
+
+These are placeholders. Do not commit populated Secret manifests to GitHub. Configure encryption at rest, least-privilege RBAC, and secure secret provisioning. Kubernetes Secrets are not automatically guaranteed to be encrypted at rest.
+
+Import all Secret keys:
+
+```yaml
+envFrom:
+  - secretRef:
+      name: backend-secret
+```
+
+Or reference one key individually:
+
+```yaml
+env:
+  - name: JWT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: backend-secret
+        key: JWT_SECRET
+```
+
+In Node.js:
+
+```javascript
+const mongoURI = process.env.MONGO_URI;
+const jwtSecret = process.env.JWT_SECRET;
+```
+
+Never print credential-bearing values to application logs.
+
+### Step 5: Combine ConfigMap and Secret in a Deployment
+Example container configuration:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: node-backend
+  template:
+    metadata:
+      labels:
+        app: node-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:v1
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: backend-secret
+```
+
+The example assumes both resources exist in the same namespace as the backend Pods. Create the ConfigMap and Secret before deploying the workload. The ConfigMap provides ordinary settings; the Secret provides credentials.
+
+### Step 6: Deploy and verify
+Use your actual filenames:
+
+```bash
+kubectl apply -f backend-configmap.yaml
+kubectl apply -f backend-secret.yaml
+kubectl apply -f backend-deployment.yaml
+
+kubectl get deployments
+kubectl get pods
+kubectl rollout status deployment/node-backend
+kubectl describe pod <pod-name>
+kubectl logs deployment/node-backend
+```
+
+Use `kubectl describe pod` to inspect configuration references and events, but avoid commands that print sensitive Secret values. If startup fails, check resource names, namespaces, and required keys.
+
+### Step 7: Update configuration safely
+When a ConfigMap or Secret is consumed as environment variables, changing the resource does not update environment variables in already-running containers. Restart the Deployment to create Pods with the new values:
+
+```bash
+kubectl rollout restart deployment/node-backend
+kubectl rollout status deployment/node-backend
+```
+
+Mounted ConfigMap/Secret files can update eventually, but the application must re-read the file; updates do not propagate through a `subPath` mount. Plan Secret rotation so application and database credentials remain synchronized.
+
+### env vs envFrom
+
+| Field | Use |
+|---|---|
+| `env` | Set individual variables or reference individual keys |
+| `envFrom` | Import all keys from a ConfigMap or Secret |
+| ConfigMap | Non-sensitive settings |
+| Secret | Sensitive values, with access and storage controls |
+
+### Interview-ready answer
+“I configure environment variables in Kubernetes using the `env` and `envFrom` fields in a Pod or Deployment specification. For non-sensitive configuration such as `PORT`, `NODE_ENV`, and `LOG_LEVEL`, I use a ConfigMap. For sensitive values such as `MONGO_URI` and `JWT_SECRET`, I use a Kubernetes Secret and reference it through `secretKeyRef` or `secretRef`. The Node.js application reads these values through `process.env`. This keeps configuration separate from the container image and makes environment-specific deployments easier to manage. I also secure Secrets with appropriate RBAC and encryption at rest.”
+
 ---
