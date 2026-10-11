@@ -15382,3 +15382,117 @@ kubectl logs <pod-name>
 **Interview Answer:** Use `kubectl describe pod <pod-name>` to inspect detailed Pod information, including its status, containers, node, conditions, and Events. It is especially useful for troubleshooting scheduling and startup problems.
 
 **Remember:** `get` gives a quick overview; `describe` gives detailed information and Events.
+
+---
+
+# 119. How Do You Scale a Deployment?
+
+## 1. English Definition
+
+Scaling a Deployment means increasing or decreasing the number of Pod replicas to handle workload changes or save resources.
+
+## 2. Hindi Definition
+
+Deployment ko scale karne ka matlab hai application ke Pods ki replicas ki sankhya badhana ya ghatana, taaki traffic ke according application handle kar sake.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application ka Node.js backend Deployment abhi 2 Pods chala raha hai. Traffic badhne par aap replicas ko 5 kar sakte hain. Traffic kam hone par replicas ko 2 ya 1 kar sakte hain.
+
+Kubernetes desired replica count maintain karne ki koshish karta hai. Dhyan rahe, replicas badhane se application ki capacity badh sakti hai, lekin database, CPU/memory limits aur application bottlenecks bhi consider karne chahiye.
+
+## 4. Practical Example / Code
+
+### Scale a Deployment to 5 replicas
+
+```bash
+kubectl scale deployment backend --replicas=5
+```
+
+Yahan:
+- `backend` Deployment ka naam hai.
+- `--replicas=5` ka matlab Kubernetes se 5 Pod replicas maintain karne ko kehna hai.
+
+### Example Deployment YAML
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:latest
+          ports:
+            - containerPort: 5000
+```
+
+Is YAML mein `replicas: 3` ka matlab desired state mein 3 Pods hain. YAML apply karne par:
+
+```bash
+kubectl apply -f deployment.yaml
+```
+
+**Note:** Agar aap `kubectl scale` se replicas badalte hain aur baad mein purani YAML ko apply karte hain, toh YAML mein likha replica count dobara set ho sakta hai.
+
+## 5. Practical Commands
+
+```bash
+# Check Deployments
+kubectl get deployments
+
+# Scale to 5 replicas
+kubectl scale deployment backend --replicas=5
+
+# Verify the replica count
+kubectl get deployment backend
+kubectl get pods
+
+# Scale down to 2 replicas
+kubectl scale deployment backend --replicas=2
+
+# Watch Pod changes live
+kubectl get pods -w
+```
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+kubectl scale deployment backend --replicas=5
+                    |
+                    v
+          Kubernetes API Server
+                    |
+                    v
+             Deployment
+                    |
+                    v
+          ReplicaSet adjusts Pods
+                    |
+                    v
+        Desired state: 5 Pod replicas
+```
+
+## 7. Summary Table
+
+| Action | Command / Configuration |
+|---|---|
+| Scale up to 5 | `kubectl scale deployment backend --replicas=5` |
+| Scale down to 2 | `kubectl scale deployment backend --replicas=2` |
+| Set replicas in YAML | `spec.replicas: 3` |
+| Check Deployment | `kubectl get deployments` |
+| Watch Pods | `kubectl get pods -w` |
+
+**Interview Answer:** You can scale a Deployment using `kubectl scale deployment <deployment-name> --replicas=<count>`. Kubernetes adjusts the number of Pod replicas to match the desired count.
+
+**Remember:** `--replicas` sets the desired number of Pods; scaling manually is different from configuring automatic scaling with an HPA.
