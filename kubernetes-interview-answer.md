@@ -9397,3 +9397,140 @@ Make sure node networking and firewall/security rules permit the connection. Clu
 | Typical use | Backend-to-backend communication | Testing or specific external access setups |
 
 **Remember:** ClusterIP is primarily for internal access; NodePort additionally exposes the Service through a port on each node. NodePort does not automatically guarantee internet access.
+---
+
+# 75. What Is the Difference Between NodePort and LoadBalancer?
+
+## 1. English Definition
+
+**NodePort:** NodePort is a Kubernetes Service type that exposes an application on a specific port on each cluster node. Clients can access the application using a reachable node IP address and the NodePort.
+
+**LoadBalancer:** LoadBalancer is a Kubernetes Service type that exposes an application through an external load balancer, typically provisioned by a supported cloud provider or load-balancer integration. Clients can access the application using the load balancer's external IP address or hostname.
+
+## 2. Hindi Definition
+
+- **NodePort:** Ismein application ko Kubernetes node ke IP address aur ek specific port ke through access kar sakte hain.
+- **LoadBalancer:** Ismein application ko external load balancer ke IP address ya hostname ke through access kar sakte hain. Supported environment mein load balancer provision aur configure bhi ho sakta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumne MERN application deploy ki hai: React frontend, Node.js backend jo port `5000` par run karta hai, aur Kubernetes mein backend ke 3 replicas.
+
+### A. NodePort kaise kaam karta hai?
+
+Maan lo NodePort `30080` configure kiya hai. Browser mein node ka reachable IP aur port use karke backend access kiya ja sakta hai. Ye testing ya specific network setups ke liye useful hai.
+
+```text
+Browser
+   |
+   | http://NODE-IP:30080
+   v
+Kubernetes Node
+   |
+   v
+NodePort Service
+   |
+   v
+Backend Pods (3 replicas)
+```
+
+### B. LoadBalancer kaise kaam karta hai?
+
+LoadBalancer Service application ko external load balancer ke address ke through expose kar sakti hai. Supported cloud environment ya load-balancer integration mein external address provision ho sakta hai.
+
+```text
+Browser
+   |
+   | http://EXTERNAL-IP
+   v
+External Load Balancer
+   |
+   v
+LoadBalancer Service
+   |
+   v
+Backend Pods (3 replicas)
+```
+
+Users ko directly node IP aur NodePort use karne ki zaroorat nahi hoti; they can use the load balancer's IP or hostname. LoadBalancer Service may also allocate a NodePort, depending on configuration and environment.
+
+## 4. Practical Example / Code
+
+### NodePort Service
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-nodeport
+spec:
+  type: NodePort
+  selector:
+    app: mern-backend
+  ports:
+    - port: 5000
+      targetPort: 5000
+      nodePort: 30080
+```
+
+### LoadBalancer Service
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-public
+spec:
+  type: LoadBalancer
+  selector:
+    app: mern-backend
+  ports:
+    - port: 80
+      targetPort: 5000
+```
+
+In both examples, `selector` matches the backend Pods. `targetPort: 5000` is the application port. For NodePort, `nodePort: 30080` is the node-facing port. For LoadBalancer, `port: 80` is the Service port and an external address is assigned only when the environment supports and configures a load balancer.
+
+## 5. Architecture Diagram
+
+```text
+NodePort:
+  Client -> Reachable Node IP:30080 -> Service -> Backend Pods
+
+LoadBalancer:
+  Client -> External LB IP/hostname -> Service -> Backend Pods
+```
+
+NodePort relies on reachable node addresses and permitted network rules. LoadBalancer provides a stable external entry point when supported, but creating the Service does not guarantee public internet access; cloud/network configuration and security rules still matter.
+
+## 6. Practical Commands / Configuration
+
+Apply the manifests:
+
+```bash
+kubectl apply -f backend-nodeport-service.yaml
+kubectl apply -f backend-loadbalancer-service.yaml
+```
+
+Inspect Services and external addresses:
+
+```bash
+kubectl get services
+kubectl describe service backend-nodeport
+kubectl describe service backend-public
+```
+
+For NodePort, test `http://<REACHABLE-NODE-IP>:30080` when network rules permit it. For LoadBalancer, check the `EXTERNAL-IP` or hostname shown by `kubectl get services`. If it remains `<pending>`, verify that a supported load-balancer integration is configured and inspect Service events and network/security rules.
+
+## 7. Summary Table
+
+| Feature | NodePort | LoadBalancer |
+|---|---|---|
+| Access method | Node IP + NodePort | External load balancer IP/hostname |
+| Typical port | Usually in default range `30000–32767` | Often a user-facing Service port such as `80` or `443` |
+| External load balancer | Not created by NodePort itself | Usually provisioned by supported integration |
+| Node reachability | A reachable node IP and allowed port are needed | Clients need to reach the load balancer address |
+| Common use | Testing or specific network setups | External access to an application in supported environments |
+| Internet access guaranteed? | No | No; depends on infrastructure and network rules |
+
+**Remember:** NodePort exposes a Service through a port on each node. LoadBalancer exposes a Service through an external load balancer address when supported by the cluster environment.
