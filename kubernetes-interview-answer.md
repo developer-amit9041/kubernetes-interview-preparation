@@ -12222,3 +12222,124 @@ kubectl exec backend-emptydir-example -- ls -la /app/tmp
 | Persistent data | PV/PVC ya suitable external storage use karo |
 
 **Remember:** `emptyDir` is temporary Pod-scoped storage. It is useful for cache and temporary files, but it should not be used when data must survive Pod removal.
+
+---
+
+# 94. What Is a PersistentVolume (PV)?
+
+## 1. English Definition
+
+A **PersistentVolume (PV)** is a piece of storage in a Kubernetes cluster that can be used to store data independently of a Pod's lifecycle. It can be provisioned manually by an administrator or dynamically through a StorageClass.
+
+## 2. Hindi Definition
+
+Bhai, **PersistentVolume (PV)** Kubernetes cluster mein available storage resource hota hai. Iska use data ko Pod ke lifecycle se alag store karne ke liye hota hai. Agar Pod delete ho jaye, toh storage ka data zaroori nahi ki delete ho—yeh storage configuration aur reclaim policy par depend karta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application mein MongoDB Kubernetes Pod ke andar run ho raha hai.
+
+Agar MongoDB ka data sirf container ke temporary filesystem mein store karoge, toh Pod recreate hone par data lose ho sakta hai.
+
+Is problem ko solve karne ke liye:
+
+- **PV:** Cluster mein storage resource represent karta hai.
+- **PVC (PersistentVolumeClaim):** Application ki storage requirement batata hai.
+- **MongoDB Pod:** PVC ke through storage use karta hai.
+
+PV ka data Pod se independently exist kar sakta hai, lekin actual data retention storage configuration aur reclaim policy par depend karti hai.
+
+## 4. Practical Example / Code
+
+Example of a statically defined PV using a node's local path (for learning and single-node testing only):
+
+```yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mongodb-pv
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath:
+    path: /mnt/data/mongodb
+```
+
+**Important:** `hostPath` ties this example to a particular node and is generally not recommended for production clusters. In production, use appropriate storage such as cloud block storage or a supported network storage provisioner.
+
+Field explanation:
+
+- `capacity.storage`: Declares the PV's storage capacity.
+- `accessModes`: Specifies how the volume may be mounted.
+- `persistentVolumeReclaimPolicy: Retain`: Keeps the PV and underlying data for manual recovery after the claim is released, subject to the storage implementation.
+- `storageClassName: manual`: Allows a matching PVC to request this PV.
+- `hostPath`: Uses a path on the node in this demonstration.
+
+A matching PVC is also needed before a Pod can normally consume this PV.
+
+## 5. Architecture Diagram
+
+```text
+          MERN Application
+                 |
+                 v
+           MongoDB Pod
+                 |
+                 v
+   PersistentVolumeClaim (PVC)
+   "I need 5Gi of storage"
+                 |
+                 v
+       PersistentVolume (PV)
+       "Storage resource"
+                 |
+                 v
+      Underlying Storage Device
+```
+
+## 6. Practical Commands / Configuration
+
+Apply the PV YAML:
+
+```bash
+kubectl apply -f mongodb-pv.yaml
+```
+
+List PersistentVolumes:
+
+```bash
+kubectl get pv
+```
+
+Inspect a particular PV:
+
+```bash
+kubectl describe pv mongodb-pv
+```
+
+Check claims and StorageClasses:
+
+```bash
+kubectl get pvc
+kubectl get storageclass
+```
+
+A PV can remain in `Available`, become `Bound` to a PVC, or enter other lifecycle states. A compatible PVC and available storage configuration are needed for binding.
+
+## 7. Summary Table
+
+| Concept | Explanation |
+|---|---|
+| PV | Cluster storage resource |
+| PVC | Request for storage by a workload |
+| Pod | Uses storage through a PVC and volume mount |
+| Provisioning | Can be static or dynamic |
+| Reclaim policy | Defines what happens to the PV/storage after claim release |
+| Production storage | Use a suitable provisioner and storage backend |
+| Persistence | Depends on the storage backend, lifecycle settings, and reclaim policy |
+
+**Remember:** A PersistentVolume is the storage resource; a PersistentVolumeClaim is the request to use that storage. A Pod typically mounts the claim, not the PV directly.
