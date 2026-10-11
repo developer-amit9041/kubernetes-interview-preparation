@@ -28498,4 +28498,138 @@ Fix the underlying cause, then let Kubernetes retry or trigger a new rollout if 
 ### Interview-ready answer
 “When a Pod is scheduled, the container runtime on its node uses the image reference from the Pod specification. Depending on the imagePullPolicy and whether the image is already available, the runtime pulls the image from Docker Hub if needed, then creates and starts the container. For private images, I configure image-pull credentials or a supported registry identity integration. I verify the result with `kubectl describe pod` and inspect events for `ErrImagePull` or `ImagePullBackOff`.”
 
+## 206. How do you use an image from a private Docker registry in Kubernetes?
+
+### English Definition
+To use an image from a private Docker registry in Kubernetes, create a registry authentication Secret and reference it through `imagePullSecrets` in the Pod specification. The container runtime uses the credentials when it needs to authenticate to pull the private image.
+
+### Hindi Definition
+Private registry ki image public nahi hoti, isliye Kubernetes node ke container runtime ko image pull karne ke liye authentication chahiye. Kubernetes mein registry credentials ka Secret create karke Pod specification mein `imagePullSecrets` se reference karte hain.
+
+### Step 1: Understand the workflow
+
+```text
+Private Docker Hub repository
+           |
+           v
+Kubernetes registry Secret
+           |
+           v
+Deployment / Pod references imagePullSecrets
+           |
+           v
+Node's container runtime authenticates
+           |
+           v
+Private image pulled and container started
+```
+
+The Secret must exist in the same namespace as the Pod. The image name must use the correct registry, repository, and tag.
+
+### Step 2: Create a registry access token
+For Docker Hub, create an access token with the minimum permissions needed to pull the image (read-only where available). Avoid putting real passwords or tokens in source control, shared scripts, or command history. In production, use an approved secrets-management workflow and rotate credentials as required.
+
+### Step 3: Create a Kubernetes image pull Secret
+
+Example command for Docker Hub:
+
+```bash
+kubectl create secret docker-registry dockerhub-secret \
+  --docker-server=https://index.docker.io/v1/ \
+  --docker-username=YOUR_DOCKERHUB_USERNAME \
+  --docker-password=YOUR_DOCKERHUB_ACCESS_TOKEN \
+  --docker-email=YOUR_EMAIL \
+  --namespace=default
+```
+
+Replace the placeholders with your own credentials. Be aware that supplying a token directly as a command-line argument can expose it through shell history or process inspection in some environments; use a safer approved method for production. Do not commit a generated Secret manifest containing real credentials.
+
+Verify the Secret metadata:
+
+```bash
+kubectl get secret dockerhub-secret -n default
+kubectl describe secret dockerhub-secret -n default
+```
+
+These commands show metadata and type, not the decoded token. A registry Secret commonly has type `kubernetes.io/dockerconfigjson`.
+
+### Step 4: Reference the Secret in a Deployment
+
+Example `backend-deployment.yaml`:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-backend
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: node-backend
+  template:
+    metadata:
+      labels:
+        app: node-backend
+    spec:
+      imagePullSecrets:
+        - name: dockerhub-secret
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:v1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5000
+```
+
+Explanation:
+- `imagePullSecrets` tells Kubernetes which registry credentials to make available for image pulls.
+- `name: dockerhub-secret` must exactly match the Secret name.
+- The Secret and Pod must be in the same namespace.
+- `image` must point to the correct private repository and tag.
+- `containerPort: 5000` declares the intended app port; the application must actually listen on it.
+
+### Step 5: Deploy and verify
+
+```bash
+kubectl apply -f backend-deployment.yaml
+kubectl rollout status deployment/node-backend
+kubectl get pods
+kubectl describe pod <pod-name>
+kubectl get events --sort-by=.metadata.creationTimestamp
+```
+
+When authentication and image access succeed, the runtime can pull the image and start the container. A locally cached image may not require a new download depending on `imagePullPolicy`.
+
+### Step 6: Troubleshooting
+
+| Symptom | What to check |
+|---|---|
+| `ErrImagePull` / `ImagePullBackOff` | Image path/tag, registry access, credentials and permissions |
+| `unauthorized` / authentication failure | Token validity, username, token permissions and registry endpoint |
+| Secret not found | Secret exists in the same namespace as the Pod |
+| Image name not found | Repository path and tag are correct |
+| Network or timeout errors | Node DNS, firewall, proxy and registry connectivity |
+
+Useful commands:
+
+```bash
+kubectl describe pod <pod-name>
+kubectl get secret dockerhub-secret -n default
+kubectl get events --sort-by=.metadata.creationTimestamp
+```
+
+Fix the underlying issue and let Kubernetes retry. Deleting Pods repeatedly will not fix incorrect credentials or an invalid image name.
+
+### Step 7: Security considerations
+- Use a scoped registry access token instead of a personal account password where possible.
+- Never commit real registry credentials to Git.
+- Restrict access to Kubernetes Secrets with least-privilege RBAC.
+- Remember that Kubernetes Secret values are base64-encoded in their API representation; base64 is not encryption. Configure encryption at rest and suitable secret-management controls.
+- For cloud registries such as Amazon ECR, consider the cluster's supported workload/node identity integration rather than long-lived static credentials when available.
+
+### Interview-ready answer
+“For a private Docker Hub image, I create a Kubernetes registry Secret using a scoped access token, then reference that Secret under `imagePullSecrets` in the Pod template of my Deployment. The Secret must be in the same namespace as the Pod, and the image repository and tag must be correct. I apply the Deployment and inspect Pod events if the image pull fails. I also protect the token, restrict Secret access, and avoid committing credentials to source control.”
+
 ---
