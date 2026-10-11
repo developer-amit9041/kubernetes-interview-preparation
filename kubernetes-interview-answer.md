@@ -1472,3 +1472,102 @@ kubectl logs mern-backend-pod
 | Kubernetes scheduling Pod level par hoti hai | Kubernetes normally container ko Pod ke through schedule karta hai |
 
 **Remember:** Container application ko run karta hai, aur Pod Kubernetes ki deployable unit hai jiske andar ek ya zyada containers run kar sakte hain.
+
+
+---
+
+# 13. What Is the Difference Between a Container and a Pod?
+
+## 1. English Definition
+
+**Container:** A container is an isolated runtime environment that packages and runs an application along with its required dependencies.
+
+**Pod:** A Pod is the smallest deployable unit in Kubernetes. It contains one or more containers that share the same network namespace and can share storage volumes when configured.
+
+## 2. Hindi Definition
+
+- **Container:** Ek isolated environment jisme application aur uski required dependencies run karti hain.
+- **Pod:** Kubernetes ki sabse chhoti deployable unit, jiske andar ek ya ek se zyada containers run kar sakte hain.
+
+## 3. Simple Hinglish Explanation
+
+Main difference ye hai:
+
+- **Container application ko run karta hai.**
+- **Pod Kubernetes ke andar container ya containers ko manage aur schedule karne ki unit hai.**
+
+Maan lo aapki MERN application mein Node.js backend hai. Docker image se Node.js container run hota hai. Jab aap us container ko Kubernetes par deploy karte ho, to Kubernetes usse ek Pod ke andar run karta hai.
+
+## 4. Architecture Diagram
+
+```text
+        Kubernetes Worker Node
+    +------------------------------+
+    |         Kubernetes Pod       |
+    |  +------------------------+  |
+    |  | Container              |  |
+    |  | Node.js + Express API  |  |
+    |  | Application process    |  |
+    |  +------------------------+  |
+    |                              |
+    |  Pod-level network namespace |
+    +------------------------------+
+```
+
+Kubernetes Pod ko Worker Node par schedule karta hai. Container runtime Pod ke andar container run karta hai. Ek Pod mein multiple containers bhi ho sakte hain, jaise Node.js application container ke saath logs collect karne wala sidecar container. Same Pod ke containers network namespace share karte hain.
+
+## 5. Difference Between Container and Pod
+
+| Feature | Container | Pod |
+|---|---|---|
+| Meaning | Application run karne ka isolated environment | Kubernetes ki smallest deployable unit |
+| Created from | Container image | Kubernetes Pod specification |
+| Contains | Application process aur dependencies | One or more containers |
+| Management | Container runtime manage karta hai | Kubernetes manage aur schedule karta hai |
+| Networking | Apne configured network namespace mein run karta hai | Pod ke containers same network namespace share karte hain |
+| Storage | Mounted volumes use kar sakta hai | Configured volumes containers ke beech share ho sakte hain |
+| Lifecycle | Container restart ya replace ho sakta hai | Pod terminate ya replace ho sakta hai |
+| Example | Node.js container | Pod containing the Node.js container |
+
+## 6. Practical YAML Example
+
+File: `backend-pod.yaml`
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mern-backend
+spec:
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:1.0
+      ports:
+        - containerPort: 5000
+```
+
+Is example mein:
+
+- `kind: Pod` batata hai ki Kubernetes Pod resource create karna hai.
+- `containers` ke andar container ki configuration di gayi hai.
+- `image` batata hai ki kaunsi container image use hogi.
+- `containerPort: 5000` application ke expected container port ko document karta hai; ye khud se external access enable nahi karta.
+
+### Create and inspect the Pod
+
+```bash
+kubectl apply -f backend-pod.yaml
+kubectl get pods
+kubectl describe pod mern-backend
+kubectl logs mern-backend
+```
+
+Image name ko apni actual published image se replace karein.
+
+## 7. Easy Way to Remember
+
+**Container = application run karta hai.**
+
+**Pod = Kubernetes ki unit jiske andar container(s) run hote hain.**
+
+Ek Pod mein usually ek main application container hota hai, lekin tightly coupled multiple containers bhi ho sakte hain.
