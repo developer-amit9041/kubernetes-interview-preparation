@@ -15999,3 +15999,91 @@ kubectl get namespaces
 **Interview Answer:** Check the current context with `kubectl config current-context` and inspect its namespace using `kubectl config view --minify`. Change the default namespace with `kubectl config set-context --current --namespace=<namespace>`, or use `-n <namespace>` for a single command.
 
 **Remember:** Changing the current namespace updates kubeconfig context settings; it does not move existing resources between namespaces.
+
+---
+
+# 125. How Do You View a Pod's YAML Configuration?
+
+## 1. English Definition
+
+Use `kubectl get pod <pod-name> -o yaml` to display a Pod's YAML representation, including its specification and current status.
+
+## 2. Hindi Definition
+
+Pod ki YAML configuration dekhne ke liye `kubectl get pod <pod-name> -o yaml` command use karte hain. Isse Pod ki specification aur current status YAML format mein dikhte hain.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapka Node.js backend Pod Kubernetes mein chal raha hai aur aap check karna chahte ho ki kaunsi container image, environment configuration, ports, volumes aur labels configured hain. Aap Pod ka YAML output dekh sakte ho.
+
+Dhyan rahe: output mein desired specification ke saath cluster ke current state ki information bhi hoti hai, jaise `status`, Pod IP aur assigned node. Isliye output sirf original YAML file ka exact copy zaroori nahi hai.
+
+## 4. Practical Example / Code
+
+### View a Pod's YAML
+
+```bash
+kubectl get pod <pod-name> -o yaml
+```
+
+Example:
+
+```bash
+kubectl get pod backend-7c8d9f6b4c-ab12c -o yaml
+```
+
+### Save the output to a file
+
+```bash
+kubectl get pod <pod-name> -o yaml > pod.yaml
+```
+
+This saves the returned YAML representation to `pod.yaml`; it may include system-generated fields that are not suitable for reapplying unchanged.
+
+## 5. Practical Commands
+
+```bash
+# List Pods to find the name
+kubectl get pods
+
+# View the Pod YAML
+kubectl get pod <pod-name> -o yaml
+
+# View a Pod in a specific namespace
+kubectl get pod <pod-name> -n production -o yaml
+
+# Save the YAML output to a file
+kubectl get pod <pod-name> -o yaml > pod.yaml
+
+# View concise details instead of full YAML
+kubectl describe pod <pod-name>
+```
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+       kubectl get pod -o yaml
+                 |
+                 v
+        Kubernetes API Server
+                 |
+                 v
+      Pod object returned as YAML
+                 |
+                 v
+  Inspect spec, metadata and status
+```
+
+## 7. Summary Table
+
+| Command | Purpose |
+|---|---|
+| `kubectl get pods` | Pod ka naam find karta hai |
+| `kubectl get pod <pod-name> -o yaml` | Pod ka YAML output dikhata hai |
+| `kubectl get pod <pod-name> -n production -o yaml` | Specific namespace mein Pod YAML dekhta hai |
+| `kubectl get pod <pod-name> -o yaml > pod.yaml` | Output ko file mein save karta hai |
+| `kubectl describe pod <pod-name>` | Human-readable detailed information aur Events dikhata hai |
+
+**Interview Answer:** Use `kubectl get pod <pod-name> -o yaml` to view a Pod's YAML representation, including its metadata, specification, and current status. Add `-n <namespace>` when the Pod is in another namespace.
+
+**Remember:** `-o yaml` displays the live API object; it may contain generated fields and status data beyond your original manifest.
