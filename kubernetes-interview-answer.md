@@ -9803,3 +9803,123 @@ If no endpoints appear, verify that the selector and Pod labels match and that t
 | Purpose | Dynamically identify Service backends without hard-coding Pod IPs |
 
 **Remember:** A Service selector matches Pod labels to determine which Pods can act as backends for that Service.
+---
+
+# 78. What Is Kubernetes DNS?
+
+## 1. English Definition
+
+**Kubernetes DNS is a cluster DNS system that allows applications and Services to discover and communicate with each other using DNS names instead of hard-coded IP addresses.** Kubernetes commonly uses CoreDNS to provide DNS-based service discovery within the cluster.
+
+## 2. Hindi Definition
+
+Kubernetes DNS ek system hai jo cluster ke andar Services ko DNS names provide karta hai, taaki applications unhe IP address ke bajaye naam se access kar saken.
+
+Jaise MERN application mein Node.js backend ko MongoDB ya kisi doosri Kubernetes Service se connect karna ho, toh har baar IP address likhne ki zaroorat nahi hoti. Tum Service ka DNS name use kar sakte ho.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari application Kubernetes par deployed hai: React frontend, Node.js backend aur MongoDB Service.
+
+MongoDB Service ka naam `mongodb-service` hai aur woh same namespace mein hai jahan Node.js backend run kar raha hai. Node.js application database ko `mongodb-service` hostname se access kar sakti hai.
+
+Agar Services alag namespaces mein hain, toh fully qualified Service DNS name use kar sakte ho:
+
+```text
+mongodb-service.database.svc.cluster.local
+```
+
+- `mongodb-service` — Service ka naam
+- `database` — namespace
+- `svc` — Kubernetes Service DNS hierarchy
+- `cluster.local` — common default cluster DNS domain; cluster mein domain alag bhi ho sakta hai
+
+Kubernetes DNS Service name ko resolve karne mein help karta hai. Service phir matching, eligible backend Pods tak traffic pahunchane mein help karti hai.
+
+## 4. Practical Example / Code
+
+Example MongoDB Service:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-service
+  namespace: database
+spec:
+  type: ClusterIP
+  selector:
+    app: mongodb
+  ports:
+    - port: 27017
+      targetPort: 27017
+```
+
+From a backend Pod in the `database` namespace, the Service can typically be reached using `mongodb-service:27017`. From a Pod in another namespace, use `mongodb-service.database.svc.cluster.local:27017` (assuming the cluster DNS domain is `cluster.local`).
+
+A Node.js MongoDB connection string could look like this:
+
+```javascript
+const mongoUri =
+  'mongodb://mongodb-service.database.svc.cluster.local:27017/myapp';
+```
+
+This is an illustrative connection string. Real deployments must use the correct hostname, authentication, TLS and network configuration. DNS resolves the name; it does not provide database credentials or guarantee network connectivity.
+
+## 5. Architecture Diagram
+
+```text
+Node.js Backend Pod
+        |
+        | DNS query: mongodb-service
+        v
+   Cluster DNS (CoreDNS)
+        |
+        | resolves Service DNS name
+        v
+  mongodb-service.database.svc.cluster.local
+        |
+        v
+  Kubernetes Service (ClusterIP)
+        |
+        v
+  Eligible MongoDB Pod endpoint(s)
+```
+
+CoreDNS provides name resolution. The Kubernetes Service and cluster networking handle forwarding traffic to eligible backend endpoints; DNS itself does not proxy the database connection.
+
+## 6. Practical Commands / Configuration
+
+List DNS Pods (often in the `kube-system` namespace):
+
+```bash
+kubectl get pods -n kube-system
+```
+
+Inspect the Service:
+
+```bash
+kubectl get service mongodb-service -n database
+kubectl describe service mongodb-service -n database
+```
+
+Test name resolution from a Pod that has `nslookup` installed:
+
+```bash
+nslookup mongodb-service.database.svc.cluster.local
+```
+
+If DNS resolution fails, check the Service name and namespace, the Pod's DNS configuration, and CoreDNS health/logs. The cluster's configured DNS domain may not be `cluster.local`.
+
+## 7. Summary Table
+
+| Term | Meaning |
+|---|---|
+| Kubernetes DNS | Resolves cluster Service names |
+| CoreDNS | Common DNS provider used in Kubernetes clusters |
+| Service DNS name | Stable name used to locate a Service |
+| Namespace | Separates namespaced resources; included in cross-namespace DNS names |
+| Benefit | Avoids hard-coding changing Pod IP addresses |
+| Important distinction | DNS resolves names; the Service/network routes the connection |
+
+**Remember:** Kubernetes DNS lets workloads find Services by name. CoreDNS commonly provides DNS resolution, while the Service routes traffic to eligible backend endpoints.
