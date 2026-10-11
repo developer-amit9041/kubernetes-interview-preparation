@@ -3550,3 +3550,120 @@ containers:
 | Controller | Desired state maintain karne ke liye reconciliation karta hai |
 
 **Remember:** Scheduler chooses the Node, kubelet manages the Pod on that Node, and the container runtime runs the container.
+
+
+---
+
+# 29. What Does `kube-proxy` Do?
+
+## 1. English Definition
+
+**`kube-proxy` is a Kubernetes network component that implements Service networking on nodes by maintaining network rules that direct traffic to appropriate backend endpoints.**
+
+Depending on the cluster's networking implementation, a cluster may use an alternative to `kube-proxy` that provides the required Service networking functionality.
+
+## 2. Hindi Definition
+
+`kube-proxy` Kubernetes ka networking component hai jo Services ke network traffic ko appropriate backend Pods tak pahunchane ke liye network rules manage karta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application mein:
+
+- 3 Node.js backend Pods hain.
+- Ek Kubernetes Service ka naam `mern-backend-service` hai.
+- React frontend backend ko request bhejta hai.
+
+Agar React frontend Service ke address par request bhejta hai, toh Service networking us request ko available backend Pod tak pahunchane mein help karti hai.
+
+`kube-proxy` supported configurations mein network rules maintain karke is traffic routing mein role play karta hai.
+
+**Important:** `kube-proxy` khud Node.js application run nahi karta aur na hi woh Pod create karta hai. Uska focus Service networking hai.
+
+## 4. Practical Example / Code — MERN Backend
+
+Maan lo backend Pods par `app: mern-backend` label hai. Un Pods ko expose karne ke liye Service:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mern-backend-service
+spec:
+  type: ClusterIP
+  selector:
+    app: mern-backend
+  ports:
+    - port: 80
+      targetPort: 5000
+```
+
+Apply karo:
+
+```bash
+kubectl apply -f backend-service.yaml
+kubectl get service mern-backend-service
+kubectl get endpointslices -l kubernetes.io/service-name=mern-backend-service
+```
+
+Service selector matching Pods ko select karta hai. Supported kube-proxy-based setups mein kube-proxy Service traffic ko available endpoints tak direct karne ke liye node networking rules maintain karta hai.
+
+## 5. Architecture Diagram
+
+```text
+        React Frontend Pod
+                |
+                | request to Service
+                v
+      mern-backend-service
+             (ClusterIP)
+                |
+       Service networking rules
+         (kube-proxy, where used)
+                |
+        +-------+-------+
+        |               |
+        v               v
+ Backend Pod 1      Backend Pod 2
+        |
+        v
+ Backend Pod 3 (illustrative endpoint)
+```
+
+Diagram conceptual hai. Service traffic actual available endpoints par route hota hai; exact behavior cluster networking implementation aur endpoint readiness par depend karta hai.
+
+## 6. Practical Commands / Configuration
+
+### Service aur endpoints inspect karo
+
+```bash
+kubectl get services
+kubectl describe service mern-backend-service
+kubectl get endpointslices -l kubernetes.io/service-name=mern-backend-service
+```
+
+### kube-proxy Pods check karna (agar cluster mein deployed ho)
+
+```bash
+kubectl get pods -n kube-system -o wide
+```
+
+Har cluster mein kube-proxy Pod visible hona guaranteed nahi hai; kuch clusters alternative networking implementation use karte hain.
+
+### kube-proxy modes
+
+Common modes mein `iptables`, `IPVS` (where supported/configured), aur newer environments mein `nftables` support shamil ho sakta hai, Kubernetes version aur platform ke hisaab se. kube-proxy generally har application request ko userspace proxy process se forward nahi karta; it commonly programs node networking rules.
+
+## 7. Summary Table
+
+| Component / Concept | Role |
+|---|---|
+| `kube-proxy` | Supported setups mein Service networking rules maintain karta hai |
+| Kubernetes Service | Stable virtual address aur logical access point provide karti hai |
+| Service selector | Matching Pods ko identify karta hai |
+| EndpointSlice | Service ke backend endpoints ki information represent karta hai |
+| `kubelet` | Assigned Node par Pods ki execution manage karta hai |
+| Container runtime | Containers ko run karta hai |
+| Alternative networking implementation | Kuch clusters mein kube-proxy ki Service-networking functionality provide kar sakti hai |
+
+**Remember:** A Service gives clients a stable way to reach backend Pods; `kube-proxy` commonly implements the node-level Service traffic rules, unless the cluster uses an alternative.
