@@ -11212,3 +11212,169 @@ Security notes:
 | Security | Restricts access and protects stored values | RBAC, encryption at rest, least privilege |
 
 **Remember:** Inject a Secret into a Pod using `env` with `secretKeyRef` for environment variables, or a Secret volume for files. Base64 is encoding, not encryption; secure access and storage separately.
+---
+
+# 87. How Do You Mount a Secret as a File?
+
+## 1. English Definition
+
+Mounting a Secret as a file in Kubernetes means exposing the keys of a Secret as files inside a container by referencing the Secret through a volume and mounting that volume at a directory path.
+
+## 2. Hindi Definition
+
+Kubernetes mein Secret ko file ke roop mein mount karne ka matlab hai Secret ki har key ko container ke andar ek file ke roop mein available karwana.
+
+Example: Agar Secret mein `username` aur `password` keys hain aur mount path `/etc/db-secret` hai, toh container mein `/etc/db-secret/username` aur `/etc/db-secret/password` files milengi.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application ka Node.js backend MongoDB se connect karta hai. Tum chahte ho ki database password environment variable ke bajaye ek file se read ho.
+
+Secret mein username aur password store karo, phir Pod specification mein `volumes` ke andar Secret ka naam do aur `volumeMounts` ke through directory mount kar do.
+
+```text
+ Kubernetes Secret
+  username: app-user
+  password: ********
+          |
+          | Secret volume
+          v
+   Node.js Backend Pod
+          |
+          v
+   /etc/db-secret/
+      |-- username
+      |-- password
+          |
+          v
+   Node.js reads password file
+          |
+          v
+   Connects to MongoDB
+```
+
+Kubernetes Secret volume ki keys ko files ke roop mein expose karta hai. Application ko file read karne ke liye code ya configuration chahiye hoti hai.
+
+## 4. Practical Example / Code
+
+### Step 1: Create the Secret
+
+```bash
+kubectl create secret generic mongodb-credentials \
+  --from-literal=username='app-user' \
+  --from-literal=password='replace-with-a-real-password'
+```
+
+Real password ko source control mein commit mat karo. Is command mein placeholder password ko apne approved secure process se provide ki gayi value se replace karo.
+
+### Step 2: Mount the Secret in a Pod
+
+Create `backend-pod.yaml`:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: backend-secret-file-example
+spec:
+  containers:
+    - name: backend
+      image: your-registry/mern-backend:1.0
+      volumeMounts:
+        - name: db-credentials
+          mountPath: "/etc/db-secret"
+          readOnly: true
+  volumes:
+    - name: db-credentials
+      secret:
+        secretName: mongodb-credentials
+```
+
+### Step 3: Read the file in Node.js
+
+```javascript
+const fs = require('node:fs');
+
+const username = fs.readFileSync('/etc/db-secret/username', 'utf8').trim();
+const password = fs.readFileSync('/etc/db-secret/password', 'utf8').trim();
+```
+
+Is example mein Secret ki `username` key `/etc/db-secret/username` file aur `password` key `/etc/db-secret/password` file banegi. Apni application image aur file-reading approach ko apne project ke hisaab se configure karo.
+
+## 5. Architecture Diagram
+
+```text
+       Kubernetes Secret
+       +------------------+
+       | username         |
+       | password         |
+       +------------------+
+                 |
+                 | volumes.secret.secretName
+                 v
+       Secret Volume (read-only)
+                 |
+                 | volumeMounts.mountPath
+                 v
+       +-----------------------+
+       | Node.js Backend Pod   |
+       | /etc/db-secret/       |
+       |   username            |
+       |   password            |
+       +-----------+-----------+
+                   |
+                   v
+             MongoDB connection
+```
+
+The Secret and the Pod must be in the same namespace. Secret volume updates are eventually propagated by Kubernetes, but the application must reread the files to use changed values. A Secret mounted using `subPath` does not receive automatic updates.
+
+## 6. Practical Commands / Configuration
+
+Create the Secret:
+
+```bash
+kubectl create secret generic mongodb-credentials \
+  --from-literal=username='app-user' \
+  --from-literal=password='replace-with-a-real-password'
+```
+
+Create the Pod:
+
+```bash
+kubectl apply -f backend-pod.yaml
+```
+
+Check the Pod:
+
+```bash
+kubectl get pods
+kubectl describe pod backend-secret-file-example
+```
+
+Verify that the expected filenames exist without printing sensitive file contents:
+
+```bash
+kubectl exec backend-secret-file-example -- ls -l /etc/db-secret
+```
+
+Security points:
+
+- Set `readOnly: true` for the Secret volume mount.
+- Restrict Secret access using least-privilege RBAC.
+- Enable encryption at rest where supported; Base64 encoding is not encryption.
+- Do not print Secret file contents in logs or commit real credentials to Git.
+- In production, consider using a Deployment instead of a standalone Pod so Kubernetes can maintain the desired replicas.
+
+## 7. Summary Table
+
+| YAML field / concept | Purpose |
+|---|---|
+| `volumes` | Defines a volume sourced from a Kubernetes Secret |
+| `secret.secretName` | Names the existing Secret to mount |
+| `volumeMounts` | Makes the volume available inside the container |
+| `mountPath` | Directory where Secret key files appear |
+| `readOnly: true` | Mounts the Secret volume as read-only in the container |
+| Secret key | Becomes a filename under the mount directory |
+
+**Remember:** To mount a Secret as a file, define a Secret volume under `spec.volumes`, reference it under the container's `volumeMounts`, and set a `mountPath`. Each Secret key becomes a file inside that directory.
