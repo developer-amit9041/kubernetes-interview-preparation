@@ -10192,3 +10192,145 @@ After a Service is recreated, check its current IP and resolve its DNS name agai
 | Handle reconnects and retries | Helps recover from interrupted connections |
 
 **Remember:** Use Kubernetes Service DNS names instead of hard-coded Service IPs. DNS helps discover the current address, while application retry and reconnect logic helps recover from interrupted connections.
+---
+
+# Part 6 — ConfigMap and Secrets
+
+# 81. What Is a ConfigMap?
+
+## 1. English Definition
+
+A **ConfigMap is a Kubernetes API object used to store non-confidential configuration data as key-value pairs.** It allows you to separate application configuration from container images so that the same image can be used across different environments.
+
+## 2. Hindi Definition
+
+ConfigMap Kubernetes ka ek object hai jisme hum application ki **non-sensitive configuration** store karte hain, jaise API URLs, application mode aur configuration values.
+
+Iska fayda ye hai ki hume configuration change karne ke liye baar-baar Docker image rebuild karne ki zaroorat nahi hoti.
+
+**Important:** Passwords, database credentials aur API secrets ko ConfigMap mein store nahi karna chahiye. Sensitive data ke liye Kubernetes Secrets use kiye jaate hain.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application mein Node.js backend hai. Development environment mein frontend URL `http://localhost:5173` hai aur production mein `https://myapp.example.com` hai.
+
+Agar URL code ke andar hard-code hai, toh configuration change karne ke liye code ya image update karni pad sakti hai. ConfigMap se tum URL ko alag store kar sakte ho aur Kubernetes Deployment mein environment variable ke through backend ko de sakte ho.
+
+```text
+Kubernetes ConfigMap
+        |
+        | FRONTEND_URL
+        v
+Node.js Backend Pod
+        |
+        v
+Application reads configuration
+```
+
+Is tarah same application image ko different configuration ke saath run kar sakte ho.
+
+## 4. Practical Example / Code
+
+Create `backend-configmap.yaml`:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+data:
+  NODE_ENV: "production"
+  FRONTEND_URL: "https://myapp.example.com"
+```
+
+Use the ConfigMap in a Deployment:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-registry/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - configMapRef:
+                name: backend-config
+```
+
+The container receives `NODE_ENV` and `FRONTEND_URL` as environment variables. Replace the example image with your own backend image. Environment variables injected this way do not automatically change inside an already-running container when the ConfigMap is edited; a rollout/restart may be required.
+
+## 5. Architecture Diagram
+
+```text
+       ConfigMap
+   NODE_ENV=production
+   FRONTEND_URL=...
+          |
+          | envFrom / env
+          v
+   +-------------------+
+   | Node.js Backend   |
+   | Pod               |
+   +-------------------+
+          |
+          v
+   Application reads configuration
+```
+
+ConfigMaps store non-secret settings, not credentials. Anyone with sufficient Kubernetes API permissions may be able to read them, so do not put passwords or private tokens in a ConfigMap.
+
+## 6. Practical Commands / Configuration
+
+Create the ConfigMap:
+
+```bash
+kubectl apply -f backend-configmap.yaml
+```
+
+List ConfigMaps:
+
+```bash
+kubectl get configmaps
+```
+
+Inspect the ConfigMap:
+
+```bash
+kubectl describe configmap backend-config
+kubectl get configmap backend-config -o yaml
+```
+
+After adding the ConfigMap reference to the Deployment, apply the Deployment manifest and check the rollout:
+
+```bash
+kubectl apply -f backend-deployment.yaml
+kubectl rollout status deployment/backend
+```
+
+Treat ConfigMap values as non-confidential. Use Kubernetes Secrets or an appropriate external secret manager for sensitive values, and apply least-privilege access controls.
+
+## 7. Summary Table
+
+| Item | Meaning |
+|---|---|
+| Kubernetes object | ConfigMap |
+| Stores | Non-confidential configuration |
+| Data format | Key-value pairs and/or configuration files |
+| Common MERN example | `NODE_ENV`, frontend URL, feature flags |
+| Use in Pods | Environment variables or mounted files |
+| Passwords and tokens | Do not store in ConfigMaps; use Secrets or a secret manager |
+
+**Remember:** A ConfigMap separates non-sensitive application configuration from the container image, making the same image reusable across environments.
