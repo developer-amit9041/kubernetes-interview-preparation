@@ -1364,3 +1364,111 @@ Is command ke liye Metrics Server ya compatible metrics provider configured hona
 | CPU/memory se application workloads execute hoti hain | Cluster-level decisions aur state management handle karta hai |
 
 **Remember:** Control Plane cluster ko manage karta hai, jabki Worker Node application Pods ko run karta hai. Production clusters mein Control Plane aur Worker Nodes ka exact arrangement setup ke according vary kar sakta hai.
+
+
+---
+
+# 12. What Is a Pod in Kubernetes?
+
+## 1. English Definition
+
+A **Pod** is the smallest deployable unit in Kubernetes. It contains one or more containers that run together and share network resources and, when configured, storage volumes.
+
+## 2. Hindi Definition
+
+Pod Kubernetes ki sabse chhoti deployable unit hoti hai. Iske andar ek ya ek se zyada containers ho sakte hain, jo same node par saath run karte hain aur network resources share kar sakte hain.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapne MERN Stack application banayi hai:
+
+- React — Frontend
+- Node.js + Express — Backend
+- MongoDB — Database
+
+Aap chahte ho ki Node.js backend Kubernetes par run ho. Kubernetes mein backend container ko aam taur par **Pod ke andar run kiya jata hai**.
+
+Pod ko ek chhote package ki tarah samjho jisme application container run karta hai.
+
+## 4. Pod Architecture Diagram
+
+```text
+             Kubernetes Pod
+      +---------------------------+
+      | Shared Pod IP / Network   |
+      |                           |
+      |  +---------------------+  |
+      |  | Node.js Container   |  |
+      |  | Express API : 5000  |  |
+      |  +---------------------+  |
+      |                           |
+      |  Optional shared volume   |
+      |  (only if configured)     |
+      +---------------------------+
+```
+
+Ek Pod mein usually ek main application container hota hai. Multiple containers tab use kiye ja sakte hain jab unhe tightly coupled hona chahiye, jaise application container aur sidecar container.
+
+## 5. Pod ki Important Characteristics
+
+1. **Smallest deployable unit:** Kubernetes Pods ko schedule karta hai, individual containers ko independently nahi.
+2. **Shared networking:** Same Pod ke containers IP address aur port space share karte hain; woh `localhost` se communicate kar sakte hain.
+3. **Shared storage:** Containers ek configured volume share kar sakte hain.
+4. **Ephemeral:** Pod terminate ya replace ho sakta hai, aur replacement Pod ka IP alag ho sakta hai.
+5. **Managed by controllers:** Deployment aur ReplicaSet jaise controllers desired number of Pod replicas maintain karne mein help karte hain.
+
+## 6. Practical Example — Node.js Backend Pod
+
+Ye sample YAML ek standalone Pod create karta hai. Production applications mein aksar Deployment use karna better hota hai.
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mern-backend-pod
+  labels:
+    app: mern-backend
+spec:
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:1.0
+      ports:
+        - containerPort: 5000
+```
+
+`your-dockerhub-username/mern-backend:1.0` ko apni actual image se replace karna hoga.
+
+### Pod create karo
+
+```bash
+kubectl apply -f backend-pod.yaml
+```
+
+### Pod status check karo
+
+```bash
+kubectl get pods
+```
+
+### Detailed information dekho
+
+```bash
+kubectl describe pod mern-backend-pod
+```
+
+### Logs dekho
+
+```bash
+kubectl logs mern-backend-pod
+```
+
+## 7. Pod vs Container
+
+| Pod | Container |
+|---|---|
+| Kubernetes ki smallest deployable unit | Application ko isolated runtime environment mein run karta hai |
+| Ek ya multiple containers rakh sakta hai | Pod ke andar run hota hai |
+| Pod-level networking share karwa sakta hai | Pod ke network namespace ko share karta hai |
+| Kubernetes scheduling Pod level par hoti hai | Kubernetes normally container ko Pod ke through schedule karta hai |
+
+**Remember:** Container application ko run karta hai, aur Pod Kubernetes ki deployable unit hai jiske andar ek ya zyada containers run kar sakte hain.
