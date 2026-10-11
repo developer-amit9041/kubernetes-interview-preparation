@@ -13402,3 +13402,140 @@ kubectl get services
 | Central management | Keeps routing rules in Kubernetes resources |
 
 **Remember:** We use Ingress to manage HTTP/HTTPS routing from outside the cluster to multiple Kubernetes Services through a common entry point.
+
+---
+
+# 103. What Is the Difference Between Ingress and a Service?
+
+## 1. English Definition
+
+- **Service:** A Kubernetes resource that provides a stable network endpoint to access a group of Pods.
+- **Ingress:** A Kubernetes resource that defines rules for routing external HTTP/HTTPS traffic to Kubernetes Services, typically through an Ingress Controller.
+
+## 2. Hindi Definition
+
+Bhai, **Service Pods tak network connection pahunchane ka kaam karti hai, jabki Ingress bahar se aane wali web requests ko sahi Service tak route karta hai.**
+
+Example: Aapki MERN application mein Service React aur Express Pods ko access karne ka stable endpoint deti hai. Ingress decide karta hai ki `/` ki request frontend Service par aur `/api` ki request backend Service par jayegi.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application Kubernetes par deployed hai:
+
+- `frontend-service` React Pods ko access karne ke liye stable endpoint deti hai.
+- `backend-service` Express Pods ko access karne ke liye stable endpoint deti hai.
+- `Ingress` domain aur URL path ke basis par incoming HTTP/HTTPS requests ko in Services tak route karta hai.
+
+Service ke common types:
+
+- **ClusterIP:** Cluster ke andar access.
+- **NodePort:** Har node ke ek port ke through access.
+- **LoadBalancer:** Supported environment mein external load balancer ke through access.
+
+Ingress primarily HTTP/HTTPS routing ke liye hota hai; yeh Service ka replacement nahi hai. Ingress rules ko implement karne ke liye compatible Ingress Controller chahiye.
+
+## 4. Practical Example / Code
+
+### Service for the frontend
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+spec:
+  type: ClusterIP
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 3000
+```
+
+### Ingress routing rules
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mern-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: myapp.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-service
+                port:
+                  number: 80
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-service
+                port:
+                  number: 5000
+```
+
+The Services and their selected Pods must exist, and a compatible Ingress Controller must be installed. The Service's `port` is used by Ingress; the Service maps that port to the Pod's `targetPort`.
+
+## 5. Architecture Diagram
+
+```text
+             External Client
+                    |
+                    v
+           Ingress Controller
+                    |
+             Ingress Rules
+              /          \\
+             v            v
+     frontend-service  backend-service
+             |            |
+             v            v
+        React Pods    Express Pods
+```
+
+A Service can also be used without Ingress for internal communication between workloads.
+
+## 6. Practical Commands / Configuration
+
+Check Services:
+
+```bash
+kubectl get services
+kubectl describe service frontend-service
+```
+
+Check Ingress resources and classes:
+
+```bash
+kubectl get ingress
+kubectl get ingressclass
+kubectl describe ingress mern-ingress
+```
+
+Check the Pods selected by a Service:
+
+```bash
+kubectl get pods --show-labels
+kubectl get endpointslices
+```
+
+## 7. Summary Table
+
+| Basis | Service | Ingress |
+|---|---|---|
+| Main purpose | Provides a stable endpoint to access Pods | Defines HTTP/HTTPS routing rules to Services |
+| Routes traffic to | Selected Pods through a Service | Kubernetes Services |
+| Typical use | Internal communication and exposing an application | Domain/path-based web routing |
+| Common configuration | Service type, selector, ports | Host, paths, backend Service, TLS options |
+| Works alone? | Yes, for its configured networking role | Needs a compatible Ingress Controller to implement its rules |
+| Common types/features | ClusterIP, NodePort, LoadBalancer | Host-based and path-based routing; TLS support depends on controller |
+| MERN example | `backend-service` reaches Express Pods | Routes `/api` requests to `backend-service` |
+
+**Remember:** A Service provides a stable network endpoint for Pods; Ingress routes external HTTP/HTTPS requests to Services.
