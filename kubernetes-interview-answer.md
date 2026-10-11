@@ -11013,3 +11013,202 @@ Do not print Secret values while debugging. Use RBAC with least privilege, enabl
 | Node.js access | Read environment variables in application code | `process.env.PORT` |
 
 **Remember:** Kubernetes provides container environment variables through `env` and `envFrom`. Use `value` for direct values, ConfigMaps for normal settings, and Secrets for sensitive values.
+---
+
+# 86. How Do You Inject a Secret into a Pod?
+
+## 1. English Definition
+
+A Kubernetes Secret can be made available to a Pod as environment variables or mounted files. This lets an application access sensitive values, such as database passwords and API tokens, without hard-coding them into application code or container images.
+
+## 2. Hindi Definition
+
+Kubernetes mein Secret inject karne ka matlab hai Secret mein stored sensitive information ko Pod ke container tak pahunchana.
+
+Iske do main methods hain:
+
+1. **Environment variables:** Secret ki specific key ko environment variable ke roop mein provide karna.
+2. **Volume mount:** Secret ki key ko container ke andar file ke roop mein expose karna.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application mein Node.js backend ko MongoDB se connect karna hai. MongoDB ka password Kubernetes Secret mein stored hai.
+
+Deployment mein Secret ko reference karke backend ko password environment variable ke through de sakte ho. Alternative ke roop mein Secret volume mount karke password ko file se read karwa sakte ho.
+
+```text
+          Kubernetes Secret
+          DB_USERNAME / DB_PASSWORD
+                    |
+          +---------+---------+
+          |                   |
+          v                   v
+   Environment variable    Volume mount
+          |                   |
+          v                   v
+     process.env.*        Secret file
+          |                   |
+          +---------+---------+
+                    |
+                    v
+             Node.js Backend
+                    |
+                    v
+             MongoDB connection
+```
+
+Environment variables are convenient for applications already using `process.env`; mounted files are useful when an application or library can read credentials from a file. Both methods require appropriate access controls.
+
+## 4. Practical Example / Code
+
+### Step 1: Create a Secret
+
+```bash
+kubectl create secret generic mongodb-credentials \
+  --from-literal=username='app-user' \
+  --from-literal=password='replace-with-a-real-password'
+```
+
+Use a real credential only through your approved secure deployment process. Do not commit real passwords to Git or put them in container images.
+
+### Method 1: Inject the Secret as environment variables
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-registry/mern-backend:1.0
+          env:
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-credentials
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-credentials
+                  key: password
+```
+
+Node.js can read these values like this:
+
+```javascript
+const username = process.env.DB_USERNAME;
+const password = process.env.DB_PASSWORD;
+```
+
+### Method 2: Mount the Secret as files
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: backend-secret-file-example
+spec:
+  containers:
+    - name: backend
+      image: your-registry/mern-backend:1.0
+      volumeMounts:
+        - name: db-credentials
+          mountPath: "/etc/db-secret"
+          readOnly: true
+  volumes:
+    - name: db-credentials
+      secret:
+        secretName: mongodb-credentials
+```
+
+With this mount, the Secret keys are exposed as files under `/etc/db-secret`; for example, the `password` key is available at `/etc/db-secret/password`. The application must be written or configured to read that file. This example is a standalone Pod; use a Deployment template for production workloads that need controller-managed replicas.
+
+Replace the example image with your own backend image. A Secret must exist in the same namespace as the Pod that references it.
+
+## 5. Architecture Diagram
+
+```text
+             Kubernetes Secret
+          username / password keys
+                     |
+             Pod specification
+                     |
+          +----------+----------+
+          |                     |
+          v                     v
+   env + secretKeyRef      Secret volume
+          |                     |
+          v                     v
+   DB_USERNAME /           /etc/db-secret/
+   DB_PASSWORD             username, password
+          |                     |
+          +----------+----------+
+                     |
+                     v
+             Node.js Backend
+                     |
+                     v
+               MongoDB server
+```
+
+Secret values are provided only to Pods that reference them, but users or workloads with sufficient permissions may still access them. Base64 encoding is not encryption. Use least-privilege RBAC and configure encryption at rest; consider an external secret manager where appropriate.
+
+## 6. Practical Commands / Configuration
+
+Create the Secret:
+
+```bash
+kubectl create secret generic mongodb-credentials \
+  --from-literal=username='app-user' \
+  --from-literal=password='replace-with-a-real-password'
+```
+
+Check that the Secret exists without printing its values:
+
+```bash
+kubectl get secrets
+kubectl describe secret mongodb-credentials
+```
+
+Apply a Deployment manifest containing the `secretKeyRef` configuration:
+
+```bash
+kubectl apply -f backend-deployment.yaml
+kubectl rollout status deployment/backend
+kubectl get pods
+```
+
+Inspect Pod events and configuration metadata if the reference fails:
+
+```bash
+kubectl describe pod <pod-name>
+```
+
+Security notes:
+
+- The Secret and the Pod must be in the same namespace.
+- Avoid printing Secret values in terminal output, logs, or CI/CD logs.
+- Restrict Secret access with least-privilege RBAC and enable encryption at rest where supported.
+- Environment variables do not automatically update in an already-running process when a Secret changes. Secret volume updates are eventually propagated, but applications must reread the files; `subPath` mounts do not receive automatic updates.
+
+## 7. Summary Table
+
+| Method | How it works | Example |
+|---|---|---|
+| Environment variable | Exposes a selected Secret key as a container environment variable | `secretKeyRef` → `process.env.DB_PASSWORD` |
+| Volume mount | Exposes Secret keys as files inside the container | `/etc/db-secret/password` |
+| Secret creation | Creates a named Kubernetes Secret | `kubectl create secret generic ...` |
+| Security | Restricts access and protects stored values | RBAC, encryption at rest, least privilege |
+
+**Remember:** Inject a Secret into a Pod using `env` with `secretKeyRef` for environment variables, or a Secret volume for files. Base64 is encoding, not encryption; secure access and storage separately.
