@@ -13539,3 +13539,130 @@ kubectl get endpointslices
 | MERN example | `backend-service` reaches Express Pods | Routes `/api` requests to `backend-service` |
 
 **Remember:** A Service provides a stable network endpoint for Pods; Ingress routes external HTTP/HTTPS requests to Services.
+
+---
+
+# 104. What Is an Ingress Controller?
+
+## 1. English Definition
+
+An **Ingress Controller** is a component in Kubernetes that implements Ingress rules and manages incoming HTTP/HTTPS traffic to Kubernetes Services. It monitors Ingress resources and routes requests according to their configured rules.
+
+## 2. Hindi Definition
+
+Bhai, Ingress Controller woh component hai jo Ingress ke rules ko practically execute karta hai. Ingress batata hai ki request kahan jaani chahiye, aur Ingress Controller us request ko correct Kubernetes Service tak route karta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application Kubernetes par deployed hai:
+
+- React frontend ke liye `frontend-service`
+- Node.js/Express backend ke liye `backend-service`
+- Ingress rules decide karte hain ki traffic kahan jayega.
+- **Ingress Controller** incoming requests receive karke un rules ke according traffic forward karta hai.
+
+Example:
+
+- `myapp.example.com/` → React frontend
+- `myapp.example.com/api` → Express backend
+
+Easy difference: **Ingress ek configuration/resource hai; Ingress Controller us configuration ko implement karne wala component hai.**
+
+## 4. Practical Example / Code
+
+An Ingress resource defines routing rules:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mern-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: myapp.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-service
+                port:
+                  number: 80
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-service
+                port:
+                  number: 5000
+```
+
+The Ingress Controller that serves the `nginx` IngressClass must be installed and exposed appropriately for these rules to work. The Service names and ports must match real Services in the cluster.
+
+## 5. Architecture Diagram
+
+```text
+           Browser / Client
+                  |
+                  v
+         Ingress Controller
+                  |
+             Reads rules
+                  |
+                  v
+             Ingress
+           /          \\
+          v            v
+ frontend-service  backend-service
+          |            |
+          v            v
+      React Pods   Express Pods
+```
+
+The controller implements the routing behavior; the Ingress resource stores the desired routing configuration.
+
+## 6. Practical Commands / Configuration
+
+Check Ingress resources and classes:
+
+```bash
+kubectl get ingress
+kubectl get ingressclass
+```
+
+Inspect the Ingress rules:
+
+```bash
+kubectl describe ingress mern-ingress
+```
+
+Check Services:
+
+```bash
+kubectl get services
+```
+
+To verify the controller itself, inspect the namespace and installation method used by your cluster. For example, if the controller was installed in the `ingress-nginx` namespace:
+
+```bash
+kubectl get pods -n ingress-nginx
+kubectl get services -n ingress-nginx
+```
+
+The namespace above is only an example; controllers can be installed in other namespaces or managed by the cloud provider.
+
+## 7. Summary Table
+
+| Concept | Explanation |
+|---|---|
+| Ingress | Stores HTTP/HTTPS routing rules |
+| Ingress Controller | Implements those rules and handles traffic |
+| Input | Incoming client requests and Ingress configuration |
+| Output | Routes requests to the configured Kubernetes Services |
+| Example implementation | NGINX-based Ingress Controller or another compatible controller |
+| Requirement | Controller must be installed/configured and reachable |
+| MERN example | Routes frontend and API requests to their Services |
+
+**Remember:** Ingress defines the routing rules; the Ingress Controller implements them and routes requests to Kubernetes Services.
