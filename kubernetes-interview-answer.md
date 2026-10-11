@@ -8833,3 +8833,143 @@ kubectl get endpoints mern-backend
 | Common MERN use | Frontend Pod communicating with backend Service |
 
 **Remember:** ClusterIP is the default Kubernetes Service type for internal communication. It provides a stable internal endpoint so applications can reach matching backend Pods without tracking individual Pod IPs.
+---
+
+# 71. What Is NodePort?
+
+## 1. English Definition
+
+**NodePort is a Kubernetes Service type that exposes an application on a specific port on each cluster node, allowing clients to access the Service using a reachable node IP address and that port.**
+
+## 2. Hindi Definition
+
+NodePort Kubernetes Service ka ek type hai jo application ko Kubernetes ke har node ke ek specific port ke through access karne deta hai.
+
+Simple words mein, agar tumhare paas node ki reachable IP address aur NodePort number hai, toh tum application ko `NodeIP:NodePort` ke through access kar sakte ho, provided network aur firewall rules allow karte hon.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application ka Node.js backend Kubernetes par chal raha hai aur backend container port `5000` par listen karta hai.
+
+Tum chahte ho ki cluster ke bahar se bhi backend ko access kar sako. Iske liye `NodePort` Service use kar sakte ho.
+
+Example:
+
+- Node IP: `192.168.1.10`
+- Backend port: `5000`
+- NodePort: `30080`
+
+External client request bhej sakta hai:
+
+```text
+http://192.168.1.10:30080
+```
+
+Request NodePort Service ke through backend Pod tak route ho sakti hai.
+
+**Important:** `30080` NodePort hai, jabki `5000` backend ka target port hai. NodePort aam taur par default range `30000–32767` mein hota hai, lekin cluster configuration ke through range change ki ja sakti hai.
+
+## 4. Practical Example / Code
+
+Create a file named `backend-nodeport-service.yaml`:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mern-backend-nodeport
+spec:
+  type: NodePort
+  selector:
+    app: mern-backend
+  ports:
+    - protocol: TCP
+      port: 5000
+      targetPort: 5000
+      nodePort: 30080
+```
+
+Configuration:
+
+- `type: NodePort` — exposes the Service through a port on each node.
+- `selector` — selects Pods labelled `app: mern-backend`.
+- `port: 5000` — Service port.
+- `targetPort: 5000` — port on the backend Pods.
+- `nodePort: 30080` — port clients use on a reachable node.
+
+The backend Pods must have the matching label and listen on port `5000`. Node reachability and firewall/security-group rules must allow the client connection.
+
+## 5. Architecture Diagram
+
+```text
+            External Client
+                  |
+                  | http://<NodeIP>:30080
+                  v
+          +-------------------+
+          | Kubernetes Node   |
+          | NodePort: 30080   |
+          +---------+---------+
+                    |
+                    v
+          +-------------------+
+          | NodePort Service  |
+          | port: 5000        |
+          +---------+---------+
+                    |
+                    v
+          +-------------------+
+          | Backend Pod       |
+          | targetPort: 5000  |
+          +-------------------+
+```
+
+NodePort exposes the Service through a port on each node; the Service routes traffic to matching, ready Pod endpoints. The node IP must be reachable from the client.
+
+## 6. Practical Commands / Configuration
+
+**Create the Service:**
+
+```bash
+kubectl apply -f backend-nodeport-service.yaml
+```
+
+**List Services and their ports:**
+
+```bash
+kubectl get services
+```
+
+**Inspect the Service:**
+
+```bash
+kubectl describe service mern-backend-nodeport
+```
+
+**Get node IP addresses:**
+
+```bash
+kubectl get nodes -o wide
+```
+
+**Check the backend Pods:**
+
+```bash
+kubectl get pods -l app=mern-backend
+```
+
+Then test `http://<reachable-NodeIP>:30080` from a client that can reach the node. If it fails, check the Service selector, Pod readiness, node networking, and firewall/security-group rules.
+
+## 7. Summary Table
+
+| Field / Term | Meaning |
+|---|---|
+| `NodePort` | Exposes a Service through a port on each node |
+| `nodePort: 30080` | Port used by external clients on a reachable node |
+| `port: 5000` | Service port |
+| `targetPort: 5000` | Destination port on backend Pods |
+| Access format | `http://<NodeIP>:<NodePort>` |
+| Default NodePort range | Commonly `30000–32767`, configurable |
+| Common limitation | Requires node reachability and appropriate network rules |
+
+**Remember:** NodePort lets clients reach a Kubernetes Service through `NodeIP:NodePort`. It can be useful for basic exposure and testing, while production systems often use a cloud `LoadBalancer` or an Ingress/Gateway design.
