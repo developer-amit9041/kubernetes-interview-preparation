@@ -28109,4 +28109,137 @@ A locally built Docker image is not automatically available to every cluster nod
 ### Interview-ready answer
 “Kubernetes uses the image reference specified in a Pod or Deployment manifest. It schedules the Pod onto a node, and that node's container runtime obtains the image from a registry if necessary and creates and starts the container. I usually build the image with Docker tooling, push it to Docker Hub or Amazon ECR, and reference its tag or digest in the Deployment. I verify the rollout and inspect Pod events for image-pull errors. Kubernetes does not require Docker Engine specifically; it works with compatible CRI runtimes such as containerd or CRI-O.”
 
+## 203. What is the relationship between a Dockerfile and Kubernetes?
+
+### English Definition
+A Dockerfile defines the instructions for building a container image, while Kubernetes uses that image in a Pod or Deployment specification to run and manage the application. Kubernetes does not normally build the image from the Dockerfile.
+
+### Hindi Definition
+Dockerfile batata hai ki application code, dependencies aur startup command ko container image mein kaise package karna hai. Kubernetes Deployment ya Pod YAML mein us image ka reference use karta hai aur application ko run, scale aur manage karta hai.
+
+### Step 1: Understand the workflow
+
+```text
+Node.js source code
+        |
+        v
+    Dockerfile
+        |
+        | docker build
+        v
+ Container image
+ mern-backend:v1
+        |
+        | push to registry
+        v
+ Docker Hub / Amazon ECR
+        |
+        v
+ Kubernetes Deployment YAML
+        |
+        v
+ Pods and running containers
+```
+
+The Dockerfile is used during the image build process. The Kubernetes manifest references the resulting image; it normally does not need the Dockerfile itself.
+
+### Step 2: Create a Dockerfile
+
+Example for a Node.js backend:
+
+```dockerfile
+FROM node:22-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+EXPOSE 5000
+CMD ["npm", "start"]
+```
+
+Explanation:
+- `FROM` selects a base image.
+- `WORKDIR` sets the working directory inside the image.
+- `COPY` copies application files into the image.
+- `RUN npm ci` installs dependencies during the build.
+- `EXPOSE 5000` documents the intended application port; it does not publish the port by itself.
+- `CMD` defines the default command used to start the application.
+
+This example assumes the project has an `npm start` script and the Node.js server listens on port 5000. Keep secrets out of the image and use a suitable `.dockerignore` file.
+
+### Step 3: Build the image
+
+```bash
+docker build -t your-dockerhub-username/mern-backend:v1 .
+docker images
+```
+
+The build command uses the Dockerfile and build context to create the image. Test it locally if appropriate, then push it to a registry accessible to the cluster:
+
+```bash
+docker login
+docker push your-dockerhub-username/mern-backend:v1
+```
+
+For a private registry, configure the appropriate image-pull credentials or cloud permissions. A local image is not automatically available on all Kubernetes nodes.
+
+### Step 4: Reference the image in Kubernetes
+
+Example `backend-deployment.yaml`:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: node-backend
+  template:
+    metadata:
+      labels:
+        app: node-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:v1
+          ports:
+            - containerPort: 5000
+```
+
+The key field is `image`. Kubernetes schedules the Pods, and the node's container runtime obtains the referenced image if needed and starts containers from it. The runtime may be containerd, CRI-O, or another compatible runtime; Kubernetes does not require Docker Engine specifically.
+
+### Step 5: Deploy and verify
+
+```bash
+kubectl apply -f backend-deployment.yaml
+kubectl rollout status deployment/node-backend
+kubectl get pods
+kubectl describe pod <pod-name>
+kubectl logs <pod-name>
+```
+
+If the image cannot be pulled, inspect Pod events. Common reasons include a wrong image name or tag, missing registry permissions, network issues, or an image incompatible with the node architecture.
+
+### Dockerfile vs Kubernetes manifest
+
+| Dockerfile | Kubernetes manifest |
+|---|---|
+| Defines how to build an image | Defines the desired Kubernetes workload and configuration |
+| Includes base image, build steps, files and startup command | Includes image reference, replicas, labels, ports, probes and other runtime settings |
+| Used by image-building tools such as Docker | Applied to the Kubernetes API, commonly with `kubectl apply` |
+| Produces a container image | Uses the image to run and manage Pods/containers |
+
+### Common interview mistakes
+1. Kubernetes does not normally build an image from the Dockerfile.
+2. `EXPOSE` in a Dockerfile does not by itself publish a port to the internet.
+3. The image must be available to the cluster's container runtime.
+4. Dockerfile and Kubernetes YAML solve different, complementary problems.
+5. Kubernetes can run compatible images without Docker Engine on the nodes.
+
+### Interview-ready answer
+“A Dockerfile defines how to build a container image, including the base image, dependencies, application files, and startup command. I use Docker tooling to build the image and push it to a registry such as Docker Hub or Amazon ECR. In Kubernetes, I reference that image in a Deployment manifest. Kubernetes schedules Pods and uses the node's container runtime to obtain the image and start containers. So, the Dockerfile builds the image, while Kubernetes deploys and manages workloads that use the image.”
+
 ---
