@@ -12728,3 +12728,136 @@ If a PVC remains `Pending`, verify the provisioner/CSI driver is installed and h
 | MERN example | Automatically provision storage for MongoDB data |
 
 **Remember:** A StorageClass defines how storage is provisioned; a PVC requests storage, and a PV represents the storage resource.
+
+---
+
+# 98. What Is Dynamic Provisioning?
+
+## 1. English Definition
+
+**Dynamic provisioning is a Kubernetes feature that automatically creates storage when a PersistentVolumeClaim (PVC) requests it, using a configured StorageClass and storage provisioner.** It eliminates the need to manually create every PersistentVolume (PV).
+
+## 2. Hindi Definition
+
+Bhai, **Dynamic Provisioning ka matlab hai storage ka automatically create hona.** Jab aapki application PVC ke through storage request karti hai, toh Kubernetes configured `StorageClass` aur provisioner ki help se required storage automatically create kar sakta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aap AWS par Kubernetes mein MongoDB deploy kar rahe ho aur database ke liye `10Gi` storage chahiye.
+
+Manual provisioning mein administrator ko pehle suitable storage/PV arrange karna pad sakta hai.
+
+Dynamic provisioning mein:
+
+1. Aap `10Gi` ka PVC create karte ho.
+2. PVC ek configured `StorageClass` select karta hai.
+3. Storage provisioner required storage automatically create karta hai.
+4. Kubernetes us storage ko PV ke through represent karta hai.
+5. MongoDB Pod PVC ke through storage ko `/data/db` par mount karta hai.
+
+**Main benefit:** Har PVC ke liye administrator ko manually PV create karne ki zaroorat nahi hoti, provided cluster mein dynamic provisioning properly configured ho.
+
+## 4. Practical Example / Code
+
+### StorageClass
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: example-dynamic
+provisioner: csi.example.com
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+```
+
+### PVC
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-pvc
+spec:
+  storageClassName: example-dynamic
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+```
+
+**Important:** `csi.example.com` is a placeholder, not a real provisioner. For a working deployment, use a StorageClass supported by a provisioner/CSI driver installed and configured in your cluster. Storage is created only if the provisioner and its backend can satisfy the claim.
+
+## 5. Architecture Diagram
+
+```text
+        MongoDB Pod
+             |
+             v
+    PersistentVolumeClaim
+       "Request: 10Gi"
+             |
+             v
+        StorageClass
+             |
+             v
+   Dynamic Storage Provisioner
+             |
+             v
+  Storage created automatically
+             |
+             v
+      PersistentVolume (PV)
+             |
+             v
+        Actual Storage
+```
+
+## 6. Practical Commands / Configuration
+
+Check available StorageClasses:
+
+```bash
+kubectl get storageclass
+```
+
+Create the PVC:
+
+```bash
+kubectl apply -f mongodb-pvc.yaml
+```
+
+Check PVC status:
+
+```bash
+kubectl get pvc
+kubectl describe pvc mongodb-pvc
+```
+
+Check the PV created or bound for the claim:
+
+```bash
+kubectl get pv
+```
+
+If the PVC remains `Pending`, inspect the StorageClass, CSI/provisioner health, events, permissions, and storage capacity:
+
+```bash
+kubectl describe storageclass example-dynamic
+kubectl get events --sort-by=.metadata.creationTimestamp
+```
+
+## 7. Summary Table
+
+| Concept | Explanation |
+|---|---|
+| Dynamic provisioning | Automatically creates storage for a compatible claim |
+| PVC | Requests storage |
+| StorageClass | Defines provisioning configuration |
+| Provisioner / CSI driver | Creates or allocates the underlying storage |
+| PV | Represents the provisioned storage resource |
+| Main benefit | Avoids manually creating every PV |
+| Requirement | A working provisioner, valid StorageClass, and available backend capacity |
+
+**Remember:** Dynamic provisioning automatically provisions storage for a PVC through a configured StorageClass and provisioner.
