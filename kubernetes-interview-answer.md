@@ -4885,3 +4885,113 @@ kubectl logs mern-multi-container-pod -c log-sidecar
 | MERN example | Node.js backend plus a log-collector sidecar |
 
 **Remember:** A multi-container Pod groups tightly coupled containers that need shared networking, storage, or lifecycle. Independently scalable services generally belong in separate Pods.
+
+---
+
+# 39. What Is a Sidecar Container?
+
+## 1. English Definition
+
+A **sidecar container** is a supporting container that runs alongside the main application container in the same Kubernetes Pod. It provides additional functionality, such as log collection, monitoring, proxying, or security, without requiring that functionality to be built into the main application.
+
+## 2. Hindi Definition
+
+Sidecar container ek supporting container hota hai jo main application container ke saath same Kubernetes Pod mein run karta hai. Iska kaam main application ki help karna hota hai, jaise logs collect karna, monitoring karna ya network traffic handle karna.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application ka Node.js backend hai jo port `5000` par run karta hai. Tum chahte ho ki backend ke logs ek alag container collect kare.
+
+- **Main container:** Node.js + Express API run karega.
+- **Sidecar container:** Backend ki log files read aur collect karega.
+- **Shared volume:** Dono containers configured volume ke through log files share kar sakte hain.
+- **Same Pod:** Dono ek saath schedule hote hain aur same Pod ka network namespace share karte hain.
+
+**Simple example:** Backend apna kaam karta hai, aur sidecar uske logs collect karta hai. Isse logging ka code backend application mein add karne ki zaroorat kam ho sakti hai.
+
+## 4. Practical Example / Code — MERN Backend with a Log Sidecar
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mern-backend-sidecar
+spec:
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:1.0
+      ports:
+        - containerPort: 5000
+      volumeMounts:
+        - name: shared-logs
+          mountPath: /var/log/mern
+
+    - name: log-sidecar
+      image: busybox:1.36
+      command:
+        - sh
+        - -c
+        - touch /var/log/mern/app.log; tail -n 20 -f /var/log/mern/app.log
+      volumeMounts:
+        - name: shared-logs
+          mountPath: /var/log/mern
+
+  volumes:
+    - name: shared-logs
+      emptyDir: {}
+```
+
+**Note:** The backend must write logs to `/var/log/mern/app.log` for this sidecar to collect meaningful application logs. The `emptyDir` volume is temporary and lasts for the lifetime of the Pod; production systems may use purpose-built log collectors and a centralized logging platform.
+
+## 5. Architecture Diagram
+
+```text
+              Kubernetes Pod
+                     |
+             +-------+-------+
+             |               |
+             v               v
+       Main Container   Sidecar Container
+       Node.js / Express Log Collector
+             |               |
+             +-------+-------+
+                     |
+                     v
+                Shared Volume
+                  App Logs
+```
+
+## 6. Practical Commands / Configuration
+
+Create the Pod:
+
+```bash
+kubectl apply -f backend-sidecar-pod.yaml
+```
+
+Check the Pod:
+
+```bash
+kubectl get pod mern-backend-sidecar
+kubectl describe pod mern-backend-sidecar
+```
+
+Read logs from a specific container:
+
+```bash
+kubectl logs mern-backend-sidecar -c backend
+kubectl logs mern-backend-sidecar -c log-sidecar
+```
+
+## 7. Summary Table
+
+| Point | Explanation |
+|---|---|
+| Purpose | Adds supporting functionality to the main application |
+| Location | Runs in the same Pod as the main container |
+| Common tasks | Logging, monitoring, proxying, and security support |
+| Networking | Shares the Pod network namespace |
+| File sharing | Possible through a configured shared volume |
+| MERN example | Node.js backend plus a log-collector sidecar |
+
+**Remember:** Main container runs the application; sidecar provides supporting functionality. They are placed in one Pod when they need to share Pod-level resources or lifecycle.
