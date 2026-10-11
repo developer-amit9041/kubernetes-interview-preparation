@@ -23311,4 +23311,146 @@ DaemonSet node-level agents ko eligible nodes par maintain karta hai. Central lo
 
 ---
 
+
+## 180. What Is a Job?
+
+### 1. English Definition
+
+A **Kubernetes Job** is a workload resource that creates one or more Pods to perform a task and tracks successful completion. Unlike a Deployment, which maintains continuously running application replicas, a Job is designed for finite tasks that eventually finish.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+Kubernetes mein **Job** ek workload resource hai jo kisi specific task ko complete karne ke liye Pods create karta hai.
+
+Jab task successfully complete ho jata hai, toh Job ka kaam complete ho jata hai. Isko continuously application run karne ke liye nahi, balki one-time ya limited tasks ke liye use karte hain.
+
+Examples:
+- Database backup
+- Data import ya migration
+- Reports generate karna
+- Batch processing
+- Initial setup scripts run karna
+
+**Yaad rakho:**
+- **Deployment:** Application ko continuously run rakhta hai.
+- **Job:** Task complete karne ke liye Pod run karta hai.
+- **CronJob:** Task ko schedule ke according baar-baar run karta hai.
+
+### 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN Stack application mein MongoDB hai aur aapko ek baar purane records ka data migration karna hai.
+
+Aap Kubernetes Job bana sakte ho jo ek Pod start karega, migration script run karega, aur successfully finish hone par complete ho jayega.
+
+Flow:
+1. Kubernetes Job create hota hai.
+2. Job ek Pod create karta hai.
+3. Pod migration script run karta hai.
+4. Script exit code `0` ke saath finish ho toh task successful maana jata hai.
+5. Job completion status record karta hai.
+
+Agar task fail ho jaye, toh Job ki retry policy ke mutabik Kubernetes Pod ko retry kar sakta hai. Isliye batch task ko safely retry-able/idempotent banana important hai.
+
+### 4. Practical Example / YAML
+
+Example: ek one-time task run karna.
+
+File: `data-migration-job.yaml`
+
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: data-migration
+  namespace: development
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migration
+          image: busybox:1.36
+          command: ["sh", "-c", "echo 'Running data migration'; sleep 5; echo 'Migration completed'"]
+```
+
+**YAML explanation:**
+- `kind: Job` — finite task manage karta hai.
+- `backoffLimit: 3` — Job failure ke baad Kubernetes retries ko limit karta hai.
+- `restartPolicy: Never` — failed container ko same Pod mein restart karne ke bajay Job naya Pod create karke retry kar sakta hai.
+- `command` — example task run karta hai aur exit code zero ke saath finish hota hai.
+
+Ye BusyBox command sirf demonstration hai. Real migration ke liye apni application image, database connection configuration aur credentials ko securely configure karo. `development` namespace pehle se create hona chahiye.
+
+### 5. Practical Commands
+
+**Job create karo:**
+
+```bash
+kubectl apply -f data-migration-job.yaml
+```
+
+**Job status check karo:**
+
+```bash
+kubectl get jobs -n development
+kubectl describe job data-migration -n development
+kubectl get pods -n development
+```
+
+**Task ka output check karo:**
+
+```bash
+kubectl logs job/data-migration -n development
+```
+
+**Completed Job delete karna ho:**
+
+```bash
+kubectl delete job data-migration -n development
+```
+
+Job delete karne se associated Pods bhi normally delete ho jaate hain, unless configured otherwise. Production mein logs ya audit evidence retain karne ki requirement check kar lena.
+
+### 6. Kubernetes Architecture Diagram
+
+```text
+          Job: data-migration
+                   |
+                   v
+           Migration Pod
+                   |
+                   v
+          Run migration task
+                   |
+             +-----+-----+
+             |           |
+             v           v
+          Success      Failure
+             |           |
+             v           v
+       Job Complete   Retry according
+                       to Job policy
+```
+
+Job desired successful completions track karta hai. Task complete hone ke baad Job completed state mein rehta hai; completed Job object automatically delete nahi hota unless cleanup/TTL behavior configure kiya gaya ho.
+
+### 7. Summary Table
+
+| Feature | Job |
+|---|---|
+| Main purpose | Finite task complete karna |
+| Pod lifecycle | Task finish hone tak |
+| Success condition | Required successful completions |
+| Failure handling | Retry/backoff policy |
+| Common use cases | Migration, backup, batch processing |
+| Continuous service | No; Deployment better hai |
+| Scheduled recurring work | CronJob use karo |
+
+**Interview-Ready Answer:**
+
+“A Kubernetes Job runs one or more Pods to complete a finite task and tracks successful completion. For example, I can use a Job to run a database migration or batch-processing script. If the task fails, Kubernetes can retry it according to the Job’s backoff policy. For continuously running applications I use a Deployment, and for recurring scheduled tasks I use a CronJob.”
+
+---
+
 ---
