@@ -13136,3 +13136,145 @@ The PVC-backed data is expected to remain as long as the claim and backing stora
 | Database backups | Can support recovery if backups are valid and tested |
 
 **Remember:** Pod deletion does not automatically mean all data is deleted. Temporary data is lost, while PVC-backed persistent data can survive according to its storage lifecycle configuration.
+
+---
+
+# Part 8 — Ingress
+
+# 101. What Is Kubernetes Ingress?
+
+## 1. English Definition
+
+**Kubernetes Ingress is an API resource that defines rules for routing external HTTP and HTTPS traffic to services inside a Kubernetes cluster.** It supports host-based and path-based routing, typically through an Ingress Controller.
+
+## 2. Hindi Definition
+
+Bhai, Kubernetes Ingress ek resource hai jo define karta hai ki bahar se aane wali HTTP/HTTPS requests ko cluster ke andar kis Service tak bhejna hai.
+
+Example: Agar aapki MERN application mein frontend aur backend alag Services hain, toh Ingress rules decide kar sakte hain ki `/` wali request frontend par aur `/api` wali request backend par jayegi.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application Kubernetes par deploy hai:
+
+- **React frontend:** `frontend-service`
+- **Node.js/Express backend:** `backend-service`
+- **MongoDB:** Database Service, jo normally public internet par expose nahi karni chahiye.
+- **Ingress:** Incoming web traffic ko correct Service tak route karta hai.
+
+Aap ek domain, jaise `myapp.example.com`, use kar sakte ho:
+
+- `myapp.example.com/` → React frontend
+- `myapp.example.com/api` → Express backend
+
+**Important:** Ingress sirf routing rules define karta hai. Actual traffic handle karne ke liye cluster mein compatible **Ingress Controller** bhi installed aur configured hona chahiye.
+
+## 4. Practical Example / Code
+
+Example `ingress.yaml` (the referenced Services must already exist, and the cluster must have a compatible Ingress Controller):
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mern-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: myapp.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-service
+                port:
+                  number: 80
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-service
+                port:
+                  number: 5000
+```
+
+**Code explanation:**
+
+- `ingressClassName: nginx`: Selects an IngressClass named `nginx`; this must exist and be served by a compatible controller.
+- `host`: Domain name that the rule matches.
+- `path: /`: Routes matching root paths to the frontend Service.
+- `path: /api`: Routes matching API paths to the backend Service.
+- `pathType: Prefix`: Matches the path prefix.
+- `backend.service`: Names the Kubernetes Service and its service port, not the Pod's container port directly.
+
+Depending on the Ingress Controller, the backend may receive the original `/api` prefix. Path rewriting requires controller-specific configuration if the backend expects the prefix to be removed.
+
+## 5. Architecture Diagram
+
+```text
+          Browser / Client
+                 |
+                 v
+       myapp.example.com
+                 |
+                 v
+        Ingress Controller
+                 |
+           Ingress Rules
+            /         \\
+           /           \\
+          v             v
+ frontend-service   backend-service
+          |             |
+          v             v
+    React Pods      Express Pods
+                         |
+                         v
+                   MongoDB Service
+                   (internal access)
+```
+
+## 6. Practical Commands / Configuration
+
+Apply the Ingress resource:
+
+```bash
+kubectl apply -f ingress.yaml
+```
+
+List Ingress resources:
+
+```bash
+kubectl get ingress
+```
+
+Inspect the rules and events:
+
+```bash
+kubectl describe ingress mern-ingress
+```
+
+Check IngressClasses and Services:
+
+```bash
+kubectl get ingressclass
+kubectl get services
+```
+
+Check whether an Ingress Controller is running in your cluster using the controller's namespace and installation method. An Ingress resource alone does not make an application reachable; DNS, controller exposure, firewall/network rules, and TLS configuration may also be required.
+
+## 7. Summary Table
+
+| Concept | Explanation |
+|---|---|
+| Ingress | Defines HTTP/HTTPS routing rules |
+| Ingress Controller | Implements those rules and handles traffic |
+| Host-based routing | Routes based on domain name |
+| Path-based routing | Routes based on URL path |
+| Kubernetes Service | Stable endpoint for backend Pods |
+| TLS | Can configure HTTPS termination, depending on controller setup |
+| MERN use case | Route frontend and API traffic through one domain |
+
+**Remember:** Ingress defines HTTP/HTTPS routing rules; an Ingress Controller implements them and routes traffic to Kubernetes Services.
