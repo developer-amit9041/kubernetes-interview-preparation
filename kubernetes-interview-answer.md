@@ -1057,3 +1057,109 @@ Ek cluster mein multiple nodes ho sakte hain, aur har node par multiple Pods run
 Kubernetes cluster woh environment hai jahan Kubernetes aapki containerized application ko deploy aur manage karta hai. Control Plane cluster ko coordinate karta hai, Worker Nodes application workloads run karte hain, aur Pods ke andar containers execute hote hain.
 
 **Remember:** Cluster poora system hai, Node us system ki machine hai, aur Pod application ko run karne ki Kubernetes deployable unit hai.
+
+
+---
+
+# 9. What Is a Node in Kubernetes?
+
+## 1. English Definition
+
+A **Node** is a physical or virtual machine in a Kubernetes cluster that runs application workloads inside Pods. A node provides computing resources such as CPU, memory, networking, and a container runtime.
+
+## 2. Hindi Definition
+
+Node Kubernetes cluster ki ek physical ya virtual machine hoti hai, jahan application ke Pods run hote hain. Node CPU, memory, networking aur containers run karne ke liye required environment provide karta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application hai:
+
+- React — Frontend
+- Node.js + Express — Backend
+- MongoDB — Database
+
+Aapke Kubernetes cluster mein 2 Worker Nodes hain:
+
+- **Worker Node 1:** Backend ke 2 Pods run kar raha hai.
+- **Worker Node 2:** Frontend ka 1 Pod aur backend ka 1 Pod run kar raha hai.
+
+Har node ke paas limited CPU aur memory hoti hai. Kubernetes Scheduler available resources aur scheduling rules ke according decide karta hai ki Pod kis node par run hoga.
+
+## 4. Node Architecture
+
+```text
+             Kubernetes Control Plane
+       (manages cluster and schedules Pods)
+                       |
+              +--------+--------+
+              |                 |
+              v                 v
+       +--------------+  +--------------+
+       | Worker Node 1|  | Worker Node 2|
+       | Kubelet      |  | Kubelet      |
+       | Runtime      |  | Runtime      |
+       | Backend Pod 1|  | React Pod    |
+       | Backend Pod 2|  | Backend Pod 3|
+       +--------------+  +--------------+
+```
+
+Ye conceptual example hai. Actual Pod placement resources aur scheduling rules par depend karti hai.
+
+## 5. Node ke Main Components
+
+| Component | Kaam |
+|---|---|
+| Kubelet | Node par assigned Pods ki state manage karne mein help karta hai |
+| Container Runtime | Containers ko run karta hai, jaise `containerd` |
+| Kube-proxy | Common clusters mein Service networking rules manage karta hai; kuch setups alternatives use karte hain |
+| CPU and Memory | Pods ko application workloads run karne ke resources dete hain |
+
+## 6. Practical Commands
+
+### 1. Cluster ke nodes dekho
+
+```bash
+kubectl get nodes
+```
+
+Example output:
+
+```text
+NAME       STATUS   ROLES
+worker-1   Ready    <none>
+worker-2   Ready    <none>
+```
+
+Ye illustrative output hai; actual node names aur roles different ho sakte hain.
+
+### 2. Node ki detailed information dekho
+
+```bash
+kubectl describe node worker-1
+```
+
+### 3. Pods kis node par run ho rahe hain, dekho
+
+```bash
+kubectl get pods -o wide
+```
+
+### 4. Node resource usage dekho
+
+```bash
+kubectl top nodes
+```
+
+`kubectl top nodes` ke liye Metrics Server ya compatible metrics provider configured hona chahiye.
+
+## 7. Node vs Pod vs Cluster
+
+| Term | Meaning |
+|---|---|
+| Cluster | Nodes aur Kubernetes management components ka group |
+| Node | Physical ya virtual machine jo workloads run karti hai |
+| Pod | Kubernetes ki deployable unit jo node par schedule hoti hai |
+| Container | Application process ko isolated environment mein run karta hai |
+
+**Remember:** Cluster poora environment hai, Node us environment ki machine hai, aur Pod application workload ko run karne ki Kubernetes unit hai.
