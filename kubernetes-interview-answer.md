@@ -20077,3 +20077,100 @@ kubectl top pods
 **Interview Answer:** The Horizontal Pod Autoscaler automatically changes the replica count of a Kubernetes workload based on observed metrics such as CPU, memory, or custom metrics. It compares current metrics with configured targets, calculates the desired number of replicas, and updates the workload's scale. For example, it can scale a Node.js API from two replicas to three when CPU utilization rises above its target. HPA scales Pod count, not Node count, and its behavior depends on metrics availability, configured limits, and cluster capacity.
 
 ---
+
+## 158. How Does HPA Scale Based on CPU Usage?
+
+### 1. English Definition
+
+The Horizontal Pod Autoscaler (HPA) scales a workload based on CPU utilization by comparing the observed average CPU usage of its Pods with a configured target percentage of their CPU requests. It calculates a desired replica count and updates the workload's scale, within configured minimum and maximum replicas and scaling behavior.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+HPA Pods ka average CPU usage check karta hai aur usko configured CPU target se compare karta hai. CPU utilization target se zyada ho, toh HPA replicas badha sakta hai; target se kam ho, toh replicas ghatane ka decision le sakta hai.
+
+**Bahut important:** HPA ka CPU utilization percentage aam taur par Pod ke actual CPU usage ko uske CPU `request` ke relative calculate karta hai, CPU `limit` ke relative nahi. Isliye CPU requests define karna aur metrics available hona zaroori hai.
+
+### 3. MERN Stack Example
+
+Maan lo Node.js API ke 2 Pods hain. Har Pod ka CPU request `200m` hai aur HPA target `60%` hai.
+
+- Har Pod ki CPU request: `200m`.
+- Target utilization: `60%` of `200m` = `120m` average CPU usage per Pod.
+- Agar observed average usage `180m` per Pod ho, toh utilization `90%` hai, jo target se upar hai.
+- HPA replicas increase karne ka decision le sakta hai, agar calculated count configured limits aur scaling rules ke andar ho.
+
+### 4. Simplified Replica Calculation
+
+For a basic single CPU-utilization metric, the simplified formula is:
+
+```text
+desired replicas = ceil(current replicas × current average utilization / target utilization)
+```
+
+Example: 2 current replicas, 90% observed utilization, 60% target:
+
+```text
+ceil(2 × 90 / 60) = 3 replicas
+```
+
+Agar observed average utilization target se kaafi neeche ho, formula desired replicas kam suggest kar sakta hai. Kubernetes final scaling decision mein tolerance, stabilization windows, scaling policies, missing metrics, multiple metrics, aur min/max replicas bhi consider karta hai. Scale-down turant hona guaranteed nahi hai.
+
+### 5. Practical YAML Example
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: node-api-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: node-api
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+```
+
+Yeh HPA `node-api` Deployment ko 2 se 10 replicas ke beech scale kar sakta hai aur average CPU utilization ka target 60% rakhta hai. Deployment ke containers mein CPU requests configured honi chahiye.
+
+### 6. How CPU-Based HPA Works
+
+1. Metrics pipeline Pods ka CPU usage report karti hai; resource metrics ke liye aam taur par Metrics Server chahiye.
+2. HPA controller observed CPU utilization ko target se compare karta hai.
+3. Controller desired replica count calculate karta hai.
+4. Target Deployment ka scale update hota hai.
+5. Deployment controller Pods create/remove karta hai, aur scheduler naye Pods ko suitable Nodes par place karta hai.
+
+Agar cluster mein capacity nahi hai, extra Pods `Pending` reh sakte hain. HPA Nodes ko automatically add nahi karta.
+
+### 7. Commands to Verify
+
+```bash
+kubectl get hpa
+kubectl describe hpa node-api-hpa
+kubectl top pods
+kubectl get deployment node-api
+kubectl get pods -o wide
+```
+
+Agar HPA mein CPU metrics `<unknown>` dikh rahe hain, Metrics Server, Pod CPU requests, aur HPA Events verify karo.
+
+### 8. Quick Revision
+
+| Condition | HPA ka possible response |
+|---|---|
+| CPU utilization target se upar | Replicas increase kar sakta hai |
+| CPU utilization target se neeche | Replicas decrease kar sakta hai, minReplicas aur policies ke andar |
+| Metrics unavailable | Reliable CPU-based scaling nahi ho paati; status/events check karo |
+| Cluster capacity insufficient | Additional Pods `Pending` reh sakte hain |
+
+**Interview Answer:** HPA scales based on CPU by comparing the average CPU utilization of Pods with a configured target percentage of their CPU requests. If utilization is above the target, HPA calculates a higher desired replica count; if it is below the target, it may scale down within configured limits and stabilization policies. CPU requests and available metrics are essential for CPU utilization-based scaling. HPA adjusts Pod replicas, not Node count.
+
+---
