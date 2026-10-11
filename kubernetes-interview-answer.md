@@ -1805,3 +1805,119 @@ kubectl rollout undo deployment/mern-backend
 | Khud rolling update strategy provide nahi karta | Rolling updates aur rollbacks support karta hai |
 
 **Remember:** Deployment desired state define karta hai, ReplicaSet replicas maintain karta hai, aur Pod ke andar containers run karte hain. Production applications ke liye standalone Pods ke bajaye aksar Deployment use kiya jata hai.
+
+
+---
+
+# 16. What Is a Service in Kubernetes?
+
+## 1. English Definition
+
+A **Service** is a Kubernetes resource that provides a stable network endpoint to access a logical group of Pods. It helps applications communicate with Pods without depending on their changing IP addresses.
+
+## 2. Hindi Definition
+
+Kubernetes mein Service ek networking resource hai jo Pods tak pahunchne ke liye stable address provide karta hai. Pod ka IP change ho sakta hai, lekin Service ke through application ko access karna aasaan rehta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application mein Node.js backend ke 3 Pods hain:
+
+- Backend Pod 1 — IP `10.1.0.11`
+- Backend Pod 2 — IP `10.1.0.12`
+- Backend Pod 3 — IP `10.1.0.13`
+
+Agar React frontend directly kisi ek Pod ke IP par request bhejta hai aur woh Pod replace ho jata hai, toh uska IP change ho sakta hai. Isse connection fail ho sakta hai.
+
+**Service is problem ko solve karti hai.** React ya doosri application ek stable Service address ko use karti hai. Kubernetes Service ke selectors aur EndpointSlices ke through matching, eligible Pods tak traffic route kar sakta hai.
+
+## 4. Service Architecture Diagram
+
+```text
+              React Frontend
+                    |
+                    v
+          +---------------------+
+          | Kubernetes Service  |
+          | Stable IP / DNS     |
+          +---------------------+
+                    |
+           +--------+--------+
+           |        |        |
+           v        v        v
+        Backend  Backend  Backend
+         Pod 1    Pod 2    Pod 3
+```
+
+Service selector aur endpoints ke through eligible Pods ko traffic forward kar sakti hai.
+
+## 5. Types of Kubernetes Services
+
+### 1. ClusterIP
+
+Cluster ke andar applications ke beech communication ke liye. Ye default Service type hai. Example: React frontend ke backend API ko cluster ke internal network mein access karna, ya Node.js backend ka MongoDB Service se connect karna.
+
+### 2. NodePort
+
+Worker Nodes ke IP par ek configured port ke through Service ko expose karta hai. Testing ya specific network setups mein use ho sakta hai; production mein direct NodePort exposure har case mein ideal nahi hota.
+
+### 3. LoadBalancer
+
+Supported cloud provider ya load-balancer integration ke through external load balancer provision karne ka request karta hai. AWS par ise suitable load-balancer integration ke saath use kiya ja sakta hai.
+
+## 6. Practical Example — Backend Service
+
+Is YAML ko `backend-service.yaml` naam se save karo. Ye Service `app: mern-backend` label wale Pods ko target karti hai. Ye labels Deployment ke Pod template se match hone chahiye.
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mern-backend-service
+spec:
+  type: ClusterIP
+  selector:
+    app: mern-backend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 5000
+```
+
+### YAML ka meaning
+
+- `kind: Service` — Kubernetes Service resource create karta hai.
+- `type: ClusterIP` — Service ko cluster ke andar expose karta hai.
+- `selector` — Matching labels wale Pods select karta hai.
+- `port: 80` — Service ka port.
+- `targetPort: 5000` — Selected Pod ke container/application ka destination port.
+
+### Service create aur inspect karo
+
+```bash
+kubectl apply -f backend-service.yaml
+kubectl get services
+kubectl describe service mern-backend-service
+kubectl get endpointslices
+kubectl get pods -l app=mern-backend
+```
+
+Service aur Deployment ko same Namespace mein rakho, ya apni cross-Namespace networking configuration ke mutabik address use karo.
+
+## 7. Service Types Comparison
+
+| Type | Accessibility | Common use |
+|---|---|---|
+| ClusterIP | Cluster ke andar | Internal service-to-service communication |
+| NodePort | Node IP aur configured port ke through | Testing ya specific external network access |
+| LoadBalancer | External load balancer, if supported/configured | External client traffic |
+
+## 8. Important Points to Remember
+
+- Pod IPs change ho sakte hain; Service ek stable access point provide karti hai.
+- Service traffic ko selector ke basis par matching Pods tak route kar sakti hai.
+- Service khud application Pods create nahi karti; Deployment jaise controllers Pods manage karte hain.
+- ClusterIP Service by default internet par directly accessible nahi hoti.
+- Service port aur targetPort alag ho sakte hain.
+
+**Remember:** Deployment Pods ko manage karta hai; Service un Pods tak stable network access provide karti hai.
