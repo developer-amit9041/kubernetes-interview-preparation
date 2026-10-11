@@ -27171,4 +27171,146 @@ Use different endpoints or logic when the checks have different meanings. Do not
 ### Interview-ready answer
 “I configure a readiness probe in the Node.js Deployment using an HTTP GET endpoint such as `/health/ready`. The Express endpoint returns HTTP 200 when the application is ready and a non-success status, such as 503, when it is not. I set values such as `initialDelaySeconds`, `periodSeconds`, `timeoutSeconds`, and `failureThreshold` according to the application's startup and response times. If the probe fails, Kubernetes marks the Pod not ready and normally removes it from ready Service endpoints without restarting the container. I then verify the probe events, application logs, and Service endpoints.”
 
+## 197. How would you configure a liveness probe for a Node.js application?
+
+### English Definition
+A liveness probe is a Kubernetes health check that determines whether a container is still functioning correctly. If the probe fails repeatedly beyond the configured failure threshold, Kubernetes restarts the container.
+
+### Hindi Definition
+Liveness probe Kubernetes ko batati hai ki Node.js application abhi bhi sahi se kaam kar rahi hai ya nahi. Agar application baar-baar health check fail karti hai, toh Kubernetes container ko restart kar sakta hai, taaki application recover ho sake.
+
+### Step 1: Understand the real-world situation
+In a MERN application, a Node.js process might become unresponsive because of a deadlock-like condition, a blocked event loop, or an unrecoverable internal failure. A liveness probe helps Kubernetes detect certain unresponsive states and restart the container.
+
+```text
+Kubernetes
+    |
+    | liveness HTTP check
+    v
+Node.js backend Pod
+    |
+    +-- responds successfully --> container keeps running
+    |
+    +-- repeatedly fails ------> container can be restarted
+```
+
+**Important:** Readiness and liveness have different purposes. Readiness decides whether a Pod should receive normal Service traffic. Liveness determines whether a container should be restarted. Do not make liveness depend on MongoDB availability by default; a temporary database outage could otherwise cause unnecessary restart loops.
+
+### Step 2: Create a lightweight Express endpoint
+Example `server.js`:
+
+```javascript
+const express = require("express");
+
+const app = express();
+
+app.get("/health/live", (req, res) => {
+  return res.status(200).json({ status: "alive" });
+});
+
+const PORT = process.env.PORT || 5000;
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log("Backend running on port " + PORT);
+});
+```
+
+Explanation:
+- Kubernetes calls `/health/live`.
+- HTTP 200 indicates that the HTTP server is responding.
+- If the process hangs and the endpoint stops responding, the probe may fail.
+- Keep this endpoint lightweight. A simple endpoint does not detect every possible logical failure, so design it to reflect the kinds of unrecoverable application failures that should trigger a restart.
+
+### Step 3: Configure livenessProbe in the Deployment
+Example `backend-deployment.yaml`:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: node-backend
+  template:
+    metadata:
+      labels:
+        app: node-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:v1
+          ports:
+            - containerPort: 5000
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+```
+
+### Step 4: Understand the fields
+
+| Field | Meaning |
+|---|---|
+| `httpGet.path` | Endpoint Kubernetes calls |
+| `httpGet.port` | Node.js container port, here 5000 |
+| `initialDelaySeconds: 10` | Begin scheduled checks 10 seconds after the container starts |
+| `periodSeconds: 10` | Interval between checks |
+| `timeoutSeconds: 2` | Maximum time to wait for a response |
+| `failureThreshold: 3` | Consecutive failures required before Kubernetes restarts the container |
+
+These are example values, not universal defaults. Tune them based on startup and response-time measurements. A liveness failure does not immediately restart a container; Kubernetes waits until the configured failure threshold is reached.
+
+### Step 5: Apply and verify
+Apply the Deployment:
+
+```bash
+kubectl apply -f backend-deployment.yaml
+kubectl rollout status deployment/node-backend
+kubectl get pods
+```
+
+Inspect a Pod and its probe events:
+
+```bash
+kubectl describe pod <pod-name>
+kubectl logs <pod-name>
+kubectl get events --sort-by=.metadata.creationTimestamp
+```
+
+If the liveness probe keeps failing, check the endpoint path, container port, server binding, application logs, and Pod events. Avoid repeatedly restarting a container to mask an underlying configuration or dependency problem.
+
+### Step 6: Liveness vs readiness vs startup probes
+
+| Probe | Main question | Effect of failure |
+|---|---|---|
+| Readiness | Can the app receive traffic now? | Pod becomes not ready and is normally removed from ready Service endpoints |
+| Liveness | Is the container unhealthy enough that it should restart? | After the configured threshold, Kubernetes restarts the container |
+| Startup | Has a slow-starting application completed startup? | Liveness/readiness probes are held back until startup succeeds |
+
+If the Node.js application has a slow startup, consider adding a `startupProbe`. This helps avoid liveness checks restarting the container before it has had enough time to initialize.
+
+### Step 7: Common mistakes
+1. **Using the wrong port or endpoint path:** the probe fails even though the application may be running.
+2. **Setting thresholds too aggressively:** transient delays can trigger unnecessary restarts.
+3. **Checking MongoDB from liveness by default:** a database outage can cause all backend replicas to restart repeatedly.
+4. **Using the same logic for readiness and liveness without considering their purpose:** an app may be alive but temporarily unable to serve traffic.
+5. **Ignoring startup time:** use a suitable initial delay or a startup probe for slow-starting applications.
+
+### Summary
+1. Create a lightweight endpoint such as `/health/live`.
+2. Configure `livenessProbe.httpGet` with the endpoint path and container port.
+3. Tune the delay, period, timeout, and failure threshold.
+4. Apply the Deployment and inspect Pod events and logs.
+5. Remember: liveness can restart a container; readiness controls traffic eligibility.
+
+### Interview-ready answer
+“I configure a liveness probe in the Node.js Deployment using an HTTP GET endpoint such as `/health/live`. The Express endpoint returns HTTP 200 while the application can respond. I configure `initialDelaySeconds`, `periodSeconds`, `timeoutSeconds`, and `failureThreshold` according to the application's behavior. If the probe fails repeatedly beyond the threshold, Kubernetes restarts the container. I keep liveness checks independent of temporary external dependency failures, such as a MongoDB outage, to avoid unnecessary restart loops. For slow-starting applications, I consider using a startup probe as well.”
+
 ---
