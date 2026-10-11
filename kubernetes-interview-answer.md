@@ -26834,4 +26834,171 @@ Mounted ConfigMap/Secret files can update eventually, but the application must r
 ### Interview-ready answer
 “I configure environment variables in Kubernetes using the `env` and `envFrom` fields in a Pod or Deployment specification. For non-sensitive configuration such as `PORT`, `NODE_ENV`, and `LOG_LEVEL`, I use a ConfigMap. For sensitive values such as `MONGO_URI` and `JWT_SECRET`, I use a Kubernetes Secret and reference it through `secretKeyRef` or `secretRef`. The Node.js application reads these values through `process.env`. This keeps configuration separate from the container image and makes environment-specific deployments easier to manage. I also secure Secrets with appropriate RBAC and encryption at rest.”
 
+## 195. Where would you use ConfigMaps and Secrets in a MERN application?
+
+### English Definition
+A Kubernetes ConfigMap stores non-sensitive configuration data that applications need at runtime, while a Secret stores sensitive information such as passwords, tokens, and credentials. In a MERN application, ConfigMaps can configure application settings, while Secrets can provide database credentials and other confidential values to backend containers.
+
+### Hindi Definition
+ConfigMap ka use application ki normal settings store karne ke liye hota hai, jaise port, environment name aur log level. Secret ka use sensitive data store karne ke liye hota hai, jaise MongoDB password, JWT secret aur third-party API keys. Isse application code aur Docker image configuration aur credentials se separate rehte hain.
+
+### Step 1: Decide what belongs where
+
+| Example | Resource | Reason |
+|---|---|---|
+| `NODE_ENV=production` | ConfigMap | Non-sensitive application setting |
+| `PORT=5000` | ConfigMap | Non-sensitive setting |
+| `LOG_LEVEL=info` | ConfigMap | Non-sensitive setting |
+| Public API base URL | ConfigMap or frontend build config | Public, non-sensitive value |
+| MongoDB password | Secret | Sensitive credential |
+| Credential-bearing `MONGO_URI` | Secret | May contain username/password |
+| `JWT_SECRET` | Secret | Signing key must remain confidential |
+| Payment provider private API key | Secret | Confidential credential |
+
+**Important:** A Kubernetes Secret is intended for sensitive data, but its existence does not by itself guarantee encryption at rest. Configure encryption at rest, least-privilege RBAC, and secure provisioning. Never commit populated Secret manifests to GitHub.
+
+### Step 2: Create a backend ConfigMap
+Example `backend-configmap.yaml`:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+data:
+  NODE_ENV: "production"
+  PORT: "5000"
+  LOG_LEVEL: "info"
+```
+
+Apply it:
+
+```bash
+kubectl apply -f backend-configmap.yaml
+```
+
+Node.js can read the values with:
+
+```javascript
+const PORT = process.env.PORT || 5000;
+const NODE_ENV = process.env.NODE_ENV || "development";
+const LOG_LEVEL = process.env.LOG_LEVEL || "info";
+```
+
+ConfigMaps keep non-sensitive configuration separate from application code and container images.
+
+### Step 3: Create a Secret for sensitive values
+Example learning file `backend-secret.yaml`:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backend-secret
+type: Opaque
+stringData:
+  MONGO_USERNAME: "appuser"
+  MONGO_PASSWORD: "REPLACE_WITH_REAL_PASSWORD"
+  JWT_SECRET: "REPLACE_WITH_STRONG_RANDOM_SECRET"
+```
+
+Apply it:
+
+```bash
+kubectl apply -f backend-secret.yaml
+```
+
+These are placeholders. Provision real credentials securely and do not commit populated Secret manifests. Creating a Secret does not automatically create the MongoDB user; the user and its database permissions must already be configured.
+
+### Step 4: Reference both from the backend Deployment
+Example `backend-deployment.yaml`:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: node-backend
+  template:
+    metadata:
+      labels:
+        app: node-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:v1
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: backend-secret
+```
+
+This imports the ConfigMap and Secret keys as environment variables. Both resources must exist in the same namespace as the backend Pod.
+
+Node.js reads them with:
+
+```javascript
+const mongoUsername = process.env.MONGO_USERNAME;
+const mongoPassword = process.env.MONGO_PASSWORD;
+const jwtSecret = process.env.JWT_SECRET;
+```
+
+Never print secret values to logs.
+
+### Step 5: Where do these resources fit in the React frontend?
+React frontend configuration depends on the build tool. With common tools such as Vite or Create React App, environment values are often embedded in the JavaScript bundle at build time. Public values, such as an API base URL, may be supplied through frontend build configuration or served at runtime by a web server.
+
+**Never put MongoDB credentials, JWT signing secrets, or private payment API keys into browser-delivered React code.** Anything shipped to the browser can be inspected by users. If using Nginx to serve React, runtime public configuration can be served as a public config file, but that does not make its contents secret.
+
+### Step 6: Where do they fit in MongoDB?
+For self-hosted MongoDB in Kubernetes:
+- A ConfigMap may hold non-sensitive MongoDB settings if the deployment method supports it.
+- A Secret can provide database initialization credentials or administrative passwords.
+- A PersistentVolumeClaim (PVC) stores database files beyond the lifetime of an individual Pod.
+
+Secret storage alone is not enough. Enable authentication, use a least-privilege application database user, configure backups, and avoid unnecessary public database exposure.
+
+### Step 7: Deploy and verify
+Apply the ConfigMap and Secret before the Deployment:
+
+```bash
+kubectl apply -f backend-configmap.yaml
+kubectl apply -f backend-secret.yaml
+kubectl apply -f backend-deployment.yaml
+
+kubectl get configmaps
+kubectl get secrets
+kubectl get deployments
+kubectl get pods
+kubectl rollout status deployment/node-backend
+```
+
+If resources are in namespace `mern-app`, add `-n mern-app` to the commands. Avoid commands that print Secret contents.
+
+When a ConfigMap or Secret is consumed as environment variables, changing the resource does not update environment variables in already-running containers. Restart the Deployment so new Pods receive the values:
+
+```bash
+kubectl rollout restart deployment/node-backend
+kubectl rollout status deployment/node-backend
+```
+
+### Summary table
+
+| Component | ConfigMap use | Secret use |
+|---|---|---|
+| React frontend | Public API URL/build settings | Do not expose secrets in browser code |
+| Node.js/Express backend | Port, environment, log level, feature flags | MongoDB credentials, JWT secret, private API keys |
+| MongoDB | Non-sensitive server settings where supported | Initialization credentials and passwords |
+| Kubernetes operations | Ordinary environment-specific settings | Confidential credentials, with RBAC and encryption controls |
+
+### Interview-ready answer
+“In a MERN application, I use ConfigMaps for non-sensitive configuration such as the backend port, environment name, log level, and feature flags. I use Secrets for sensitive values such as the MongoDB connection string when it contains credentials, JWT signing keys, and private third-party API keys. The backend Deployment references these resources through `envFrom`, `env`, or `secretKeyRef`, and Node.js reads the values from `process.env`. For React, I only expose public configuration because browser-delivered variables are visible to users. I also protect Secrets with RBAC, encryption at rest, and secure provisioning, and I never commit real credentials to GitHub.”
+
 ---
