@@ -20323,3 +20323,86 @@ A common approach is to use HPA for replica scaling and VPA recommendations (`up
 "HPA and VPA solve different autoscaling problems. HPA changes the number of Pod replicas based on observed metrics, helping an application scale horizontally as demand changes. VPA recommends or adjusts the CPU and memory resource requests for containers, helping right-size each Pod vertically. For example, HPA may scale a Node.js API from two Pods to four, while VPA may recommend increasing each Pod's memory request. They can be used together with care, particularly when HPA uses CPU utilization and VPA changes CPU requests."
 
 ---
+
+## 161. What Is the Cluster Autoscaler?
+
+### 1. English Definition
+
+The **Cluster Autoscaler (CA)** is a Kubernetes autoscaling component that adjusts the number of Nodes in a cluster when configured conditions indicate that more or fewer Nodes are needed. It can add Nodes when Pods cannot be scheduled due to insufficient cluster capacity, and remove eligible underutilized Nodes when their workloads can be safely moved, subject to its configuration and provider support.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+Cluster Autoscaler ka kaam Kubernetes cluster mein **Nodes ki quantity ko automatically increase ya decrease karna** hai.
+
+- Agar naye Pods ke liye cluster mein suitable resources/Nodes nahi hain aur Pods unschedulable reh jaate hain, toh supported configuration mein Cluster Autoscaler naye Nodes add kar sakta hai.
+- Jab kuch Nodes underutilized hon aur unke Pods safely doosre Nodes par move ho sakte hon, toh Cluster Autoscaler un Nodes ko remove kar sakta hai.
+
+**Important:** Cluster Autoscaler Pods ki replicas directly scale nahi karta. Pod replicas ko HPA manage kar sakta hai; Cluster Autoscaler Nodes ko scale karta hai.
+
+### 3. MERN Stack Example
+
+Maan lo aapka MERN application AWS par Kubernetes (EKS) mein chal raha hai.
+
+1. Traffic badhta hai aur HPA Node.js API ke replicas 3 se 8 kar deta hai.
+2. Existing worker Nodes par CPU/memory capacity ya doosri scheduling requirements ke kaaran kuch Pods `Pending` reh jaate hain.
+3. Cluster Autoscaler, agar properly configured hai aur supported node group mein capacity available hai, ek ya zyada Nodes add kar sakta hai.
+4. Naye Nodes cluster mein register hone aur Ready hone ke baad scheduler pending Pods ko un par place kar sakta hai.
+5. Traffic kam hone par HPA replicas reduce kar sakta hai. Baad mein agar koi Node underutilized ho aur uske workloads safely reschedule ho sakein, Cluster Autoscaler Node remove kar sakta hai.
+
+Yeh process immediate hona guaranteed nahi hai; cloud provisioning, node startup, Pod constraints aur autoscaler settings par time lag sakta hai.
+
+### 4. How Cluster Autoscaler Works
+
+1. Scheduler Pod ko suitable Node nahi de paata aur Pod unschedulable rehta hai.
+2. Cluster Autoscaler check karta hai ki kisi configured node group ko scale up karne se Pod schedule ho sakta hai ya nahi.
+3. Cloud/provider integration ke through Node group ki desired size increase hoti hai.
+4. Naya Node cluster mein register hota hai aur Ready hone ke baad scheduler Pods ko place kar sakta hai.
+5. Scale-down ke liye autoscaler eligible underutilized Nodes evaluate karta hai, Pods ko safely drain/reschedule karne ki feasibility check karta hai, aur phir provider Node group size reduce kar sakta hai.
+
+### 5. Practical Example — AWS EKS Concept
+
+Cluster Autoscaler ko EKS ke worker Node groups ke saath configure kiya ja sakta hai. Exact setup aapke provisioning model, IAM permissions, autoscaler version aur node group configuration par depend karta hai. Alternative AWS-native approach mein EKS managed node groups ke saath Karpenter bhi use kiya ja sakta hai; Karpenter Cluster Autoscaler se alag node-provisioning solution hai.
+
+Conceptual example:
+
+```text
+HPA increases API replicas
+          ↓
+Some Pods stay Pending (insufficient capacity)
+          ↓
+Cluster Autoscaler evaluates configured node groups
+          ↓
+Cloud provider adds Node(s)
+          ↓
+Node becomes Ready → scheduler places Pods
+```
+
+### 6. Useful Commands
+
+```bash
+# Check Pods that may be waiting for capacity
+kubectl get pods -A
+
+# Inspect why a specific Pod is Pending
+kubectl describe pod <pod-name>
+
+# View cluster Nodes
+kubectl get nodes
+
+# Check Node resource requests and allocatable capacity
+kubectl describe node <node-name>
+```
+
+Cluster Autoscaler logs and configuration are deployment-specific; inspect its workload/logs and cloud node group events according to how it was installed.
+
+### 7. HPA vs. VPA vs. Cluster Autoscaler
+
+| Tool | What it scales | Typical trigger/goal |
+|---|---|---|
+| HPA | Pod replicas | Application metrics and workload demand |
+| VPA | Per-container resource requests/recommendations | Right-sizing CPU and memory |
+| Cluster Autoscaler | Cluster Nodes | Unschedulable Pods or eligible underutilized Nodes |
+
+**Interview Answer:** The Cluster Autoscaler automatically adjusts the number of Nodes in a Kubernetes cluster. It can scale up when Pods cannot be scheduled because the cluster lacks suitable capacity, and scale down eligible underutilized Nodes when their workloads can be safely moved. In a MERN application on EKS, HPA may increase Node.js API replicas, and Cluster Autoscaler can add worker Nodes if the existing cluster cannot accommodate them. HPA scales Pods; Cluster Autoscaler scales Nodes.
+
+---
