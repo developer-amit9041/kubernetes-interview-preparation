@@ -16649,3 +16649,136 @@ kubectl get endpointslices
 
 **Remember:** Liveness = “Should this container restart?”; readiness = “Should this Pod receive traffic?”
 
+---
+
+# 130. Why Do We Need a Startup Probe?
+
+## 1. English Definition
+
+A **startup probe** is needed to give slow-starting applications enough time to initialize before Kubernetes begins running their liveness and readiness probes.
+
+## 2. Hindi Definition
+
+Startup probe ki zaroorat slow-starting applications ko startup complete karne ke liye sufficient time dene ke liye hoti hai. Jab tak startup probe successful nahi hota, Kubernetes liveness aur readiness probes ko execute nahi karta, agar woh configured hain.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN Stack application ka Node.js backend Kubernetes par deploy hai.
+
+Application ko start hone mein 60 seconds lagte hain, kyunki use configuration load karni hai, initial setup karna hai aur MongoDB connection establish karna hai.
+
+Agar liveness probe startup ke sirf 10 seconds baad fail hona shuru ho jaaye, toh Kubernetes configured failure threshold ke baad container restart kar sakta hai. Agar application abhi bhi start nahi hui, toh yeh restart baar-baar ho sakta hai.
+
+**Startup probe ki zaroorat kyun hai?**
+
+- Application ko startup complete karne ke liye sufficient time milta hai.
+- Startup ke dauran liveness probe ki wajah se unnecessary restarts se bachne mein help milti hai.
+- Startup successful hone ke baad liveness aur readiness probes apne configured schedule ke according kaam karte hain.
+
+## 4. Practical Example / Code
+
+### Kubernetes Deployment YAML
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:latest
+          ports:
+            - containerPort: 5000
+          startupProbe:
+            httpGet:
+              path: /startup
+              port: 5000
+            periodSeconds: 5
+            failureThreshold: 18
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 5000
+            periodSeconds: 5
+            failureThreshold: 3
+```
+
+**Configuration explanation:**
+
+- `startupProbe`: Checks whether the backend has completed startup.
+- `path: /startup`: Endpoint that should return success only after required initialization is complete.
+- `periodSeconds: 5`: Runs the startup check approximately every 5 seconds.
+- `failureThreshold: 18`: Allows 18 consecutive failed checks, giving roughly 90 seconds of startup time, subject to probe timing.
+- `livenessProbe`: Starts running only after the startup probe succeeds.
+- `readinessProbe`: Also starts running only after the startup probe succeeds.
+
+If the startup probe continues failing beyond its configured threshold, Kubernetes restarts the container. Set the threshold according to the application's actual startup time. The `/startup`, `/health`, and `/ready` endpoints must be implemented by the application.
+
+## 5. Practical Commands
+
+```bash
+# Apply the Deployment
+kubectl apply -f deployment.yaml
+
+# Check Pod status and restart counts
+kubectl get pods
+
+# Inspect probe settings and Events
+kubectl describe pod <pod-name>
+
+# Check backend logs
+kubectl logs <pod-name>
+
+# Follow logs while the container starts
+kubectl logs -f <pod-name>
+
+# Inspect the live Deployment configuration
+kubectl get deployment backend -o yaml
+```
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+       Node.js Backend Container Starts
+                     |
+                     v
+              Startup Probe
+                     |
+              +------+------+
+              |             |
+           Success         Repeated failure
+              |             |
+              v             v
+     Liveness and        Container restart
+     readiness probes
+     can start running
+```
+
+## 7. Summary Table
+
+| Without a startup probe | With a startup probe |
+|---|---|
+| A slow-starting app may fail liveness checks before initialization finishes | Startup checks allow time for initialization |
+| Repeated liveness failures may restart the container prematurely | Liveness and readiness checks wait until startup succeeds |
+| Startup timing must be accommodated by other probe settings | Startup timing can be configured independently |
+
+**Interview Answer:** We need a startup probe to give slow-starting applications enough time to initialize and to prevent liveness and readiness checks from running too early. Once the startup probe succeeds, the other configured probes begin running. If startup repeatedly fails beyond the configured threshold, Kubernetes restarts the container.
+
+**Remember:** Startup probe protects the initialization phase; liveness checks whether a container should restart, and readiness checks whether a Pod should receive traffic.
+
