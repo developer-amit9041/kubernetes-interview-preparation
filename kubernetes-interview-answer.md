@@ -14111,3 +14111,114 @@ If HTTPS fails, check that the Secret is in the same namespace as the Ingress, t
 **Interview Answer:** Configure a valid TLS certificate and private key in a Kubernetes TLS Secret, reference that Secret in the Ingress `spec.tls` section, and ensure DNS points to the Ingress Controller. This enables HTTPS at the Ingress layer.
 
 **Remember:** TLS Secret stores the certificate and key; Ingress TLS configuration tells the controller which certificate to use for the domain.
+
+---
+
+# 108. What Is Path-Based Routing in Ingress?
+
+## 1. English Definition
+
+Path-based routing in Kubernetes Ingress routes incoming HTTP/HTTPS requests to different Kubernetes Services based on the URL path.
+
+## 2. Hindi Definition
+
+Path-based routing ka matlab hai URL ke path ke basis par request ko alag-alag Kubernetes Services tak bhejna. Jaise `/api` backend ko aur `/` frontend ko route kar sakta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application ek hi domain, `app.example.com`, use karti hai:
+
+- `https://app.example.com/` → React frontend
+- `https://app.example.com/api` → Node.js/Express backend
+- `https://app.example.com/admin` → admin-service (agar aapke setup mein ye Service hai)
+
+Is tarah har application ke liye alag domain rakhna zaroori nahi hota. Ingress path aur host rules match karke request ko correct Service tak bhejta hai.
+
+## 4. Practical Example / Code
+
+Example Ingress YAML:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mern-path-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-service
+                port:
+                  number: 5000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-service
+                port:
+                  number: 80
+```
+
+**Explanation:**
+- `host`: hostname jiske liye rules apply honge.
+- `path: /api`: `/api` aur uske matching subpaths, jaise `/api/users`, ko backend Service tak route karta hai.
+- `path: /`: remaining matching paths ko frontend Service tak route karta hai.
+- `pathType: Prefix`: path prefix ke basis par match karta hai.
+- Service names aur ports aapke actual Kubernetes Services se match hone chahiye.
+
+Note: Ingress routing traffic ko Service tak forward karti hai; ye automatically URL prefix remove nahi karti. Agar Express backend ko `/api` prefix strip karwana hai, to controller-specific rewrite configuration ya application-side routing alag se configure karni hogi.
+
+## 5. Practical Commands
+
+```bash
+# Apply the Ingress configuration
+kubectl apply -f ingress.yaml
+
+# List and inspect Ingress resources
+kubectl get ingress
+kubectl describe ingress mern-path-ingress
+
+# Verify the target Services and Pods
+kubectl get services
+kubectl get pods
+```
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+          Browser / Client
+                 |
+        app.example.com
+                 |
+                 v
+       Ingress Controller
+                 |
+        Path-based routing
+           /          \\
+          /            \\
+       /api              /
+         |               |
+         v               v
+ backend-service   frontend-service
+         |               |
+         v               v
+ Express API        React app
+```
+
+## 7. Summary Table
+
+| URL path | Destination | MERN example |
+|---|---|---|
+| `/api` | `backend-service:5000` | Node.js / Express API |
+| `/` | `frontend-service:80` | React frontend |
+| `/admin` | Optional admin Service | Admin UI, if configured |
+
+**Interview Answer:** Path-based routing uses URL paths defined in an Ingress resource to route HTTP/HTTPS requests to different Kubernetes Services, for example `/api` to the Express backend and `/` to the React frontend.
+
+**Remember:** Same domain, different URL paths, different Services.
