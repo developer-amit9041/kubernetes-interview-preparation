@@ -2704,3 +2704,156 @@ Ye commands API Server ko query karne ke practical examples hain. Managed Kubern
 | Component communication | Kubernetes components ko API ke through cluster state interact karne deta hai |
 
 **Remember:** `kube-apiserver` Kubernetes ka central API entry point hai. Ye requests process karta hai; scheduling Scheduler karta hai aur containers Worker Nodes par Kubelet aur container runtime ke through run hote hain.
+
+
+---
+
+# 23. What Is `etcd`?
+
+## 1. English Definition
+
+**`etcd` is a distributed, consistent key-value store used by Kubernetes to persist cluster state and configuration data.** It stores information about Kubernetes resources, such as Pods, Deployments, Services, Secrets, and ConfigMaps.
+
+## 2. Hindi Definition
+
+`etcd` ek distributed key-value database hai jo Kubernetes cluster ki important information ko persistently store karta hai, taaki Kubernetes ko pata rahe ki cluster mein kaun se resources configured hain aur unki desired state kya hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapke MERN project mein 3 backend replicas chahiye:
+
+```yaml
+spec:
+  replicas: 3
+```
+
+Jab aap ye configuration apply karte ho, Kubernetes API Server ke through desired configuration persist hoti hai. `etcd` is cluster state ko store karta hai.
+
+Simple example:
+
+- Aapne backend ke 3 replicas configure kiye.
+- `etcd` mein Deployment ki desired configuration store hoti hai.
+- Agar ek backend Pod fail ho jata hai, Deployment controller current state observe karta hai.
+- Controller missing replica ko restore karne ke liye action leta hai.
+
+**Important:** `etcd` khud failed Pod ko recreate nahi karta. Ye state store karta hai; Deployment controller desired state maintain karne ke liye kaam karta hai.
+
+### `etcd` mein data kaise socho?
+
+Key-value store ko simple example se samjho:
+
+| Key (example) | Value (example) |
+|---|---|
+| `/registry/deployments/default/mern-backend` | Deployment ki stored configuration |
+| `/registry/services/default/backend-service` | Service ki stored configuration |
+| `/registry/secrets/default/app-secret` | Secret resource ka stored data |
+
+Ye illustrative keys hain; Kubernetes ki actual internal storage representation version aur resource ke hisaab se vary kar sakti hai.
+
+## 4. Practical Example / Code — MERN Backend
+
+Maan lo aapke paas ye Deployment configuration hai:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+```
+
+Apply karo:
+
+```bash
+kubectl apply -f backend-deployment.yaml
+```
+
+Is process mein API Server request ko process karta hai aur cluster state persist hoti hai. `etcd` desired configuration ko store karne mein role play karta hai.
+
+Aap current resources check kar sakte ho:
+
+```bash
+kubectl get deployments
+kubectl get pods
+kubectl describe deployment mern-backend
+```
+
+In commands se aap Kubernetes API ke through resource information dekhte ho. Ye commands directly `etcd` ko query nahi karti hain.
+
+## 5. Architecture Diagram
+
+```text
+            kubectl
+               |
+               v
+        +----------------+
+        | kube-apiserver |
+        +----------------+
+               |
+               v
+        +----------------+
+        |      etcd      |
+        | Cluster state  |
+        +----------------+
+
+Deployment controller observes state through the API
+               |
+               v
+      Desired replicas maintained
+               |
+               v
+        Worker Nodes / Pods
+```
+
+Diagram conceptual hai. Controllers API Server ke through state observe aur update karte hain; ve etcd ko directly query nahi karte.
+
+## 6. Practical Commands / Configuration
+
+### Resources check karna
+
+```bash
+kubectl get deployments
+kubectl get pods -A
+kubectl get services
+```
+
+Ye commands API Server se resource information leti hain; ye direct etcd commands nahi hain.
+
+### etcd health check (sirf control-plane access ke saath)
+
+Self-managed cluster mein etcd health check ke liye aam taur par `etcdctl` use hota hai. Exact endpoint, certificates aur credentials aapke cluster setup par depend karte hain.
+
+```bash
+etcdctl endpoint health
+```
+
+Is command ko chalane ke liye correctly configured `etcdctl` aur etcd endpoint access zaroori hai. Managed Kubernetes mein direct etcd access aam taur par expose nahi hota.
+
+**Security note:** etcd mein sensitive Kubernetes data, including Secret resources, ho sakta hai. Production clusters mein etcd access restrict karo, backups protect karo aur encryption-at-rest configuration verify karo.
+
+## 7. Summary Table
+
+| Feature | `etcd` ka role |
+|---|---|
+| Storage type | Distributed key-value store |
+| Main purpose | Kubernetes cluster state persist karna |
+| Stores | Resource configuration and state, including Secrets |
+| API access | Kubernetes components normally API Server ke through interact karte hain |
+| Pod recovery | Khud Pod recreate nahi karta; controllers desired state maintain karte hain |
+| Operations | Backup, restore, access control aur health monitoring important hain |
+
+**Remember:** `etcd` Kubernetes ka persistent state store hai. API Server requests process karta hai, etcd state store karta hai, aur controllers desired state maintain karte hain.
