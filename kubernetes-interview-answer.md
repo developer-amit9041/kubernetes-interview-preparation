@@ -3667,3 +3667,138 @@ Common modes mein `iptables`, `IPVS` (where supported/configured), aur newer env
 | Alternative networking implementation | Kuch clusters mein kube-proxy ki Service-networking functionality provide kar sakti hai |
 
 **Remember:** A Service gives clients a stable way to reach backend Pods; `kube-proxy` commonly implements the node-level Service traffic rules, unless the cluster uses an alternative.
+
+
+---
+
+# 30. What Is a Container Runtime?
+
+## 1. English Definition
+
+**A container runtime is software responsible for running containers.** It pulls container images when needed, creates and starts containers, and manages their execution.
+
+In Kubernetes, the kubelet communicates with the container runtime through the **Container Runtime Interface (CRI)**.
+
+Common Kubernetes container runtimes include `containerd` and `CRI-O`.
+
+## 2. Hindi Definition
+
+Container Runtime ek software hai jo container image se container create karta hai aur us container ko start karke run karne mein help karta hai.
+
+Kubernetes mein `kubelet`, CRI ke through Container Runtime se communicate karta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapne apni Node.js backend application ki Docker image build karke Docker Hub par push kar di:
+
+```bash
+docker build -t amit/mern-backend:1.0 .
+docker push amit/mern-backend:1.0
+```
+
+Ab aap Kubernetes par ye backend deploy karna chahte ho.
+
+Process samjho:
+
+1. **Deployment:** Batata hai ki kitne backend replicas chahiye.
+2. **Scheduler:** Decide karta hai ki Pod kis Worker Node par chalega.
+3. **kubelet:** Assigned Node par Pod ki specification follow karta hai.
+4. **Container Runtime:** Zaroorat padne par image pull karta hai aur container create aur start karta hai.
+5. **Backend:** Aapka Node.js application container ke andar run hota hai.
+
+Yaad rakho: Docker image application ka packaged template hai, jabki container runtime us image se container run karne mein help karta hai.
+
+## 4. Practical Example / Code — MERN Backend
+
+Kubernetes Pod manifest mein image specify karo:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mern-backend
+spec:
+  containers:
+    - name: backend
+      image: amit/mern-backend:1.0
+      ports:
+        - containerPort: 5000
+```
+
+Apply karo:
+
+```bash
+kubectl apply -f backend-pod.yaml
+kubectl get pod mern-backend
+kubectl describe pod mern-backend
+```
+
+Agar image local cache mein nahi hai aur pull policy image pull karne ko kehti hai, toh node ka runtime registry se image pull karega. Image pull credentials, network access aur image name sahi hona zaroori hai.
+
+## 5. Architecture Diagram
+
+```text
+      Deployment / Pod YAML
+                |
+                v
+          kube-apiserver
+                |
+                v
+          kube-scheduler
+       (selects a Node)
+                |
+                v
+             kubelet
+                |
+           CRI interface
+                |
+                v
+       +------------------+
+       | Container Runtime|
+       | containerd/CRI-O |
+       +------------------+
+                |
+                v
+       MERN Backend Container
+```
+
+## 6. Practical Commands / Configuration
+
+### Image build aur push
+
+```bash
+docker build -t amit/mern-backend:1.0 .
+docker push amit/mern-backend:1.0
+```
+
+Ye commands Docker CLI aur configured image builder/daemon setup ke through image build/push karte hain; ye Kubernetes Node ke runtime ko directly configure nahi karte.
+
+### Kubernetes par Pod status check karo
+
+```bash
+kubectl get pods -o wide
+kubectl describe pod mern-backend
+```
+
+### Node ka runtime identify karna
+
+```bash
+kubectl get nodes -o wide
+kubectl describe node <node-name>
+```
+
+Node details mein container runtime aur version ki information available ho sakti hai. Exact host-level runtime commands ke liye authorized access to the node is needed; managed Kubernetes mein access restricted ho sakta hai.
+
+## 7. Summary Table
+
+| Concept | Role |
+|---|---|
+| Container image | Application aur uski dependencies ka packaged template |
+| Container runtime | Image se containers create aur run karta hai |
+| `containerd` | Kubernetes mein use hone wala common container runtime |
+| `CRI-O` | Kubernetes ke liye banaya gaya container runtime |
+| CRI | Kubelet aur runtime ke beech standard interface |
+| `kubelet` | Node par assigned Pods ko run karne ki process manage karta hai |
+| `kube-scheduler` | Pod ke liye suitable Node select karta hai |
+
+**Remember:** Scheduler chooses the Node, kubelet manages the Pod, and the container runtime runs the container.
