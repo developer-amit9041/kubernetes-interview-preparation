@@ -22110,4 +22110,185 @@ Isliye sirf `ClusterRole` use hone se access cluster-wide nahi hota; binding ka 
 
 ---
 
+
+## 173. How Do You Grant a Pod Only the Minimum Permissions It Needs?
+
+### 1. English Definition
+
+Grant a Pod only the minimum permissions it requires by following the **Principle of Least Privilege**: assign a dedicated ServiceAccount, bind it to a narrowly scoped Role, and allow only the necessary resources and verbs. Avoid unnecessary permissions, wildcards, and cluster-admin access.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+Pod ko sirf utni hi permissions deni chahiye jitni uske kaam ke liye zaroori hain. Is principle ko **Principle of Least Privilege** kehte hain.
+
+Iske liye dedicated ServiceAccount banao, namespace-scoped Role mein minimum required permissions define karo, aur RoleBinding se us ServiceAccount ko attach karo. Bina zaroorat `get`, `list`, `create`, ya admin permissions mat do.
+
+### 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application ka Node.js backend Kubernetes mein chal raha hai. Backend ko Kubernetes API se sirf `app-config` naam ka ConfigMap read karna hai.
+
+Aapko backend ko Pods delete karne, Secrets read karne, ya cluster ke saare resources manage karne ki permission dene ki zaroorat nahi hai.
+
+Least-privilege setup:
+1. Backend ke liye dedicated ServiceAccount banao: `mern-backend-sa`.
+2. Role mein sirf `configmaps` resource aur `get` verb allow karo.
+3. Permission ko `app-config` ConfigMap tak restrict karo.
+4. RoleBinding se Role ko ServiceAccount ke saath bind karo.
+5. Deployment ke Pod template mein `serviceAccountName: mern-backend-sa` set karo.
+
+Agar application Kubernetes API ko call hi nahi karti, toh ServiceAccount token ki automatic mounting disable karna bhi achha security practice hai.
+
+### 4. Practical Example / YAML
+
+File: `least-privilege.yaml`
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mern-backend-sa
+  namespace: development
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: read-app-config
+  namespace: development
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["app-config"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: mern-backend-read-config
+  namespace: development
+subjects:
+  - kind: ServiceAccount
+    name: mern-backend-sa
+    namespace: development
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: read-app-config
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+  namespace: development
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      serviceAccountName: mern-backend-sa
+      containers:
+        - name: backend
+          image: your-registry/mern-backend:latest
+```
+
+**Explanation:**
+- `ServiceAccount` — identity used by the Pod when it accesses the Kubernetes API.
+- `Role` — permits only the `get` verb on ConfigMaps named `app-config` in the `development` namespace.
+- `RoleBinding` — grants that Role to `mern-backend-sa`.
+- `serviceAccountName` — tells the Deployment's Pods to use this identity.
+- No wildcard permissions such as `*` are used, and no cluster-wide access is granted.
+
+The namespace `development` and ConfigMap `app-config` must exist. Replace the sample image with your actual backend image. This example grants API permissions; the application must use the Kubernetes API to read the ConfigMap.
+
+**If the Pod does not need to call the Kubernetes API**, you can add this to the Pod template's `spec` instead:
+
+```yaml
+automountServiceAccountToken: false
+```
+
+Do not disable token mounting if the application genuinely needs the automatically mounted ServiceAccount token to authenticate to the Kubernetes API.
+
+### 5. Practical Commands
+
+**Apply the configuration:**
+
+```bash
+kubectl apply -f least-privilege.yaml
+```
+
+**Check the ServiceAccount, Role, and RoleBinding:**
+
+```bash
+kubectl get serviceaccount mern-backend-sa -n development
+kubectl get role read-app-config -n development
+kubectl get rolebinding mern-backend-read-config -n development
+kubectl describe role read-app-config -n development
+```
+
+**Test the effective permissions:**
+
+```bash
+kubectl auth can-i get configmap/app-config \
+  --as=system:serviceaccount:development:mern-backend-sa \
+  -n development
+
+kubectl auth can-i get secrets \
+  --as=system:serviceaccount:development:mern-backend-sa \
+  -n development
+
+kubectl auth can-i delete pods \
+  --as=system:serviceaccount:development:mern-backend-sa \
+  -n development
+```
+
+Expected results for this example:
+- Read `app-config`: `yes`
+- Read Secrets: `no`
+- Delete Pods: `no`
+
+The `--as` checks require the current user to have permission to impersonate the specified ServiceAccount.
+
+### 6. Kubernetes Architecture Diagram
+
+```text
+MERN Backend Pod
+      |
+      | serviceAccountName
+      v
+mern-backend-sa (ServiceAccount)
+      |
+      | RoleBinding
+      v
+read-app-config (Role)
+      |
+      | get only
+      | configmaps/app-config
+      v
+Only the required ConfigMap
+```
+
+Permissions flow from the Role through the RoleBinding to the Pod's ServiceAccount. The Pod does not automatically receive every permission in the cluster.
+
+### 7. Summary Table
+
+| Best practice | Why it matters |
+|---|---|
+| Use a dedicated ServiceAccount | Avoid sharing identities unnecessarily |
+| Use a namespace-scoped Role | Limit the scope of access |
+| Allow only required verbs | For example, use `get` instead of `*` |
+| Restrict resources and names | Grant access only to the required resource |
+| Avoid wildcard rules and cluster-admin | Reduce the impact of a compromised Pod |
+| Disable token automount if API access is unnecessary | Avoid exposing an unnecessary API credential |
+| Verify with `kubectl auth can-i` | Confirm allowed and denied actions |
+
+**Interview-Ready Answer:**
+
+“I follow the Principle of Least Privilege. I create a dedicated ServiceAccount for the Pod, define a namespace-scoped Role with only the required resources and verbs, and use a RoleBinding to grant those permissions. I avoid wildcard permissions and cluster-admin access, disable ServiceAccount token automount when Kubernetes API access is unnecessary, and verify the effective permissions using `kubectl auth can-i`.”
+
+---
+
 ---
