@@ -13001,3 +13001,138 @@ Before a production upgrade or migration, take a database-consistent backup and 
 | Reclaim policy | Controls storage handling after a claim is released |
 
 **Remember:** Use PVC-backed persistent storage for stateful data, StatefulSets when stable identity/per-replica claims are needed, and regular tested backups for recovery.
+
+---
+
+# 100. What Happens to Data When a Pod Is Deleted?
+
+## 1. English Definition
+
+When a Kubernetes Pod is deleted, **the fate of its data depends on where the data is stored and how the storage is configured**. Data in the container's writable filesystem is generally lost, while data stored in persistent volumes can survive Pod deletion.
+
+## 2. Hindi Definition
+
+Bhai, jab Kubernetes mein Pod delete hota hai, toh data hamesha delete nahi hota. Ye depend karta hai ki data kahan store kiya gaya hai.
+
+- Container ke temporary filesystem ka data generally lose ho jata hai.
+- `emptyDir` ka data Pod remove hone par delete ho jata hai.
+- PVC ke through mounted persistent storage ka data generally survive karta hai, lekin actual behavior storage configuration aur reclaim policy par depend karta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application mein MongoDB Kubernetes Pod ke andar run ho raha hai.
+
+Agar MongoDB ka data container ke writable filesystem mein store hai, toh Pod delete hone par data lose ho sakta hai.
+
+Lekin agar MongoDB ka `/data/db` directory PVC-backed persistent storage par mounted hai, toh Pod delete hone ke baad bhi data generally available reh sakta hai, aur replacement Pod us storage ko dobara mount kar sakta hai.
+
+Isliye database jaise stateful workloads ke liye persistent storage, proper reclaim policy aur regular backups important hain.
+
+## 4. Practical Example / Code
+
+### Temporary storage using `emptyDir`
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: temporary-data-pod
+spec:
+  containers:
+    - name: app
+      image: busybox:1.36
+      command: ["sh", "-c", "mkdir -p /tmp/work && echo hello > /tmp/work/file.txt && sleep 3600"]
+      volumeMounts:
+        - name: temporary-work
+          mountPath: /tmp/work
+  volumes:
+    - name: temporary-work
+      emptyDir: {}
+```
+
+The `emptyDir` data is available while the Pod exists. If the Pod is deleted, this volume and its data are removed.
+
+### Persistent storage using a PVC
+
+A container can mount a PVC-backed volume like this:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: app-with-persistent-storage
+spec:
+  containers:
+    - name: app
+      image: busybox:1.36
+      command: ["sh", "-c", "sleep 3600"]
+      volumeMounts:
+        - name: app-data
+          mountPath: /data
+  volumes:
+    - name: app-data
+      persistentVolumeClaim:
+        claimName: app-data-pvc
+```
+
+This Pod expects an existing, compatible PVC named `app-data-pvc`. Deleting the Pod does not by itself delete the PVC or the underlying persistent data. However, deleting the PVC or its backing storage can affect retention depending on the PV reclaim policy, StorageClass, provisioner, and backend.
+
+## 5. Architecture Diagram
+
+```text
+              Pod deleted
+                   |
+          +--------+---------+
+          |                  |
+          v                  v
+   Container filesystem   Mounted volume
+          |                  |
+          v          +-------+--------+
+    Usually lost     |                |
+                     v                v
+                  emptyDir         PVC-backed
+                     |             storage
+                     v                |
+               Data removed           v
+                                  Usually persists*
+```
+
+`* `Persistent data retention depends on storage lifecycle settings and the backend. A persistent volume is not a substitute for a backup.`
+
+## 6. Practical Commands / Configuration
+
+Check the Pod and its PVCs before deleting anything:
+
+```bash
+kubectl get pods
+kubectl get pvc
+kubectl get pv
+```
+
+Inspect the claim and reclaim-related configuration:
+
+```bash
+kubectl describe pvc app-data-pvc
+kubectl get pv
+kubectl get storageclass
+```
+
+If you delete a test Pod:
+
+```bash
+kubectl delete pod app-with-persistent-storage
+```
+
+The PVC-backed data is expected to remain as long as the claim and backing storage are retained. Verify the claim and storage status before recreating a Pod that mounts it. Do not delete PVCs or storage resources unless you understand their retention policy and have the required backups.
+
+## 7. Summary Table
+
+| Where data is stored | What happens when the Pod is deleted? |
+|---|---|
+| Container writable filesystem | Generally lost with the container |
+| `emptyDir` volume | Deleted when the Pod is removed |
+| PVC-backed persistent volume | Usually survives Pod deletion |
+| PVC deleted | Retention depends on PV reclaim policy and storage implementation |
+| Database backups | Can support recovery if backups are valid and tested |
+
+**Remember:** Pod deletion does not automatically mean all data is deleted. Temporary data is lost, while PVC-backed persistent data can survive according to its storage lifecycle configuration.
