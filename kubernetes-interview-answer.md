@@ -14469,3 +14469,129 @@ Note: `EXTERNAL-IP` pending reh sakta hai agar cluster/provider LoadBalancer pro
 **Interview Answer:** A LoadBalancer Service exposes a Kubernetes Service externally, while Ingress defines HTTP/HTTPS host- and path-based routing rules for an Ingress Controller to send traffic to one or more Services.
 
 **Remember:** LoadBalancer exposes a Service; Ingress routes web traffic to Services.
+
+---
+
+# 111. What Is `kubectl`?
+
+## 1. English Definition
+
+`kubectl` is the Kubernetes command-line tool used to communicate with a Kubernetes cluster and create, inspect, update, and delete Kubernetes resources.
+
+## 2. Hindi Definition
+
+`kubectl` ek command-line tool hai jiske through hum Kubernetes cluster se interact karte hain. Isse Pods, Deployments, Services aur doosre resources ko create, check, update aur delete kar sakte hain.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapne apni MERN application Kubernetes par deploy ki hai. Aapko check karna hai ki backend Pods running hain ya nahi, Service bani hai ya nahi, ya Deployment mein koi error to nahi hai.
+
+In kaamon ke liye `kubectl` use karte hain. Ye aapke configured Kubernetes cluster ke API server se communicate karta hai.
+
+Examples:
+- `kubectl get pods` — Pods ki list check karta hai.
+- `kubectl get services` — Services check karta hai.
+- `kubectl describe deployment backend` — Deployment ki details aur events dikhata hai.
+- `kubectl apply -f deployment.yaml` — YAML configuration apply karta hai.
+
+## 4. Practical Example / Code
+
+Example Deployment YAML for a Node.js backend:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:latest
+          ports:
+            - containerPort: 5000
+```
+
+Save this as `backend-deployment.yaml`, then apply it:
+
+```bash
+kubectl apply -f backend-deployment.yaml
+kubectl get deployments
+kubectl get pods
+```
+
+**Explanation:**
+- `kubectl apply -f` YAML file ki desired configuration cluster mein apply karta hai.
+- `kubectl get deployments` Deployment ka status check karta hai.
+- `kubectl get pods` us Deployment ke Pods ka status dikhata hai.
+
+Replace the image name with an image that exists in your registry and is accessible to the cluster.
+
+## 5. Practical Commands
+
+```bash
+# Check cluster information
+kubectl cluster-info
+
+# List common resources
+kubectl get nodes
+kubectl get pods
+kubectl get deployments
+kubectl get services
+
+# Inspect a Pod in detail
+kubectl describe pod <pod-name>
+
+# View container logs
+kubectl logs <pod-name>
+
+# Apply a YAML file
+kubectl apply -f deployment.yaml
+
+# View the current kubectl context
+kubectl config current-context
+```
+
+Commands such as `kubectl get pods` use the current namespace unless you specify another namespace with `-n <namespace>`.
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+       Developer / Terminal
+                |
+          kubectl command
+                |
+                v
+       Kubernetes API Server
+                |
+                v
+       Kubernetes Resources
+     (Deployments, Pods, Services)
+                |
+                v
+          Worker Nodes
+```
+
+## 7. Summary Table
+
+| Command | Purpose |
+|---|---|
+| `kubectl get pods` | Lists Pods |
+| `kubectl get deployments` | Lists Deployments |
+| `kubectl get services` | Lists Services |
+| `kubectl describe pod <name>` | Shows Pod details and events |
+| `kubectl logs <name>` | Shows container logs |
+| `kubectl apply -f file.yaml` | Applies a resource configuration |
+| `kubectl cluster-info` | Displays cluster endpoint information |
+
+**Interview Answer:** `kubectl` is the Kubernetes CLI used to communicate with a cluster and manage resources such as Pods, Deployments, and Services through the Kubernetes API.
+
+**Remember:** `kubectl` is the command-line interface for managing Kubernetes resources.
