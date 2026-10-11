@@ -7850,3 +7850,128 @@ Make sure `spec.selector.matchLabels` matches `spec.template.metadata.labels`. F
 | `kubectl get pods -l app=mern-backend` | Lists Pods matching that label |
 
 **Remember:** A selector identifies Pods by matching labels. In a Deployment, `spec.selector.matchLabels` must match the labels in `spec.template.metadata.labels`.
+---
+
+# 64. What Role Do Labels Play in a Deployment?
+
+## 1. English Definition
+
+**Labels are key-value pairs attached to Kubernetes resources, such as Pods, that help identify, organize, and select those resources.** In a Deployment, labels help the Deployment's selector and its ReplicaSet identify the Pods that belong to the application.
+
+## 2. Hindi Definition
+
+Kubernetes mein **labels key-value pairs hote hain jo Pods aur doosre resources ki pehchaan karne aur unhe group karne mein help karte hain.**
+
+Example:
+
+```yaml
+labels:
+  app: mern-backend
+  environment: production
+```
+
+- `app: mern-backend` application ko identify karta hai.
+- `environment: production` batata hai ki resource production environment ke liye hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application mein React frontend aur Node.js backend hai. Kubernetes mein dono ke multiple Pods chal rahe hain.
+
+Labels ke through tum backend Pods ko `app: mern-backend` aur frontend Pods ko `app: mern-frontend` de sakte ho.
+
+Deployment ka selector in labels ko match karke apne Pods identify karta hai. **Label resource ko identify karta hai; selector matching labels wale resources ko find karta hai.**
+
+Labels ko `environment`, `team` ya `version` jaise metadata ke liye bhi use kar sakte ho. Labels khud traffic route nahi karte; Services aur controllers unka use apne selection rules ke liye kar sakte hain.
+
+## 4. Practical Example / Code
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+  labels:
+    app: mern-backend
+    environment: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+        environment: production
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+```
+
+Here, `spec.template.metadata.labels` labels each Pod created from the template. The Deployment selector matches `app: mern-backend`, so the selector must match the Pod template labels.
+
+## 5. Architecture Diagram
+
+```text
+        Deployment
+             |
+             v
+  Selector: app=mern-backend
+             |
+             v
+      Matching Pod labels
+             |
+       +-----+-----+
+       |     |     |
+       v     v     v
+     Pod 1 Pod 2 Pod 3
+      app=  app=  app=
+      mern- mern- mern-
+      backend on each Pod
+```
+
+Labels provide resource metadata. Selectors use matching label values to identify the intended Pods.
+
+## 6. Practical Commands / Configuration
+
+**List Pods with their labels:**
+
+```bash
+kubectl get pods --show-labels
+```
+
+**Find backend Pods by label:**
+
+```bash
+kubectl get pods -l app=mern-backend
+```
+
+**Find production Pods by environment label:**
+
+```bash
+kubectl get pods -l environment=production
+```
+
+**Apply the Deployment YAML:**
+
+```bash
+kubectl apply -f backend-deployment.yaml
+```
+
+Keep the Deployment's `spec.selector.matchLabels` consistent with `spec.template.metadata.labels`. For an `apps/v1` Deployment, its selector is required and immutable after creation.
+
+## 7. Summary Table
+
+| Item | Role |
+|---|---|
+| Label | Key-value metadata attached to a resource |
+| `app: mern-backend` | Identifies backend Pods by application label |
+| `environment: production` | Adds environment metadata |
+| Deployment selector | Matches Pods using labels |
+| `kubectl get pods --show-labels` | Displays Pod labels |
+| `kubectl get pods -l app=mern-backend` | Lists Pods matching a label selector |
+
+**Remember:** Labels organize and identify Kubernetes resources. Deployment selectors use labels to match Pods, while labels can also support filtering and selection by other Kubernetes resources.
