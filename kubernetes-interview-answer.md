@@ -18336,3 +18336,132 @@ Note: `kubectl top` shows current observed usage, so it may not reveal a short-l
 
 **Interview Answer:** `OOMKilled` means the container was terminated by an Out-Of-Memory mechanism because of memory exhaustion or a memory limit being exceeded. Kubernetes may restart it according to the Pod's restart policy. To troubleshoot, inspect the Pod's termination reason, events, previous logs, memory metrics, and node memory pressure.
 
+
+## 143. What Are Kubernetes QoS Classes?
+
+### 1. English Definition
+
+Kubernetes Quality of Service (QoS) classes categorize Pods according to the CPU and memory requests and limits configured for their containers. Kubernetes automatically assigns one of three classes: **Guaranteed, Burstable, or BestEffort**. QoS is one factor Kubernetes considers when evicting Pods during node resource pressure.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+Kubernetes QoS classes batati hain ki Pod ke CPU aur memory resources ki configuration kis category mein aati hai. Kubernetes requests aur limits dekhkar automatically **Guaranteed, Burstable, ya BestEffort** class assign karta hai. Node par resources ki kami hone par ye class eviction decision mein help karti hai.
+
+### 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application mein Node.js API aur MongoDB chal rahe hain:
+
+- **Guaranteed:** Critical payment API ke har container mein CPU aur memory ke requests aur limits set hain, aur har resource ke liye request = limit hai.
+- **Burstable:** Node.js API ka CPU request 250m aur limit 500m hai. Request aur limit alag hone ke karan Pod Burstable ho sakta hai.
+- **BestEffort:** Kisi bhi container mein CPU ya memory request/limit set nahi hai.
+
+QoS class Kubernetes automatically assign karta hai; ise Pod YAML mein manually set nahi karte. Eviction mein QoS ke alawa Pod priority aur actual resource usage bhi matter karte hain.
+
+### 4. Practical YAML Examples
+
+**Guaranteed:**
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: guaranteed-pod
+spec:
+  containers:
+    - name: node-api
+      image: node:20-alpine
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "256Mi"
+        limits:
+          cpu: "500m"
+          memory: "256Mi"
+```
+
+Har container ke liye CPU aur memory dono specify hain aur requests, limits ke equal hain, isliye QoS **Guaranteed** hai.
+
+**Burstable:**
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: burstable-pod
+spec:
+  containers:
+    - name: node-api
+      image: node:20-alpine
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "128Mi"
+        limits:
+          cpu: "500m"
+          memory: "256Mi"
+```
+
+Requests aur limits alag hain, isliye QoS **Burstable** hai.
+
+**BestEffort:**
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: besteffort-pod
+spec:
+  containers:
+    - name: node-api
+      image: node:20-alpine
+```
+
+Kisi bhi container ke liye CPU/memory requests ya limits nahi hain, isliye QoS **BestEffort** hai.
+
+### 5. Practical Commands
+
+```bash
+kubectl apply -f guaranteed-pod.yaml
+kubectl get pod guaranteed-pod -o jsonpath='{.status.qosClass}'
+kubectl get pod burstable-pod -o jsonpath='{.status.qosClass}'
+kubectl get pod besteffort-pod -o jsonpath='{.status.qosClass}'
+kubectl describe pod guaranteed-pod
+```
+
+Expected QoS output for the three examples: `Guaranteed`, `Burstable`, and `BestEffort`.
+
+### 6. QoS and Eviction Overview
+
+```text
+CPU/Memory Requests and Limits
+             |
+             v
+  Kubernetes assigns QoS class
+             |
+     +-------+-------+
+     |       |       |
+ Guaranteed Burstable BestEffort
+     |       |       |
+     +-------+-------+
+             |
+             v
+       Node pressure
+             |
+             v
+ Eviction considers QoS, usage
+ relative to requests, and priority
+```
+
+Under node memory pressure, **BestEffort** Pods are generally considered first for eviction. **Burstable** Pods may be evicted depending on usage relative to requests and Pod priority. **Guaranteed** Pods are generally the most protected of the three classes, but are not absolutely immune to eviction or termination.
+
+### 7. Summary Table
+
+| QoS Class | Resource configuration | General eviction behavior |
+|---|---|---|
+| **Guaranteed** | Every container has CPU and memory requests and limits; each request equals its corresponding limit | Generally most protected |
+| **Burstable** | Does not qualify as Guaranteed, but at least one container has a CPU or memory request/limit | Depends on usage relative to requests and Pod priority |
+| **BestEffort** | No container has CPU or memory requests or limits | Generally considered first |
+
+**Interview Answer:** Kubernetes QoS classes are Guaranteed, Burstable, and BestEffort. Kubernetes assigns the class automatically based on container CPU and memory requests and limits. Guaranteed requires every container to specify both CPU and memory requests and limits, with each request equal to its limit. BestEffort means no container has CPU or memory requests or limits; other eligible configurations are generally Burstable. QoS helps Kubernetes make eviction decisions under node resource pressure, along with factors such as Pod priority and resource usage relative to requests.
+
+---
