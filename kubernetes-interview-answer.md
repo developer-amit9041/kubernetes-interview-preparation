@@ -5097,3 +5097,108 @@ kubectl get pod mern-backend-lifecycle -o jsonpath='{.status.phase}'
 | `CrashLoopBackOff` | A container waiting reason, not a Pod phase |
 
 **Remember:** Pod phase describes the Pod's broad lifecycle state. Container states and readiness probes provide more detail about whether the application is actually ready to serve traffic.
+---
+
+# 41. What Are the Different Pod States?
+
+## 1. English Definition
+
+Kubernetes reports a Pod's lifecycle phase to indicate its overall status. The five Pod phases are `Pending`, `Running`, `Succeeded`, `Failed`, and `Unknown`. Individual containers inside a Pod have their own states: `Waiting`, `Running`, and `Terminated`.
+
+## 2. Hindi Definition
+
+Kubernetes Pod ki overall condition ko samajhne ke liye uski phase show karta hai. Pod ki five main phases hoti hain. Lekin Pod ke andar chalne wale har container ki apni state bhi hoti hai, jo batati hai ki container start hone ka wait kar raha hai, run kar raha hai, ya terminate ho chuka hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumne Kubernetes mein Node.js backend deploy kiya hai.
+
+### A. Five Pod phases
+
+- **Pending:** Pod create ho gaya, lekin setup ya container startup abhi complete nahi hua. Example: image download ho rahi hai.
+- **Running:** Pod Node par assign ho chuka hai aur kam se kam ek container start ho gaya hai ya start ho raha hai. Iska matlab app necessarily Ready nahi hai.
+- **Succeeded:** Pod ke sabhi containers successfully terminate ho gaye. Example: ek one-time database migration Job complete ho gaya.
+- **Failed:** Pod ke sabhi containers terminate ho gaye aur kam se kam ek container failure ke saath exit hua.
+- **Unknown:** Kubernetes ko Pod ki state determine karne ke liye sufficient information nahi mil rahi, aksar Node se communication issue ki wajah se.
+
+### B. Three container states
+
+- **Waiting:** Container setup/start hone ka wait kar raha hai, jaise image pull ya configuration issue ke time.
+- **Running:** Container process currently run kar raha hai.
+- **Terminated:** Container ne execution finish kar di ya woh stop ho gaya; exit code se success/failure samajhne mein help milti hai.
+
+**Important:** `CrashLoopBackOff` Pod phase nahi hai. Yeh container ke `Waiting` state ka reason ho sakta hai jab container repeatedly crash aur restart hota hai. `ImagePullBackOff` bhi container waiting reason hai, Pod phase nahi.
+
+## 4. Practical Example / Code — MERN Backend Pod
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mern-backend-state-demo
+spec:
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:1.0
+      ports:
+        - containerPort: 5000
+```
+
+Use an existing image that listens on port 5000. Kubernetes will report the Pod phase and container state as the Pod is scheduled and started.
+
+## 5. Architecture Diagram
+
+```text
+              Pod lifecycle phase
+                      |
+       +--------------+--------------+
+       |              |              |
+    Pending         Running        Unknown
+                      |
+             Container process ends
+                /             \
+          Succeeded           Failed
+
+Container states (separate concept):
+       Waiting  <-->  Running  -->  Terminated
+```
+
+The diagram is simplified: Pod phases do not always follow one fixed path, and container restarts can occur while a Pod remains in the `Running` phase.
+
+## 6. Practical Commands / Configuration
+
+Check the Pod phase:
+
+```bash
+kubectl get pods
+kubectl get pod mern-backend-state-demo -o jsonpath='{.status.phase}'
+```
+
+Inspect container state, readiness, restart count, and events:
+
+```bash
+kubectl describe pod mern-backend-state-demo
+kubectl get pod mern-backend-state-demo -o jsonpath='{.status.containerStatuses[*].state}'
+kubectl get events --sort-by=.metadata.creationTimestamp
+```
+
+Check logs:
+
+```bash
+kubectl logs mern-backend-state-demo -c backend
+```
+
+## 7. Summary Table
+
+| Category | State | Meaning |
+|---|---|---|
+| Pod phase | `Pending` | Setup or container startup is not complete |
+| Pod phase | `Running` | Pod is assigned to a Node and at least one container has started or is starting |
+| Pod phase | `Succeeded` | All containers terminated successfully |
+| Pod phase | `Failed` | All containers terminated and at least one failed |
+| Pod phase | `Unknown` | Kubernetes cannot determine the Pod's state |
+| Container state | `Waiting` | Container is waiting to start or restart |
+| Container state | `Running` | Container process is running |
+| Container state | `Terminated` | Container process has finished or stopped |
+
+**Remember:** Pod phases describe overall Pod status; container states describe each container. `CrashLoopBackOff` and `ImagePullBackOff` are waiting reasons, not Pod phases.
