@@ -9534,3 +9534,137 @@ For NodePort, test `http://<REACHABLE-NODE-IP>:30080` when network rules permit 
 | Internet access guaranteed? | No | No; depends on infrastructure and network rules |
 
 **Remember:** NodePort exposes a Service through a port on each node. LoadBalancer exposes a Service through an external load balancer address when supported by the cluster environment.
+---
+
+# 76. How Does a Service Identify Pods?
+
+## 1. English Definition
+
+A **Kubernetes Service identifies Pods using label selectors**. The Service matches its selector against the labels attached to Pods and routes traffic to matching, eligible Pod endpoints.
+
+## 2. Hindi Definition
+
+Kubernetes Service, Pods ko identify karne ke liye **Labels aur Selectors** ka use karti hai.
+
+- **Label:** Pod par lagaya gaya key-value tag, jaise `app: mern-backend`.
+- **Selector:** Service mein define kiya gaya rule jo matching labels wale Pods ko find karta hai.
+
+Simple words mein, Service Pod ka naam ya IP address manually yaad nahi rakhti. Woh labels ke basis par matching Pods ko identify karti hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhare Node.js backend ke 3 Pods hain: `backend-pod-1`, `backend-pod-2` aur `backend-pod-3`. Teeno Pods par same label hai:
+
+```yaml
+labels:
+  app: mern-backend
+```
+
+Ab tum ek Service banate ho jiska selector hai:
+
+```yaml
+selector:
+  app: mern-backend
+```
+
+Service check karegi ki kaunse Pods par `app=mern-backend` label hai. Teeno matching Pods Service ke endpoints ban sakte hain, agar woh traffic receive karne ke liye eligible hain.
+
+Agar kisi Pod ka label badal diya jaye aur woh selector se match na kare, toh Service use apne matching endpoints se hata sakti hai.
+
+**Yaad rakho:** Labels Pods par hote hain, aur selector Service mein hota hai. Dono ki values match honi chahiye.
+
+## 4. Practical Example / Code
+
+### Backend Pod labels (example)
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: backend-pod
+  labels:
+    app: mern-backend
+spec:
+  containers:
+    - name: backend
+      image: node:22-alpine
+      command: ["sh", "-c", "node -e \"require('http').createServer((req,res)=>res.end('OK')).listen(5000)\""]
+      ports:
+        - containerPort: 5000
+```
+
+### Service selector
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+spec:
+  type: ClusterIP
+  selector:
+    app: mern-backend
+  ports:
+    - port: 5000
+      targetPort: 5000
+```
+
+The Service selector `app: mern-backend` matches Pods with that label. In a real application, you would usually deploy multiple replicas through a Deployment rather than manually create Pods.
+
+## 5. Architecture Diagram
+
+```text
+Pod 1: app=mern-backend ----+
+                            |
+Pod 2: app=mern-backend ----+----> Service selector
+                            |      app=mern-backend
+Pod 3: app=mern-backend ----+              |
+                                           v
+                                 Matching Pod endpoints
+                                           |
+                                           v
+                                  Traffic to eligible Pods
+```
+
+Pods that do not match the selector are not selected by this Service. Kubernetes updates the Service's endpoint information as matching Pods are added, removed or their labels change.
+
+## 6. Practical Commands / Configuration
+
+Check Pod labels:
+
+```bash
+kubectl get pods --show-labels
+```
+
+List Pods matching the Service selector:
+
+```bash
+kubectl get pods -l app=mern-backend
+```
+
+Inspect the Service:
+
+```bash
+kubectl describe service backend-service
+```
+
+Check the endpoints selected for the Service:
+
+```bash
+kubectl get endpoints backend-service
+kubectl get endpointslices
+```
+
+EndpointSlices are the modern API for tracking Service backends. If no Pods match, verify that the Service selector and Pod labels match and that the Pods are ready and otherwise eligible to receive traffic.
+
+## 7. Summary Table
+
+| Term | Meaning |
+|---|---|
+| Label | Key-value metadata attached to a Pod |
+| Selector | Matching rule configured on the Service |
+| Match | Pod labels satisfy the selector |
+| Endpoint | A backend address eligible for Service traffic |
+| No matching Pods | Service has no matching backend endpoints |
+
+**Remember:** A Kubernetes Service uses label selectors to find matching Pods and sends traffic to eligible endpoints; it does not identify Pods by their names.
