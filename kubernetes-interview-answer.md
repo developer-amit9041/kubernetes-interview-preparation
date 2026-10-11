@@ -16497,3 +16497,155 @@ can begin
 
 **Remember:** Startup = “Has the application started?”; liveness = “Should the container be restarted?”; readiness = “Should the Pod receive traffic?”
 
+---
+
+# 129. What Is the Difference Between Liveness and Readiness Probes?
+
+## 1. English Definition
+
+**Liveness Probe:** Checks whether a container is functioning properly. If it repeatedly fails, Kubernetes restarts the container.
+
+**Readiness Probe:** Checks whether an application is ready to receive traffic. If it fails, Kubernetes marks the Pod as not ready and removes it from the Service's ready endpoints.
+
+## 2. Hindi Definition
+
+- **Liveness Probe:** Check karta hai ki application properly kaam kar rahi hai ya nahi. Baar-baar fail hone par Kubernetes container ko restart kar sakta hai.
+- **Readiness Probe:** Check karta hai ki application requests receive karne ke liye ready hai ya nahi. Fail hone par Kubernetes us Pod ko normal Service traffic dena band kar deta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN Stack application ka Node.js backend Kubernetes par 3 Pods mein run ho raha hai.
+
+**Scenario 1: Liveness Probe**
+
+Ek backend Pod hang ho gaya hai aur requests process nahi kar raha. Liveness probe fail hota hai. Configured failure threshold reach hone par Kubernetes us container ko restart kar deta hai.
+
+**Scenario 2: Readiness Probe**
+
+Ek backend Pod start ho raha hai aur abhi MongoDB connection initialize kar raha hai. Container running hai, lekin requests handle karne ke liye ready nahi hai. Readiness probe fail hota hai, toh Kubernetes us Pod ko Service ke ready endpoints se hata deta hai. Jab Pod ready ho jaata hai, toh woh dobara traffic receive kar sakta hai.
+
+**Main difference:** Liveness ka focus *restart karna hai ya nahi* par hai, jabki readiness ka focus *traffic dena hai ya nahi* par hai.
+
+## 4. Practical Example / Code
+
+### Express.js endpoints
+
+```javascript
+app.get("/health", (req, res) => {
+  // Liveness: process is able to respond.
+  res.status(200).json({ status: "alive" });
+});
+
+app.get("/ready", (req, res) => {
+  // In production, return 200 only when the app
+  // is initialized and able to serve requests.
+  res.status(appInitialized ? 200 : 503).json({
+    status: appInitialized ? "ready" : "not ready",
+  });
+});
+```
+
+Here, `appInitialized` is illustrative application state. Set it based on the initialization required for the backend to serve requests.
+
+### Kubernetes Deployment YAML
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:latest
+          ports:
+            - containerPort: 5000
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 5000
+            periodSeconds: 5
+            failureThreshold: 3
+```
+
+**How it works:**
+
+- `/health` is used by the liveness probe to decide whether the container should be restarted.
+- `/ready` is used by the readiness probe to decide whether the Pod should receive Service traffic.
+- A liveness failure can restart the container after the configured threshold.
+- A readiness failure marks the Pod unready; it does not restart the container by itself.
+
+Avoid making liveness depend on every external dependency, because a temporary database outage could cause unnecessary container restarts. Readiness can account for dependencies that are necessary to serve requests.
+
+## 5. Practical Commands
+
+```bash
+# Apply the Deployment
+kubectl apply -f deployment.yaml
+
+# Check Pod readiness and restart counts
+kubectl get pods
+
+# Inspect probe configuration and Events
+kubectl describe pod <pod-name>
+
+# Check backend logs
+kubectl logs <pod-name>
+
+# Inspect the live Deployment YAML
+kubectl get deployment backend -o yaml
+
+# Check Services and ready endpoints
+kubectl get services
+kubectl get endpointslices
+```
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+             Node.js Backend Pod
+                      |
+            +---------+---------+
+            |                   |
+            v                   v
+      Liveness Probe       Readiness Probe
+       GET /health          GET /ready
+            |                   |
+       Repeated failure      Probe failure
+            |                   |
+            v                   v
+      Restart container     Mark Pod unready
+                                |
+                                v
+                       Remove from ready endpoints
+```
+
+## 7. Summary Table
+
+| Feature | Liveness Probe | Readiness Probe |
+|---|---|---|
+| Main purpose | Detect a container that should be restarted | Detect whether a Pod can receive traffic |
+| Failure action | Restarts the affected container after the threshold | Marks the Pod not ready and removes it from ready Service endpoints |
+| Container restart? | Yes, after configured failure threshold | No, not because of readiness failure alone |
+| Traffic routing | Does not directly control readiness-based routing | Controls whether the Pod is considered ready for Service traffic |
+| MERN example | Backend process is stuck | Backend is starting or temporarily unable to serve requests |
+
+**Interview Answer:** A liveness probe determines whether a container should be restarted, while a readiness probe determines whether a Pod should receive traffic. A failed liveness probe can restart the container; a failed readiness probe marks the Pod as not ready without restarting it.
+
+**Remember:** Liveness = “Should this container restart?”; readiness = “Should this Pod receive traffic?”
+
