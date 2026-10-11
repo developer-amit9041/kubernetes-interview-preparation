@@ -15697,3 +15697,114 @@ kubectl get pods
 **Interview Answer:** Use `kubectl rollout undo deployment <deployment-name>` to roll back a Deployment to its previous revision. Use `--to-revision=<number>` to select a specific revision, and check progress with `kubectl rollout status`.
 
 **Remember:** Rollback reverts the Deployment revision; it does not automatically undo database migrations or other external changes.
+
+---
+
+# 122. How Do You Apply a YAML File?
+
+## 1. English Definition
+
+Use `kubectl apply -f <file.yaml>` to create or update Kubernetes resources defined in a YAML manifest.
+
+## 2. Hindi Definition
+
+Kubernetes mein YAML file ko apply karne ke liye `kubectl apply -f <file.yaml>` command use karte hain. Yeh file ke configuration ke according resources create ya update karti hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapne MERN application ke backend ke liye `deployment.yaml` banayi hai. Is file mein Deployment ka naam, container image aur replicas define hain. Aap `kubectl apply -f deployment.yaml` run karke Kubernetes cluster mein configuration apply kar sakte ho.
+
+Agar resource pehle se exist karta hai, toh Kubernetes desired configuration ke hisaab se usko update kar sakta hai. Command run karne ke liye cluster access aur correct namespace/context ki zaroorat hoti hai.
+
+## 4. Practical Example / Code
+
+### Example: `deployment.yaml`
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:latest
+          ports:
+            - containerPort: 5000
+```
+
+### Apply the file
+
+```bash
+kubectl apply -f deployment.yaml
+```
+
+Kubernetes manifest mein define ki gayi Deployment ko create ya update karega.
+
+## 5. Practical Commands
+
+```bash
+# Apply one YAML file
+kubectl apply -f deployment.yaml
+
+# Apply all supported manifests in a directory
+kubectl apply -f ./k8s/
+
+# Apply to a specific namespace
+kubectl apply -f deployment.yaml -n production
+
+# Preview changes before applying (server-side dry run)
+kubectl apply -f deployment.yaml --dry-run=server
+
+# Check the Deployment
+kubectl get deployment backend
+
+# Check Pods
+kubectl get pods
+
+# Validate/show changes against the live object
+kubectl diff -f deployment.yaml
+```
+
+Use `kubectl diff -f` to review differences before applying. `--dry-run=server` asks the API server to validate the request without persisting the resource.
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+        deployment.yaml
+               |
+               v
+    kubectl apply -f deployment.yaml
+               |
+               v
+       Kubernetes API Server
+               |
+               v
+   Resource created or configuration updated
+               |
+               v
+     Controllers reconcile desired state
+```
+
+## 7. Summary Table
+
+| Command | Purpose |
+|---|---|
+| `kubectl apply -f deployment.yaml` | Single YAML file apply karta hai |
+| `kubectl apply -f ./k8s/` | Directory ke manifests apply karta hai |
+| `kubectl apply -f deployment.yaml -n production` | Specific namespace mein apply karta hai |
+| `kubectl diff -f deployment.yaml` | Proposed differences dikhata hai |
+| `kubectl apply -f deployment.yaml --dry-run=server` | Server-side validation karta hai bina save kiye |
+
+**Interview Answer:** Use `kubectl apply -f <file.yaml>` to create or update Kubernetes resources defined in a manifest. Use `kubectl diff` to review changes and `kubectl get` to verify the result.
+
+**Remember:** `-f` means file; `apply` creates or updates resources to match the manifest.
