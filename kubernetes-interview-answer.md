@@ -27819,4 +27819,157 @@ If the API cannot reach MongoDB, verify the connection string, credentials, DNS/
 ### Interview-ready answer
 “I would deploy React and Node.js as separate Kubernetes Deployments, each exposed through a ClusterIP Service. An Ingress controller would route external HTTPS requests to the frontend and API paths to the backend. The Node.js Pods would connect to MongoDB over a secured network using credentials stored in a Secret or an external secrets manager. For production, I would configure readiness and liveness probes, resource requests, scaling policies, TLS, monitoring, and database backups. I would usually prefer a managed MongoDB service unless there is a specific reason to operate MongoDB inside Kubernetes, in which case I would design persistent storage and database replication and recovery carefully.”
 
+## 201. What is the relationship between Docker and Kubernetes?
+
+### English Definition
+Docker is a platform and set of tools used to build, package, and run applications in containers. Kubernetes is a container orchestration platform that manages containerized applications across a cluster of machines. Docker-built images can be used by Kubernetes when they are compatible with the cluster's container runtime.
+
+### Hindi Definition
+Docker application ko container image mein package karne aur containers run karne ke tools deta hai. Kubernetes un containerized applications ko cluster par deploy, manage, scale aur recover karne mein help karta hai. Simple words mein: Docker image banane mein help karta hai, Kubernetes us image se chalne wale workloads ko manage karta hai.
+
+### Step 1: Understand the relationship
+
+```text
+MERN application source code
+          |
+          v
+     Dockerfile
+          |
+          v
+  Docker builds images
+  - React frontend image
+  - Node.js backend image
+          |
+          v
+   Container image registry
+          |
+          v
+    Kubernetes cluster
+          |
+          v
+ Deployments create and manage Pods
+ Services provide stable networking
+ Kubernetes monitors desired state
+```
+
+For example, Docker can build an image for a Node.js API. That image can be pushed to a registry such as Docker Hub or Amazon ECR. A Kubernetes Deployment references the image and creates Pods to run it.
+
+### Step 2: What Docker does
+
+Docker tooling can help developers:
+1. Write a `Dockerfile` that defines how to package the application.
+2. Build a container image.
+3. Run and test a container locally.
+4. Tag and push an image to a container registry.
+
+Example Node.js Dockerfile:
+
+```dockerfile
+FROM node:22-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+EXPOSE 5000
+CMD ["npm", "start"]
+```
+
+Build and test the image locally:
+
+```bash
+docker build -t my-backend:v1 .
+docker run --rm -p 5000:5000 my-backend:v1
+```
+
+This example assumes the Node.js app starts with `npm start` and listens on port 5000. The image must be built and tested according to the actual project structure and production requirements.
+
+### Step 3: What Kubernetes does
+
+Kubernetes manages the desired state of the application. For example, a Deployment can ask Kubernetes to maintain three replicas of the backend.
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: node-backend
+  template:
+    metadata:
+      labels:
+        app: node-backend
+    spec:
+      containers:
+        - name: backend
+          image: my-backend:v1
+          ports:
+            - containerPort: 5000
+```
+
+In this example:
+- The Deployment declares a desired count of three Pods.
+- Each Pod runs a container created from the specified image.
+- Kubernetes works to replace failed Pods and maintain the desired replica count.
+- A separate Service can provide a stable endpoint for traffic to eligible backend Pods.
+
+The image must be available to the cluster nodes, such as through a registry, or be loaded into the cluster using a workflow supported by the cluster environment. A locally built image is not automatically available to every Kubernetes node.
+
+### Step 4: Docker vs Kubernetes
+
+| Docker | Kubernetes |
+|---|---|
+| Builds and packages container images | Orchestrates containerized workloads |
+| Runs containers locally or on a host | Schedules Pods across cluster nodes |
+| Uses Dockerfiles to define image builds | Uses Kubernetes manifests such as Deployments and Services |
+| Can test a container before deployment | Maintains desired replicas and replaces failed Pods |
+| Can push images to registries | Pulls or otherwise obtains images through the configured runtime workflow |
+| Docker Compose can define multi-container local environments | Kubernetes manages applications across a cluster with networking, health checks, scaling, and rollout mechanisms |
+
+They are complementary technologies, not direct replacements for each other.
+
+### Step 5: Does Kubernetes require Docker Engine?
+
+No. This is a common interview trap.
+
+Modern Kubernetes does not require Docker Engine specifically to run containers. Kubernetes communicates with compatible container runtimes through the Container Runtime Interface (CRI). Common runtimes include containerd and CRI-O.
+
+Docker-built images can still run on Kubernetes when the image format and runtime are compatible. Developers may use Docker to build images even if the Kubernetes nodes use containerd or CRI-O to run them. Docker Engine's historical integration through dockershim was removed from Kubernetes in version 1.24.
+
+### Step 6: Typical workflow for a MERN backend
+
+```bash
+# Build the image
+docker build -t your-dockerhub-username/mern-backend:v1 .
+
+# Sign in to the registry (if required)
+docker login
+
+# Push the image
+docker push your-dockerhub-username/mern-backend:v1
+
+# Deploy the Kubernetes manifest
+kubectl apply -f backend-deployment.yaml
+
+# Verify the Deployment and Pods
+kubectl rollout status deployment/node-backend
+kubectl get pods
+kubectl describe deployment node-backend
+```
+
+The Deployment manifest must reference the pushed image, for example `your-dockerhub-username/mern-backend:v1`. For private registries, configure suitable image-pull credentials or cloud identity permissions. In a real project, use a unique immutable tag or image digest for predictable rollouts rather than relying on a mutable `latest` tag.
+
+### Step 7: Common misunderstandings
+
+1. **“Kubernetes builds Docker images.”** Usually it does not; image building is a separate step in the development or CI/CD workflow.
+2. **“Kubernetes requires Docker Engine.”** It does not; it uses a compatible CRI runtime.
+3. **“A local Docker image is automatically available in the cluster.”** Not necessarily; push it to a registry or use the cluster's supported image-loading workflow.
+4. **“Docker and Kubernetes do the same job.”** They have different, complementary responsibilities.
+5. **“Kubernetes replaces the need for images.”** Kubernetes still needs a container image (or another supported artifact workflow) to create the application containers.
+
+### Interview-ready answer
+“Docker and Kubernetes complement each other. I use Docker tooling to package my React or Node.js application into container images, test those images, and push them to a registry. I then use Kubernetes Deployments and Services to run and expose the containerized application, maintain replicas, perform health checks, and support scaling and rollouts. Kubernetes does not require Docker Engine specifically; it uses a compatible container runtime through the Container Runtime Interface, such as containerd or CRI-O.”
+
 ---
