@@ -21073,3 +21073,111 @@ Effective permissions in production
 **Interview-Ready Answer:** A Role is a Kubernetes RBAC object that defines allowed actions on specific resources within one namespace. Its rules specify API groups, resources, and verbs such as `get`, `list`, or `create`. A Role does not grant access on its own; a RoleBinding assigns its permissions to a user, group, or ServiceAccount. For example, I can create a Role that lets a developer view Pods in production without allowing them to delete Pods.
 
 ---
+
+
+## 167. What Is a ClusterRole in Kubernetes?
+
+### 1. English Definition
+
+A Kubernetes ClusterRole is an RBAC object that defines permissions for resources at cluster scope, non-resource URLs, or namespaced resources that can be reused across namespaces. It grants no access by itself; a RoleBinding or ClusterRoleBinding must bind it to an identity.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+ClusterRole Kubernetes ka RBAC object hai jo cluster-scoped resources ya reusable permissions define karta hai. Ismein namespaced resources, jaise Pods, ke permissions bhi define kar sakte hain.
+
+ClusterRole khud access grant nahi karta. Agar ise `RoleBinding` se bind karte hain, toh granted permissions us namespace mein apply hoti hain. Agar `ClusterRoleBinding` se bind karte hain, toh permissions cluster level par apply ho sakti hain.
+
+### 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapke MERN application ke `development`, `staging`, aur `production` namespaces hain. Support team ko in namespaces mein Pods ki details read karni hain.
+
+Har namespace mein alag-alag Role define karne ke bajaye, ek reusable ClusterRole bana sakte hain aur har namespace mein usse RoleBinding ke through bind kar sakte hain.
+
+ClusterRole ka use Nodes jaise cluster-scoped resources ki permissions define karne ke liye bhi ho sakta hai. Lekin binding ka type decide karta hai ki permissions kahan grant hongi.
+
+### 4. Practical Example / YAML
+
+**Step 1: ClusterRole define karo**
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pod-reader-global
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+```
+
+**Step 2: Isse ek namespace mein bind karo**
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pod-reader-staging
+  namespace: staging
+subjects:
+  - kind: ServiceAccount
+    name: developer-viewer
+    namespace: staging
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: pod-reader-global
+```
+
+Yeh example `staging` namespace mein ServiceAccount ko Pods read karne ki permission deta hai. Isi ClusterRole ko doosre namespaces mein bhi separate RoleBindings se reuse kar sakte hain.
+
+### 5. Practical Commands
+
+```bash
+# Create ClusterRole
+kubectl apply -f pod-reader-clusterrole.yaml
+
+# Inspect ClusterRoles
+kubectl get clusterroles
+kubectl describe clusterrole pod-reader-global
+
+# Create the namespace-scoped binding
+kubectl apply -f pod-reader-staging-binding.yaml
+kubectl get rolebindings -n staging
+
+# Check effective access
+kubectl auth can-i list pods \
+  --as=system:serviceaccount:staging:developer-viewer \
+  -n staging
+```
+
+`--as` command ke liye current user ke paas impersonation permission honi chahiye.
+
+### 6. Kubernetes Architecture Diagram
+
+```text
+             ClusterRole
+          (defines permissions)
+                  |
+          +-------+--------+
+          |                |
+          v                v
+  RoleBinding in       ClusterRoleBinding
+  staging namespace         |
+          |                 v
+          v            Cluster-wide grant
+  Access in staging    according to rules
+```
+
+### 7. Summary Table
+
+| Item | ClusterRole |
+|---|---|
+| Scope | Cluster-scoped resources or reusable permissions |
+| Can define Pod permissions? | Yes |
+| Reuse across namespaces? | Yes, using separate RoleBindings |
+| Grants access alone? | No |
+| Bindings | RoleBinding or ClusterRoleBinding |
+
+**Interview-Ready Answer:** A ClusterRole is a Kubernetes RBAC object that defines permissions for cluster-scoped resources or reusable permissions for resources such as Pods. Unlike a Role, it can be reused across namespaces. A RoleBinding can grant its permissions within one namespace, while a ClusterRoleBinding can grant them at cluster scope. The binding determines where the permissions apply.
+
+---
