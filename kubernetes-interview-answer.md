@@ -15279,3 +15279,106 @@ kubectl exec -it <pod-name> -n production -- sh
 **Interview Answer:** Use `kubectl exec -it <pod-name> -- sh` to open an interactive shell inside a running Pod's container. Use `-c` to select a container when the Pod has multiple containers.
 
 **Remember:** `kubectl exec` runs commands inside a container; a shell is available only if the container image includes one.
+
+---
+
+# 118. How Do You Describe a Pod?
+
+## 1. English Definition
+
+Use `kubectl describe pod` to display detailed information about a Pod, including its status, node, containers, IP address, events, and recent scheduling or startup issues.
+
+## 2. Hindi Definition
+
+Kubernetes mein kisi Pod ki detailed information dekhne ke liye `kubectl describe pod <pod-name>` command use karte hain. Ismein Pod ka status, containers, node, IP address aur Events milte hain.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapka Node.js backend Pod `Pending` ya `CrashLoopBackOff` state mein hai. `kubectl get pods` se aapko short status dikhega, lekin `kubectl describe pod` se detailed information aur **Events** mil sakte hain, jo issue troubleshoot karne mein help karte hain.
+
+Dhyan rahe: `describe` detailed status aur events dikhata hai; application ke stdout/stderr logs dekhne ke liye `kubectl logs` use karein.
+
+## 4. Practical Example / Code
+
+### Step 1: List the Pods
+
+```bash
+kubectl get pods
+```
+
+### Step 2: Describe a specific Pod
+
+```bash
+kubectl describe pod <pod-name>
+```
+
+Example:
+
+```bash
+kubectl describe pod backend-7c8d9f6b4c-ab12c
+```
+
+Typical output sections include:
+
+- **Name / Namespace:** Pod ka naam aur namespace.
+- **Status:** Pod ki current phase/status details.
+- **Node:** Kis worker node par Pod scheduled hai.
+- **IP:** Pod ka IP address, agar assigned hai.
+- **Containers:** Container image, state, restart count aur related details.
+- **Conditions:** Pod ki readiness aur scheduling-related conditions.
+- **Events:** Scheduling, image pulling, mounting, ya startup ke related events.
+
+## 5. Practical Commands
+
+```bash
+# List Pods
+kubectl get pods
+
+# Describe a Pod in the current namespace
+kubectl describe pod <pod-name>
+
+# Describe a Pod in a specific namespace
+kubectl describe pod <pod-name> -n production
+
+# Find Pods across all namespaces
+kubectl get pods -A
+
+# Describe a Pod after finding its namespace
+kubectl describe pod <pod-name> -n <namespace>
+
+# Check application logs separately
+kubectl logs <pod-name>
+```
+
+## 6. Kubernetes Architecture Diagram
+
+```text
+       Developer / Terminal
+                |
+                v
+ kubectl describe pod <pod-name>
+                |
+                v
+       Kubernetes API Server
+                |
+                v
+     Pod details and recorded Events
+                |
+                v
+  Troubleshoot scheduling / container state
+```
+
+## 7. Summary Table
+
+| Command / Section | Purpose |
+|---|---|
+| `kubectl get pods` | Pods ka short status dikhata hai |
+| `kubectl describe pod <pod>` | Pod ki detailed information dikhata hai |
+| `-n <namespace>` | Specific namespace select karta hai |
+| **Containers** | Container state aur restart details |
+| **Events** | Scheduling, image pull aur startup-related clues |
+| `kubectl logs <pod>` | Application logs dikhata hai |
+
+**Interview Answer:** Use `kubectl describe pod <pod-name>` to inspect detailed Pod information, including its status, containers, node, conditions, and Events. It is especially useful for troubleshooting scheduling and startup problems.
+
+**Remember:** `get` gives a quick overview; `describe` gives detailed information and Events.
