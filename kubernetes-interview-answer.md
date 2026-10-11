@@ -19838,3 +19838,150 @@ kubectl top pods
 **Interview Answer:** Resource availability affects Kubernetes scheduling because the scheduler checks whether a Node has enough allocatable CPU and memory to satisfy a Pod's resource requests. It also evaluates other constraints, such as taints, affinity, and selectors. If no eligible Node has sufficient resources, the Pod remains Pending, often with an event such as `Insufficient cpu` or `Insufficient memory`. Resource requests influence placement, while limits primarily constrain container usage.
 
 ---
+
+# Part 13 — Autoscaling
+
+## 156. What Is HPA in Kubernetes?
+
+### 1. English Definition
+
+The **Horizontal Pod Autoscaler (HPA)** is a Kubernetes API resource that automatically increases or decreases the number of replicas in a scalable workload, such as a Deployment or StatefulSet, based on observed metrics such as CPU utilization, memory utilization, or custom metrics.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+HPA ka full form **Horizontal Pod Autoscaler** hai. Yeh workload ke Pods ki quantity ko automatically increase ya decrease karta hai, metrics ke basis par.
+
+- Traffic ya load badhne par, agar configured metric target se upar jaata hai, HPA replicas increase kar sakta hai.
+- Load kam hone par, HPA replicas decrease kar sakta hai, configured minimum aur scaling behavior ke andar.
+
+**Important:** HPA Pods ki replicas scale karta hai; yeh directly Nodes ki quantity increase nahi karta. Nodes ki quantity scale karne ke liye Cluster Autoscaler ya cloud provider ka node autoscaling mechanism use ho sakta hai.
+
+### 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapka MERN application Kubernetes par deployed hai aur Node.js backend Deployment mein 2 replicas chal rahe hain.
+
+Normal traffic mein 2 Pods enough hain. Lekin jab users aur API requests badh jaati hain, CPU utilization configured target—maan lo 60%—se upar ja sakta hai. HPA metrics observe karke Deployment ko 3 ya 4 replicas tak scale kar sakta hai, subject to configured limits and available cluster capacity.
+
+Traffic kam hone par HPA replicas ko minimum configured count tak reduce kar sakta hai. HPA ko metrics dene ke liye CPU/memory jaise resource metrics ke case mein aam taur par Metrics Server ki zaroorat hoti hai.
+
+### 4. Practical YAML Example
+
+**Step 1 — Deployment create karo:**
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: node-api
+  template:
+    metadata:
+      labels:
+        app: node-api
+    spec:
+      containers:
+        - name: node-api
+          image: nginx:stable
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+```
+
+**Step 2 — HPA configure karo:**
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: node-api-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: node-api
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+```
+
+Yahan:
+- `scaleTargetRef` batata hai ki kis Deployment ko scale karna hai.
+- `minReplicas: 2` minimum replicas set karta hai.
+- `maxReplicas: 10` maximum replicas set karta hai.
+- `averageUtilization: 60` CPU request ke relative average CPU utilization ka target 60% set karta hai.
+- CPU utilization-based HPA ke liye containers ke CPU `requests` set hona important hai; metrics available bhi hone chahiye.
+
+Apply and inspect:
+
+```bash
+kubectl apply -f node-api-deployment.yaml
+kubectl apply -f node-api-hpa.yaml
+kubectl get hpa
+kubectl describe hpa node-api-hpa
+kubectl get deployment node-api
+kubectl get pods -o wide
+```
+
+Alternative, agar Deployment pehle se exist karta hai aur Metrics Server properly configured hai:
+
+```bash
+kubectl autoscale deployment node-api --cpu-percent=60 --min=2 --max=10
+```
+
+### 5. How HPA Works
+
+1. Metrics pipeline target workload ke Pods ke metrics provide karti hai.
+2. HPA controller observed metrics ko configured target ke saath compare karta hai.
+3. Controller required replicas calculate karta hai aur workload ke scale target ko update karta hai.
+4. Deployment controller required Pods create ya remove karta hai.
+5. Scheduler naye Pods ko suitable Nodes par place karta hai, agar cluster mein enough resources aur suitable Nodes available hon.
+
+Agar cluster capacity nahi hai, toh extra replicas create hone ke baad bhi kuch Pods `Pending` reh sakte hain. HPA khud Nodes add nahi karta.
+
+### 6. Useful Commands and Troubleshooting
+
+```bash
+# Check HPA status and current/target metrics
+kubectl get hpa
+
+# See HPA events and configuration details
+kubectl describe hpa node-api-hpa
+
+# Check metrics, if Metrics Server is installed
+kubectl top pods
+kubectl top nodes
+
+# Check Deployment replicas and Pod placement
+kubectl get deployment node-api
+kubectl get pods -o wide
+```
+
+If metrics show `<unknown>`, verify Metrics Server or the relevant custom-metrics adapter, confirm resource requests are configured for CPU utilization, and inspect HPA events.
+
+### 7. HPA vs. VPA vs. Cluster Autoscaler
+
+| Tool | What it scales |
+|---|---|
+| HPA | Number of Pod replicas |
+| VPA | Pod container resource requests (and, depending on configuration, limits) |
+| Cluster Autoscaler | Number of cluster Nodes, according to supported provider and configuration |
+
+**Interview Answer:** HPA stands for Horizontal Pod Autoscaler. It automatically adjusts the number of replicas in a Kubernetes workload based on metrics such as CPU or memory utilization, or custom metrics. For example, if a Node.js API experiences increased traffic and CPU utilization rises above the configured target, HPA can increase its replicas within the configured minimum and maximum. HPA scales Pods, not Nodes, and CPU utilization-based scaling generally requires resource requests and available metrics.
+
+---
