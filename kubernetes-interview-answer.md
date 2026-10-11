@@ -19288,3 +19288,110 @@ placement        constraints pass
 “Pod anti-affinity is a Kubernetes scheduling feature that prevents or discourages a Pod from sharing a topology domain, such as a Node or zone, with Pods matching specified labels. Required anti-affinity is a hard scheduling constraint; preferred anti-affinity is a soft preference. It is commonly used to spread application replicas across Nodes or zones to reduce the impact of a single failure.”
 
 ---
+
+## 151. What Are Taints?
+
+### 1. English Definition
+
+**Taints** are settings applied to Kubernetes Nodes that repel Pods unless those Pods have a matching toleration. They help administrators reserve Nodes for specific workloads or keep workloads away from Nodes that should not accept them.
+
+### 2. Hindi Definition (Roman Hinglish)
+
+Taint ek rule hai jo hum **Node par apply** karte hain. Yeh scheduler ko batata hai ki Node par normally kaunse Pods schedule nahi hone chahiye. Pod ko us taint ke saath matching **toleration** chahiye, tabhi woh taint ke bawajood schedule hone ke liye eligible ho sakta hai.
+
+Yaad rakho: **Taint Node par lagta hai; toleration Pod mein define hoti hai.** Toleration hona guarantee nahi karta ki Pod us Node par hi schedule hoga—baaki scheduling requirements bhi satisfy honi chahiye.
+
+### 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapke Kubernetes cluster mein ek Node database workloads ke liye reserve karna hai. Aap us Node par taint lagate hain, jisse normal frontend aur backend Pods wahan schedule nahi honge jab tak unke paas matching toleration na ho.
+
+Taints aur tolerations ke common effects:
+- `NoSchedule`: Matching toleration ke bina naye Pods schedule nahi hote.
+- `PreferNoSchedule`: Scheduler koshish karta hai ki matching toleration ke bina Pods us Node par na aayein, lekin yeh hard guarantee nahi hai.
+- `NoExecute`: Matching toleration na ho toh naye Pods schedule nahi hote aur existing Pods ko bhi evict kiya ja sakta hai. `tolerationSeconds` eviction ko delay/limit kar sakta hai.
+
+### 4. Practical Commands
+
+Node par taint lagao:
+
+```bash
+kubectl taint nodes worker-1 workload=database:NoSchedule
+```
+
+Taints check karo:
+
+```bash
+kubectl describe node worker-1
+kubectl get nodes -o custom-columns=NAME:.metadata.name,TAINTS:.spec.taints
+```
+
+Example taint remove karo:
+
+```bash
+kubectl taint nodes worker-1 workload=database:NoSchedule-
+```
+
+### 5. Practical YAML Example — Pod Toleration
+
+Node par yeh taint laga hua hai:
+
+```text
+workload=database:NoSchedule
+```
+
+Is taint ko tolerate karne wala Pod:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: database-client
+spec:
+  tolerations:
+    - key: workload
+      operator: Equal
+      value: database
+      effect: NoSchedule
+  containers:
+    - name: client
+      image: busybox:1.36
+      command: ["sh", "-c", "sleep 3600"]
+```
+
+Yeh toleration matching taint ko tolerate karti hai. Iska matlab yeh nahi ki Pod automatically `worker-1` par hi jayega; Node selector/affinity aur doosre scheduling rules bhi use kiye ja sakte hain agar specific placement chahiye.
+
+### 6. Taint and Toleration Flow
+
+```text
+Taint applied to a Node
+          |
+          v
+Scheduler checks the Pod's tolerations
+          |
+     +----+-----+
+     |          |
+     v          v
+Matching     No matching
+Toleration   Toleration
+     |          |
+     v          v
+May schedule  Effect determines outcome:
+if other      NoSchedule: don't schedule
+rules pass    PreferNoSchedule: avoid if possible
+              NoExecute: don't schedule and
+              may evict existing Pod
+```
+
+### 7. Summary Table
+
+| Item | Meaning |
+|---|---|
+| Taint | Node-side rule that repels Pods without a matching toleration |
+| Toleration | Pod-side setting that allows it to tolerate a matching taint |
+| `NoSchedule` | Blocks scheduling of Pods without matching toleration |
+| `PreferNoSchedule` | Softly avoids scheduling Pods without matching toleration |
+| `NoExecute` | Blocks new scheduling and can evict existing non-tolerating Pods |
+
+**Interview Answer:** Taints are applied to Nodes to repel Pods that do not have matching tolerations. A Pod with a matching toleration is allowed to be considered for that Node, but it is not guaranteed to schedule there. The three common effects are `NoSchedule`, `PreferNoSchedule`, and `NoExecute`, which determine how the scheduler and kubelet handle Pods without matching tolerations.
+
+---
