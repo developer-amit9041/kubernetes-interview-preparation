@@ -7975,3 +7975,146 @@ Keep the Deployment's `spec.selector.matchLabels` consistent with `spec.template
 | `kubectl get pods -l app=mern-backend` | Lists Pods matching a label selector |
 
 **Remember:** Labels organize and identify Kubernetes resources. Deployment selectors use labels to match Pods, while labels can also support filtering and selection by other Kubernetes resources.
+---
+
+# 65. What Happens If One Pod Crashes?
+
+## 1. English Definition
+
+**If a Pod managed by a Kubernetes Deployment crashes or fails, Kubernetes attempts to maintain the desired number of replicas by creating a replacement Pod.** The container may also be restarted, depending on the failure and Pod restart policy.
+
+## 2. Hindi Definition
+
+Agar Kubernetes mein koi Pod crash ho jaata hai, toh Kubernetes usko recover karne ki koshish karta hai.
+
+Agar Pod kisi Deployment ke under hai, toh uska ReplicaSet replacement Pod create karne ki koshish karega, taaki desired replica count maintain rahe.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application ka Node.js backend Kubernetes Deployment mein **3 replicas** ke saath chal raha hai.
+
+```text
+Before crash:
+Pod 1  OK
+Pod 2  OK
+Pod 3  OK
+
+Pod 2 crashes:
+Pod 1  OK
+Pod 2  Failed
+Pod 3  OK
+
+Kubernetes replacement create karne ki koshish karta hai:
+Pod 1  OK
+Pod 3  OK
+Pod 4  Starting
+```
+
+Yahan Kubernetes ka controller desired state ko maintain karne ki koshish karta hai. Replacement Pod ka naam aur IP purane Pod se different ho sakta hai.
+
+Important difference:
+
+- Agar container crash hota hai, toh kubelet us container ko restart kar sakta hai, depending on its restart policy.
+- Agar Pod delete ya fail ho jaata hai aur Deployment manage kar raha hai, toh ReplicaSet replacement Pod create karne ki koshish karta hai.
+- Agar cluster mein resources nahi hain ya application start nahi ho sakti, toh replacement Pod `Pending` ya `CrashLoopBackOff` state mein reh sakta hai.
+
+## 4. Practical Example / Code
+
+Example Deployment for a Node.js backend:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+```
+
+With `replicas: 3`, the Deployment manages a ReplicaSet that attempts to keep three matching Pods. If a Pod is lost, the ReplicaSet attempts to create a replacement.
+
+## 5. Architecture Diagram
+
+```text
+          Deployment
+          replicas: 3
+               |
+               v
+           ReplicaSet
+               |
+       +-------+-------+
+       |       |       |
+       v       v       v
+     Pod 1   Pod 2   Pod 3
+               X
+           Pod crashes
+               |
+               v
+       ReplicaSet creates
+       a replacement Pod
+               |
+               v
+     Pod 1   Pod 4   Pod 3
+```
+
+Replacement is not instantaneous or guaranteed to become ready; scheduling, resource capacity, image availability and application health affect recovery.
+
+## 6. Practical Commands / Configuration
+
+**List Pods and their status:**
+
+```bash
+kubectl get pods
+```
+
+**Watch Pods as they change:**
+
+```bash
+kubectl get pods -w
+```
+
+**Inspect a Pod's events and details:**
+
+```bash
+kubectl describe pod <pod-name>
+```
+
+**Check logs for a container or application failure:**
+
+```bash
+kubectl logs <pod-name>
+```
+
+**Check the Deployment replica status:**
+
+```bash
+kubectl get deployment mern-backend
+```
+
+If the replacement Pod is not becoming ready, inspect its events and logs. `CrashLoopBackOff` means a container is repeatedly failing and Kubernetes is backing off before restarting it; it is not a guarantee that the application will recover by itself.
+
+## 7. Summary Table
+
+| Situation | Kubernetes behavior |
+|---|---|
+| Container process exits | Kubelet may restart the container according to restart policy |
+| Deployment-managed Pod is lost | ReplicaSet attempts to create a replacement Pod |
+| Pod replacement starts | It gets its own Pod identity and may have a different IP |
+| Insufficient resources | Replacement may remain `Pending` |
+| Container repeatedly fails | It may enter `CrashLoopBackOff` |
+| Check status | `kubectl get pods` and `kubectl get deployment mern-backend` |
+
+**Remember:** For a Deployment-managed workload, Kubernetes attempts to replace a failed Pod to maintain the desired replica count. Recovery can take time, and the new Pod must start successfully before it becomes ready.
