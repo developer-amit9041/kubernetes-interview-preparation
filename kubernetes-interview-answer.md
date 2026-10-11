@@ -11855,3 +11855,123 @@ Other options include mounting ConfigMaps or Secrets as files, or using an exter
 | External Secret Manager | Centrally managing production credentials | AWS Secrets Manager with suitable integration |
 
 **Remember:** In Kubernetes, use ConfigMaps instead of `.env` files for non-sensitive configuration and Secrets for sensitive values. You can expose them to a container as environment variables or mounted files.
+
+---
+
+# 91. What Is a Kubernetes Volume?
+
+## 1. English Definition
+
+A Kubernetes Volume is a storage resource that a Pod can make available to its containers. It allows containers to access files and data, and its lifecycle and persistence depend on the volume type.
+
+## 2. Hindi Definition
+
+Kubernetes Volume ek storage mechanism hai jiske through Pod ke andar chalne wale containers files aur data ko access kar sakte hain. Kuch volumes temporary hote hain, jabki PersistentVolumeClaim jaise options ke through data ko Pod ke lifecycle ke baad bhi preserve kiya ja sakta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application mein Node.js backend file upload karta hai, ya application ko temporary files store karni hain.
+
+Container ke andar directly file save karne par, agar container recreate hota hai, toh uske writable container layer ka data lost ho sakta hai. Kubernetes Volume container ko storage provide karta hai.
+
+Common examples:
+
+- **`emptyDir`:** Pod ke liye temporary storage. Container restart hone par data rehta hai, lekin Pod remove hone par yeh data delete ho jata hai.
+- **PersistentVolume (PV) / PersistentVolumeClaim (PVC):** Persistent storage provide karne ke liye use hote hain, jaise cloud disk ya network storage.
+- **ConfigMap / Secret volumes:** Configuration ya sensitive values ko files ke roop mein container tak pahunchate hain.
+
+Production MERN application mein user uploads ke liye persistent volume ya object storage use kar sakte ho. MongoDB ka persistent data bhi suitable persistent storage par hona chahiye.
+
+## 4. Practical Example / Code
+
+### Example: Use an `emptyDir` Volume
+
+`backend-pod.yaml`:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: backend-volume-example
+spec:
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:1.0
+      volumeMounts:
+        - name: temporary-storage
+          mountPath: /app/tmp
+  volumes:
+    - name: temporary-storage
+      emptyDir: {}
+```
+
+Is example mein:
+
+- `volumes` Pod ke liye `emptyDir` storage define karta hai.
+- `volumeMounts` us storage ko container ke andar `/app/tmp` path par mount karta hai.
+- Container restart hone par `emptyDir` ka data rehta hai, lekin Pod delete hone par storage aur uska data delete ho jata hai.
+
+### Persistent Storage Concept
+
+Persistent storage ke liye Pod ya Deployment aam taur par ek PersistentVolumeClaim (PVC) reference karta hai. PVC storage request karta hai; Kubernetes cluster configuration ke mutabik us request ko available PersistentVolume ya storage provisioner se fulfill kiya ja sakta hai.
+
+## 5. Architecture Diagram
+
+```text
+             Kubernetes Pod
+                   |
+             volumes section
+                   |
+             emptyDir / PVC
+                   |
+                   v
+             volumeMounts
+                   |
+                   v
+          Container file path
+              /app/tmp
+                   |
+                   v
+           Application reads
+             or writes files
+
+   emptyDir: Pod ke saath temporary
+   PVC:      Persistent storage request
+```
+
+## 6. Practical Commands / Configuration
+
+Pod apply karo:
+
+```bash
+kubectl apply -f backend-pod.yaml
+```
+
+Pod aur uske volume-related details check karo:
+
+```bash
+kubectl get pods
+kubectl describe pod backend-volume-example
+```
+
+PersistentVolume aur PersistentVolumeClaim resources check karo:
+
+```bash
+kubectl get pv
+kubectl get pvc
+```
+
+Note: Har cluster mein PVs pre-created hona zaroori nahi; StorageClass aur dynamic provisioning ke through PVC ke liye storage automatically provision ho sakta hai, agar cluster configured ho.
+
+## 7. Summary Table
+
+| Concept | Meaning |
+|---|---|
+| Volume | Pod ke containers ko storage provide karta hai |
+| `emptyDir` | Temporary storage; Pod remove hone par data delete hota hai |
+| PersistentVolume (PV) | Cluster mein available persistent storage resource |
+| PersistentVolumeClaim (PVC) | Application ki storage request |
+| `volumeMounts` | Container ke andar volume ka path define karta hai |
+| ConfigMap / Secret volume | Configuration ya sensitive values ko files ke roop mein provide karta hai |
+
+**Remember:** A Kubernetes Volume provides storage to containers in a Pod. Choose the volume type based on whether the data is temporary or must persist beyond the Pod's lifecycle.
