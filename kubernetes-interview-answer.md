@@ -10805,3 +10805,211 @@ Security checklist:
 | MERN example | Backend port and MongoDB Service hostname | MongoDB username and password |
 
 **Remember:** ConfigMap = normal configuration; Secret = sensitive data. Secret is not automatically secure merely because it is a Kubernetes Secret.
+---
+
+# 85. How Do You Provide Environment Variables in Kubernetes?
+
+## 1. English Definition
+
+Environment variables in Kubernetes are provided to containers through a Pod specification, commonly using the `env` and `envFrom` fields in a Pod or Deployment manifest. Values can be defined directly, loaded from a ConfigMap, or sourced from a Secret.
+
+## 2. Hindi Definition
+
+Kubernetes mein environment variables provide karne ka matlab hai container ke andar application ko configuration values dena, taaki application unhe access kar sake.
+
+Common methods:
+
+1. `value`: variable ki value directly define karna.
+2. `env`: ek-ek environment variable define karna.
+3. `valueFrom`: ConfigMap ya Secret ki kisi specific key se value lena.
+4. `envFrom`: ConfigMap ya Secret ke multiple key-value entries ko environment variables ke roop mein load karna.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo tumhari MERN application mein Node.js backend port `5000` par run hota hai aur MongoDB se connect karta hai. Backend ko `PORT`, `NODE_ENV`, `DB_HOST` aur database password chahiye.
+
+Kubernetes Deployment mein normal configuration ko ConfigMap se aur database password ko Secret se provide kar sakte ho. Node.js application in values ko `process.env` se read kar sakti hai.
+
+```text
+Kubernetes Deployment YAML
+           |
+           v
+       Backend Pod
+           |
+           v
+    Node.js Container
+           |
+           v
+       process.env
+    /       |        \
+  PORT   DB_HOST   DB_PASSWORD
+```
+
+**Important:** ConfigMap normal, non-sensitive configuration ke liye hai. Passwords aur API keys jaise sensitive data ke liye Secret use karo. Secret ki Base64 representation encryption nahi hoti; proper access controls aur encryption at rest bhi important hain.
+
+## 4. Practical Example / Code
+
+### Method 1: Define variables directly with `env` and `value`
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-registry/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+          env:
+            - name: PORT
+              value: "5000"
+            - name: NODE_ENV
+              value: "production"
+```
+
+`env` mein har variable ka `name` aur uski `value` define ki jaati hai. Is method ko non-sensitive, simple values ke liye use karo.
+
+### Method 2: Load multiple values from a ConfigMap using `envFrom`
+
+Create `backend-config.yaml`:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+data:
+  NODE_ENV: "production"
+  PORT: "5000"
+  DB_HOST: "mongodb-service"
+```
+
+Deployment container configuration:
+
+```yaml
+envFrom:
+  - configMapRef:
+      name: backend-config
+```
+
+`envFrom` ConfigMap ke eligible entries ko environment variables ke roop mein expose karta hai.
+
+### Method 3: Load a specific ConfigMap key using `valueFrom`
+
+```yaml
+env:
+  - name: DB_HOST
+    valueFrom:
+      configMapKeyRef:
+        name: backend-config
+        key: DB_HOST
+```
+
+### Method 4: Load a sensitive value from a Secret
+
+Create the Secret (example value replace karo; real credentials ko source control mein commit mat karo):
+
+```bash
+kubectl create secret generic mongodb-credentials \
+  --from-literal=password='replace-with-a-real-password'
+```
+
+Reference a specific key in the Deployment:
+
+```yaml
+env:
+  - name: DB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: mongodb-credentials
+        key: password
+```
+
+Node.js mein values read karne ka example:
+
+```javascript
+const port = process.env.PORT || 5000;
+const environment = process.env.NODE_ENV;
+const mongoHost = process.env.DB_HOST;
+const mongoPassword = process.env.DB_PASSWORD;
+```
+
+Keep the actual password out of application code, committed manifests and logs. Replace `your-registry/mern-backend:1.0` with the actual backend image.
+
+## 5. Architecture Diagram
+
+```text
+      ConfigMap                       Secret
+   NODE_ENV, PORT                    DB_PASSWORD
+        |                                 |
+        | envFrom / valueFrom             | valueFrom
+        +---------------+-----------------+
+                        |
+                        v
+               Backend Pod / Container
+                        |
+                        v
+                 Node.js process
+                 process.env.*
+                        |
+                        v
+                  MongoDB connection
+```
+
+The environment variables are made available to the container when it starts. Updating a ConfigMap or Secret does not update an already-running process's environment variables automatically; a Pod rollout/restart may be required. Applications should also handle connection failures appropriately.
+
+## 6. Practical Commands / Configuration
+
+Apply the ConfigMap and Deployment manifests:
+
+```bash
+kubectl apply -f backend-config.yaml
+kubectl apply -f backend-deployment.yaml
+```
+
+Create the Secret if it does not already exist:
+
+```bash
+kubectl create secret generic mongodb-credentials \
+  --from-literal=password='replace-with-a-real-password'
+```
+
+Check ConfigMaps, Secrets and Pods:
+
+```bash
+kubectl get configmaps
+kubectl get secrets
+kubectl get pods
+kubectl rollout status deployment/backend
+```
+
+Inspect the Deployment configuration:
+
+```bash
+kubectl describe deployment backend
+```
+
+Do not print Secret values while debugging. Use RBAC with least privilege, enable encryption at rest where supported, and consider a managed external secret store for production.
+
+## 7. Summary Table
+
+| Method | Purpose | Example |
+|---|---|---|
+| `env` + `value` | Define one variable directly | `PORT: "5000"` |
+| `envFrom` + `configMapRef` | Load multiple non-sensitive settings | `NODE_ENV`, `DB_HOST` |
+| `valueFrom` + `configMapKeyRef` | Load one ConfigMap key | `DB_HOST` |
+| `valueFrom` + `secretKeyRef` | Load one sensitive Secret key | `DB_PASSWORD` |
+| Node.js access | Read environment variables in application code | `process.env.PORT` |
+
+**Remember:** Kubernetes provides container environment variables through `env` and `envFrom`. Use `value` for direct values, ConfigMaps for normal settings, and Secrets for sensitive values.
