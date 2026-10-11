@@ -8,6 +8,7 @@ Topic-wise Kubernetes interview preparation for developers, with practical focus
 
 ## Detailed Answers
 
+- **[Kubernetes Interview Answers](./kubernetes-interview-answer.md)** — detailed answers with English/Hindi definitions, Hinglish explanations, practical examples, diagrams, commands, and summary tables.
 - **[1. What Is Kubernetes?](./answers/01-what-is-kubernetes.md)** — English definition, Hindi definition, Hinglish explanation, practical YAML, architecture diagram, commands, summary table, and interview-ready answer.
 
 ## Topics Covered
