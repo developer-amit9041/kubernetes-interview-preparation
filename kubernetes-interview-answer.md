@@ -3409,3 +3409,144 @@ Node details mein runtime information available ho sakti hai. Exact host-level c
 | Monitoring/logging agents | Metrics aur logs collect kar sakte hain; optional/additional components hain |
 
 **Remember:** `kubelet` manages Pods on the Node, the container runtime runs containers, and `kube-proxy` commonly supports Kubernetes Service networking.
+
+
+---
+
+# 28. What Does `kubelet` Do?
+
+## 1. English Definition
+
+**`kubelet` is a Kubernetes node agent that runs on each Worker Node and ensures that the Pods assigned to that node are running and healthy according to their specifications.**
+
+It communicates with the Kubernetes API Server and works with the container runtime to manage Pod execution.
+
+## 2. Hindi Definition
+
+`kubelet` ek agent hai jo Kubernetes ke har Worker Node par chalta hai. Ye assigned Pods ko run karne, unki condition monitor karne aur unki configuration ke according execution manage karne mein help karta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aapki MERN application ka Node.js backend Kubernetes par deploy hai.
+
+Jab Scheduler backend Pod ko Worker Node 1 par assign karta hai, toh:
+
+1. **Scheduler:** Decide karta hai ki Pod Worker Node 1 par chalega.
+2. **kubelet:** Node par Pod ki specification ke according kaam karta hai.
+3. **Container Runtime:** Zaroorat padne par image pull karke container create aur start karta hai.
+4. **kubelet:** Pod aur container ki status monitor karta hai aur configured probes ke results report karta hai.
+5. **API Server:** Cluster ke components ko Pod ki status information available karata hai.
+
+**Important:** `kubelet` khud Pod ko kisi doosre Node par move nahi karta. Agar Node fail ho jaye, toh replacement Pod create aur schedule karne ka process controllers aur Scheduler handle karte hain.
+
+## 4. Practical Example / Code — MERN Backend
+
+Example Pod manifest:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mern-backend
+  labels:
+    app: mern-backend
+spec:
+  containers:
+    - name: backend
+      image: your-dockerhub-username/mern-backend:1.0
+      ports:
+        - containerPort: 5000
+```
+
+Apply karo:
+
+```bash
+kubectl apply -f backend-pod.yaml
+kubectl get pod mern-backend -o wide
+kubectl describe pod mern-backend
+```
+
+Pod kisi Node par schedule hone ke baad us Node ka kubelet Pod ko run karne ki process manage karta hai. Container runtime image aur container execution handle karta hai.
+
+## 5. Architecture Diagram
+
+```text
+          kube-apiserver
+                |
+       Pod assigned to Node
+                |
+                v
+       +------------------+
+       | Worker Node      |
+       |                  |
+       |     kubelet      |
+       |        |         |
+       |        v         |
+       | Container Runtime|
+       |        |         |
+       |        v         |
+       |  MERN Backend    |
+       |  Container / Pod |
+       +------------------+
+                |
+       Pod status reported
+         through API Server
+```
+
+## 6. Practical Commands / Configuration
+
+### Pod aur assigned Node check karo
+
+```bash
+kubectl get pods -o wide
+kubectl describe pod mern-backend
+```
+
+### Pod logs check karo
+
+```bash
+kubectl logs mern-backend
+```
+
+Ye commands API Server ke through cluster information retrieve karti hain; ye kubelet par direct shell commands nahi hain.
+
+### Health probes ka example
+
+Container ki health aur readiness check karne ke liye probes configure kiye ja sakte hain. Example endpoint tabhi use karo jab Express app par `/health` route implemented ho:
+
+```yaml
+containers:
+  - name: backend
+    image: your-dockerhub-username/mern-backend:1.0
+    ports:
+      - containerPort: 5000
+    readinessProbe:
+      httpGet:
+        path: /health
+        port: 5000
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    livenessProbe:
+      httpGet:
+        path: /health
+        port: 5000
+      initialDelaySeconds: 10
+      periodSeconds: 20
+```
+
+- **Readiness probe:** Batati hai ki container traffic receive karne ke liye ready hai ya nahi.
+- **Liveness probe:** Fail hone par kubelet configured policy ke mutabik container restart kar sakta hai.
+
+## 7. Summary Table
+
+| Component / Concept | Role |
+|---|---|
+| `kubelet` | Node par assigned Pods ki execution manage karta hai |
+| kube-scheduler | Pod ke liye suitable Node select karta hai |
+| Container runtime | Container ko actually run karta hai |
+| Readiness probe | Batati hai ki container traffic ke liye ready hai ya nahi |
+| Liveness probe | Container ko unhealthy detect karne aur restart karne mein help kar sakti hai |
+| kube-apiserver | Kubernetes resources aur status ke liye API interface |
+| Controller | Desired state maintain karne ke liye reconciliation karta hai |
+
+**Remember:** Scheduler chooses the Node, kubelet manages the Pod on that Node, and the container runtime runs the container.
