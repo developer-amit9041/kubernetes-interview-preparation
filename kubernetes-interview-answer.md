@@ -3966,3 +3966,143 @@ Events scheduling problems, image pull failures, probe failures ya doosre operat
 | `kubectl get pods` | Pod status aur placement dekhne mein help karta hai |
 
 **Remember:** API Server accepts and processes the request, etcd stores state, controllers reconcile resources, Scheduler chooses the Node, and kubelet plus the container runtime get the Pod running.
+
+
+---
+
+# 32. What Is the Role of the API Server?
+
+## 1. English Definition
+
+**The Kubernetes API Server (`kube-apiserver`) is the control plane component that exposes the Kubernetes API and acts as the primary interface for managing and accessing cluster resources.**
+
+It handles API requests, performs authentication and authorization, validates requests, and coordinates the persistence of resource state in `etcd`.
+
+## 2. Hindi Definition
+
+Kubernetes API Server ek control plane component hai jo cluster ke resources ko create, read, update aur delete karne ke liye central API interface provide karta hai. Ye requests ko verify aur validate karta hai aur resource state ko store karne ke process ko manage karta hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aap apne Node.js backend ke liye Kubernetes Deployment create karte ho:
+
+```bash
+kubectl apply -f backend-deployment.yaml
+```
+
+Internally:
+
+1. `kubectl` API Server ko request bhejta hai.
+2. API Server authentication aur authorization check karta hai.
+3. Request aur resource configuration validate hoti hai.
+4. Accepted changes `etcd` mein persist kiye jaate hain.
+5. Controllers desired state reconcile karte hain.
+6. Scheduler unscheduled Pods ke liye suitable Nodes select karta hai.
+7. Selected Node ka `kubelet` Container Runtime ke saath Pod ko run karne ki process handle karta hai.
+
+**Important:** API Server khud application containers run nahi karta aur na hi woh directly Pod ke liye Worker Node select karta hai. Ye responsibilities doosre Kubernetes components ki hain.
+
+## 4. Practical Example / Code — MERN Backend
+
+Example Deployment manifest:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mern-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mern-backend
+  template:
+    metadata:
+      labels:
+        app: mern-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:1.0
+          ports:
+            - containerPort: 5000
+```
+
+Apply karo:
+
+```bash
+kubectl apply -f backend-deployment.yaml
+kubectl get deployment mern-backend
+kubectl get pods
+```
+
+`kubectl` API Server ke through Deployment create/update request bhejta hai aur baad mein resource status bhi API Server se read karta hai.
+
+## 5. Architecture Diagram
+
+```text
+     kubectl / Controllers / Scheduler
+                   |
+                   v
+           +----------------+
+           | kube-apiserver |
+           | Auth / Validate|
+           | Kubernetes API |
+           +----------------+
+                   |
+                   v
+                 etcd
+          (persistent state)
+
+Controllers reconcile resources
+Scheduler selects a Node for a Pod
+Node kubelet + runtime run the Pod
+                   |
+                   v
+            Pod status update
+             via API Server
+```
+
+Diagram conceptual hai. Components Kubernetes API ke through interact karte hain; API Server unke beech primary interface hai.
+
+## 6. Practical Commands / Configuration
+
+### Cluster API endpoint information
+
+```bash
+kubectl cluster-info
+kubectl config view --minify
+```
+
+Kubeconfig mein API Server endpoint aur authentication-related settings ho sakti hain. Sensitive credentials ko share ya expose mat karo.
+
+### Resources API ke through check karo
+
+```bash
+kubectl get nodes
+kubectl get deployments
+kubectl get pods -A
+kubectl api-resources
+```
+
+### API discovery check karo
+
+```bash
+kubectl version
+```
+
+Command ke output mein client aur server version ki information mil sakti hai, depending on cluster connectivity and permissions.
+
+## 7. Summary Table
+
+| API Server responsibility | Explanation |
+|---|---|
+| Kubernetes API | Cluster resources ke liye central interface expose karta hai |
+| Authentication | Request kis identity se aayi hai, verify karta hai |
+| Authorization | Identity ko requested action ki permission hai ya nahi, check karta hai |
+| Validation | Resource request aur configuration validate karta hai |
+| State persistence | Resource state ko etcd mein persist karne ke workflow ko handle karta hai |
+| Component communication | Controllers aur doosre components ko API ke through resources access/update karne deta hai |
+| Workload execution | Containers khud run nahi karta; ye node components ka kaam hai |
+
+**Remember:** The API Server is Kubernetes' central API interface: it processes resource requests and coordinates state persistence, while controllers, Scheduler, kubelet, and the runtime handle reconciliation, placement, and execution.
