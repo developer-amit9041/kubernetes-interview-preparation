@@ -12601,3 +12601,130 @@ If the PVC remains `Pending`, check whether a compatible PV exists or whether th
 | MERN example | Storage resource for MongoDB data | Request for 5Gi MongoDB storage |
 
 **Remember:** PV provides storage, PVC requests storage, and the Pod mounts storage through the PVC.
+
+---
+
+# 97. What Is a StorageClass?
+
+## 1. English Definition
+
+A **StorageClass** is a Kubernetes resource that defines how storage can be dynamically provisioned. It specifies the storage provisioner and may include parameters such as storage type, performance options, and reclaim policy.
+
+## 2. Hindi Definition
+
+Bhai, **StorageClass Kubernetes mein storage create karne ka tarika define karti hai.** Jab application ko storage chahiye hota hai, toh PVC ke through request kar sakte hain, aur StorageClass configured provisioner ki help se automatically storage create karwa sakti hai.
+
+## 3. Hinglish Explanation — MERN Stack Example
+
+Maan lo aap AWS par Kubernetes mein MongoDB deploy kar rahe ho aur database ke liye 10Gi storage chahiye.
+
+- **StorageClass:** Define karti hai ki storage kaise provision hoga.
+- **PVC:** 10Gi storage ki request karta hai.
+- **PV:** Provision hua storage resource represent karta hai.
+- **MongoDB Pod:** PVC ke through storage mount karta hai.
+
+Iska fayda ye hai ki har baar administrator ko manually PV create karne ki zaroorat nahi hoti—agar cluster mein suitable dynamic provisioner aur StorageClass configured hain, toh storage automatically provision ho sakta hai.
+
+## 4. Practical Example / Code
+
+Example StorageClass for a cluster with the appropriate CSI provisioner installed:
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: example-storage
+provisioner: csi.example.com
+parameters:
+  type: standard
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+```
+
+**Important:** `csi.example.com` and `type: standard` are illustrative placeholders, not a working provider configuration. Use the provisioner name and parameters supported by your cluster's storage driver. In a cloud cluster, the driver and its supported parameters depend on the cloud provider and cluster setup.
+
+A PVC can request this StorageClass by name:
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-pvc
+spec:
+  storageClassName: example-storage
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+```
+
+When configured correctly, the StorageClass can allow the provisioner to create suitable storage for the claim.
+
+## 5. Architecture Diagram
+
+```text
+        MongoDB Pod
+             |
+             v
+    PersistentVolumeClaim
+       "Request: 10Gi"
+             |
+             v
+        StorageClass
+    "Provisioning rules"
+             |
+             v
+    Storage Provisioner
+             |
+             v
+   PersistentVolume (PV)
+             |
+             v
+       Actual Storage
+```
+
+The exact provisioning and binding sequence depends on the StorageClass, provisioner, and volume binding mode.
+
+## 6. Practical Commands / Configuration
+
+List StorageClasses:
+
+```bash
+kubectl get storageclass
+```
+
+Inspect a StorageClass:
+
+```bash
+kubectl describe storageclass example-storage
+```
+
+Check PVC status:
+
+```bash
+kubectl get pvc
+kubectl describe pvc mongodb-pvc
+```
+
+Check PVs:
+
+```bash
+kubectl get pv
+```
+
+If a PVC remains `Pending`, verify the provisioner/CSI driver is installed and healthy, the StorageClass name and parameters are valid, and the cluster has the required permissions and capacity.
+
+## 7. Summary Table
+
+| Concept | Explanation |
+|---|---|
+| StorageClass | Defines storage provisioning rules |
+| Provisioner | Driver or component that creates storage |
+| PVC | Requests storage and may select a StorageClass |
+| PV | Represents the provisioned or configured storage resource |
+| Dynamic provisioning | Can create storage automatically when a compatible claim requests it |
+| Parameters | Provider-specific options such as storage type |
+| MERN example | Automatically provision storage for MongoDB data |
+
+**Remember:** A StorageClass defines how storage is provisioned; a PVC requests storage, and a PV represents the storage resource.
