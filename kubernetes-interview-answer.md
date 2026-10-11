@@ -25937,4 +25937,270 @@ Scaling command current replica count set karti hai. Agar Horizontal Pod Autosca
 ### Interview-ready answer
 “I create separate Deployments for the React frontend and Node.js/Express backend because they have different responsibilities, images, resource requirements, and release cycles. Separate Deployments let me scale the backend independently when API traffic increases, update the frontend without redeploying the backend, and manage rollouts and rollbacks separately. I expose the workloads through appropriate Kubernetes Services and keep backend secrets and database credentials separate from the frontend. This gives the application more flexibility and easier operations.”
 
+## 191. How would the frontend communicate with the backend in Kubernetes?
+
+### English Definition
+In Kubernetes, a frontend communicates with a backend through HTTP/HTTPS API requests. Kubernetes Services provide stable network endpoints for backend Pods, while an Ingress or LoadBalancer can expose the API outside the cluster. The frontend sends requests to the backend endpoint, and the backend processes them and returns responses.
+
+### Hindi Definition
+Kubernetes mein React frontend backend se API requests ke through communicate karta hai. Backend ke saamne Kubernetes Service banate hain, jo backend Pods tak requests pahunchati hai. Agar request browser se cluster ke bahar se aa rahi hai, toh Ingress ya LoadBalancer ke through API ko expose kiya ja sakta hai.
+
+### Step 1: Understand the architecture
+Maan lo ek MERN e-commerce application hai. User browser mein Products page open karta hai aur React `/api/products` par request bhejta hai.
+
+```text
+User's Browser (React)
+        |
+        | GET https://shop.example.com/api/products
+        v
+Ingress Controller
+        |
+        | /api -> backend Service
+        v
+Backend Service (ClusterIP)
+        |
+        v
+Node.js / Express Pod(s)
+        |
+        v
+MongoDB Service / Database
+        |
+        v
+JSON response -> Browser
+```
+
+Ingress rules can also route `/` to the frontend Service so the same domain serves both the React application and its API. This is a common setup, not the only valid architecture.
+
+### Step 2: Make the backend listen on the correct interface
+Example Express server:
+
+```javascript
+const express = require("express");
+
+const app = express();
+app.use(express.json());
+
+app.get("/api/products", async (req, res) => {
+  // In a real app, fetch products from MongoDB.
+  res.json([
+    { id: 1, name: "Keyboard" },
+    { id: 2, name: "Mouse" }
+  ]);
+});
+
+const PORT = process.env.PORT || 5000;
+
+// Listen on all container interfaces so Kubernetes networking can reach it.
+app.listen(PORT, "0.0.0.0", () => {
+  console.log("API server listening on port " + PORT);
+});
+```
+
+**Samjho:** backend container ke andar port 5000 par listen kar raha hai. Express route `GET /api/products` JSON return karta hai. Real application mein product data MongoDB se fetch kiya jayega. `containerPort: 5000` document karta hai ki container ka port kya hai; woh khud se application ko expose nahi karta.
+
+### Step 3: Create a backend Deployment
+Example `backend-deployment.yaml`:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: node-backend
+  template:
+    metadata:
+      labels:
+        app: node-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/mern-backend:v1
+          ports:
+            - containerPort: 5000
+```
+
+**Samjho:**
+- Deployment Node.js backend ke do Pod replicas maintain karne ki koshish karta hai.
+- Dono Pods par `app: node-backend` label hota hai.
+- Service selector isi label ka use karke backend Pods ko identify karega.
+- Apni actual published image ka naam use karo.
+
+### Step 4: Create a backend Service
+Example `backend-service.yaml`:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: node-backend
+spec:
+  type: ClusterIP
+  selector:
+    app: node-backend
+  ports:
+    - port: 5000
+      targetPort: 5000
+```
+
+**Yeh Service kya karti hai?**
+- `selector` un Pods ko select karta hai jinke paas `app: node-backend` label hai.
+- `port: 5000` Service ka port hai.
+- `targetPort: 5000` backend container ke port ko target karta hai.
+- `ClusterIP` Service ko cluster ke andar reachable banata hai; yeh apne aap external browser ke liye public endpoint nahi banati.
+
+Cluster ke andar doosre Pods backend ko Service DNS ke through reach kar sakte hain, for example `http://node-backend:5000` when they are in the same namespace. Fully qualified DNS is `http://node-backend.<namespace>.svc.cluster.local:5000`.
+
+### Step 5: Expose the API to the browser with Ingress
+If an Ingress Controller is installed and configured in the cluster, an Ingress can route the frontend and API paths on one host. Example `app-ingress.yaml`:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mern-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: shop.example.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: node-backend
+                port:
+                  number: 5000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: react-frontend
+                port:
+                  number: 80
+```
+
+**Important details:**
+- This example assumes an NGINX Ingress Controller is installed and configured.
+- `/api` requests go to the backend Service; `/` requests go to the frontend Service. Kubernetes Ingress implementations should apply the most specific matching path.
+- The frontend Service must exist and select the React Pods.
+- DNS for `shop.example.com` and TLS/HTTPS configuration must be set up for a real public deployment.
+- Ingress behavior and annotations can differ by controller; configure the controller and TLS according to your cluster.
+
+### Step 6: Call the API from React
+Example React component:
+
+```jsx
+import { useEffect, useState } from "react";
+
+export default function Products() {
+  const [products, setProducts] = useState([]);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetch("/api/products")
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("API request failed: " + response.status);
+        }
+        return response.json();
+      })
+      .then(setProducts)
+      .catch((err) => setError(err.message));
+  }, []);
+
+  if (error) return <p>Could not load products: {error}</p>;
+
+  return (
+    <ul>
+      {products.map((product) => (
+        <li key={product.id}>{product.name}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+**Why use `fetch("/api/products")`?**
+- The browser sends the request to the same origin that served the React app, such as `https://shop.example.com/api/products`.
+- Ingress routes the `/api` path to the backend Service.
+- Backend handles the request and returns JSON.
+- React converts the JSON into UI.
+- Because the request uses the same origin, this arrangement generally avoids cross-origin browser CORS issues, assuming scheme, host, and port match.
+
+If frontend and backend use different public origins, configure React with the backend's public API URL and configure CORS on the backend for the exact allowed frontend origin. Do not put Kubernetes-only Service DNS names into browser-side React code.
+
+### Step 7: Understand internal DNS versus browser requests
+This is a very important interview distinction:
+
+- **Pod-to-Pod / server-side communication:** a Pod inside the cluster can call `http://node-backend:5000` if the Service is in the same namespace. For another namespace, use a name such as `http://node-backend.backend.svc.cluster.local:5000`.
+- **Browser-side React code:** executes on the user's machine, outside the Kubernetes cluster. It normally cannot resolve or reach an internal ClusterIP Service DNS name. Give the browser a public/reachable endpoint via Ingress or LoadBalancer, or use a same-origin reverse proxy.
+- If a frontend web server/proxy itself makes the backend request from inside the cluster, it can use the internal Service DNS name. That is different from JavaScript running in the user's browser.
+
+### Step 8: Deploy the resources
+Use your actual file names and make sure the frontend Service and Ingress Controller are configured.
+
+```bash
+kubectl apply -f backend-deployment.yaml
+kubectl apply -f backend-service.yaml
+kubectl apply -f frontend.yaml
+kubectl apply -f app-ingress.yaml
+
+kubectl get pods
+kubectl get deployments
+kubectl get services
+kubectl get ingress
+```
+
+Check rollout and troubleshoot:
+
+```bash
+kubectl rollout status deployment/node-backend
+kubectl describe service node-backend
+kubectl get endpointslices
+kubectl logs deployment/node-backend
+kubectl describe ingress mern-ingress
+```
+
+Depending on the Kubernetes version and setup, EndpointSlices are the modern way to inspect Service backends. Verify that the backend Service has ready endpoints and that the Ingress Controller can reach the Service.
+
+For a local test without Ingress, you can port-forward the backend Service:
+
+```bash
+kubectl port-forward service/node-backend 5000:5000
+```
+
+Then test from the same machine:
+
+```bash
+curl http://localhost:5000/api/products
+```
+
+This port-forward is for development/debugging; it is not the normal public production exposure method.
+
+### Step 9: Troubleshoot common problems
+1. **502/503 from Ingress:** check backend Pod readiness, Service selector/ports, EndpointSlices, and Ingress Controller logs.
+2. **Connection refused:** confirm Express listens on `0.0.0.0` and the correct container port.
+3. **404 response:** verify the React API path, Express route, and any path-rewrite behavior configured in the Ingress Controller.
+4. **CORS error:** occurs when browser frontend and backend origins differ and the backend has not allowed the frontend origin. Same-origin routing can avoid this.
+5. **DNS name not resolving in browser:** internal Kubernetes Service DNS is intended for cluster networking, not direct browser access.
+6. **Backend cannot access MongoDB:** check MongoDB Service name/namespace, port, credentials from Secrets, and network policies.
+
+### Summary table
+
+| Component | Responsibility |
+|---|---|
+| React | Sends HTTP requests to the API endpoint |
+| Ingress Controller / LoadBalancer | Makes an external endpoint available and routes traffic |
+| Backend Service (ClusterIP) | Stable in-cluster endpoint for backend Pods |
+| Node.js/Express Pods | Process API requests and return responses |
+| MongoDB Service / database | Provides the data used by the backend |
+
+### Interview-ready answer
+“In Kubernetes, the frontend communicates with the backend through HTTP APIs. I expose the Node.js backend Pods through a ClusterIP Service, which provides a stable endpoint and load-balances traffic to ready Pods. For browser traffic, I normally configure an Ingress so requests to `/api` reach the backend Service and requests to `/` reach the React frontend Service. React can then call a same-origin URL such as `/api/products`. A browser cannot normally call an internal ClusterIP DNS name directly because it runs outside the cluster. I also verify Service selectors, ports, Pod readiness, Ingress rules, and CORS when the frontend and backend use different origins.”
+
 ---
